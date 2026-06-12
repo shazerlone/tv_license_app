@@ -24,7 +24,7 @@ def is_license_valid(license_id: str) -> bool:
 
 @app.route("/")
 def home():
-    return redirect(url_for("dashboard"))
+    return render_template("index.html")
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
