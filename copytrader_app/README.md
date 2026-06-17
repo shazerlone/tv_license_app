@@ -58,23 +58,62 @@ copytrader_app/
   main.py                  # window shell + sidebar navigation
   ui/                      # one module per page
     widgets.py             # theme + shared widgets (cards, tables, buttons)
-    dashboard.py terminals.py masterslave.py mapping.py logs.py
+    dashboard.py terminals.py masterslave.py mapping.py settings.py logs.py
+  live/                    # LIVE TRADING ENGINE
+    types.py               # broker-neutral Position / OrderRequest / etc.
+    sizing.py              # pure lot-sizing maths (unit tested)
+    clients.py             # BrokerClient interface + FakeClient (demo)
+    engine.py              # the copy engine (detect -> size -> replicate)
+    mt5_client.py          # live MetaTrader 5 (official API)
+    mt4_client.py          # live MetaTrader 4 (file bridge)
+    ea/CopyTraderBridge.mq4# Expert Advisor installed in each MT4 terminal
+  tests/test_engine.py     # engine + sizing tests (run on any OS)
 ```
 
-## Going live (next phase)
+## How live trading works
 
-The UI never touches MetaTrader directly — it only reads/writes `AppState`.
-To make it trade for real, implement the stubs in `connectors.py`:
+The engine (`live/engine.py`) polls each **master**, detects newly opened /
+closed positions, and replicates them to every enabled **slave**:
+auto/manual symbol mapping → per-slave lot rule (multiplier / fixed / balance
+ratio / equity ratio) → reverse & SL/TP options → order. It talks to a
+`BrokerClient`, so MT5, MT4 and the demo `FakeClient` are interchangeable.
 
-- **MT5** — use the official [`MetaTrader5`](https://pypi.org/project/MetaTrader5/)
-  package. `mt5.initialize(path=...)` attaches to a specific terminal;
-  `positions_get()` reads the master, `order_send()` places slave trades.
-  One terminal per process, so run a worker process per `terminal_path`.
-- **MT4** — no official API. Ship a small Expert Advisor (EA) "bridge" inside
-  each MT4 terminal that exchanges JSON over files or a local socket.
-- **Detection** — replace `scan_terminals()` with a `psutil` process scan for
-  `terminal64.exe` / `terminal.exe` and read each terminal's logged-in account.
-- **Copy engine** — a loop that diffs master positions, applies the symbol map
-  + per-slave lot rules, and sends orders to each enabled slave.
+Run the tests (no MetaTrader needed):
 
-> ⚠️ Copy-trade only accounts you own or are authorized to operate.
+```bash
+python -m unittest copytrader_app.tests.test_engine
+```
+
+### Demo mode (default)
+Settings → **Live mode OFF**. Simulated brokers generate master trades so you
+can watch the whole pipeline on the Dashboard. Nothing real trades.
+
+### Going live — MT5
+1. Install each account in its **own** MT5 terminal and log it in.
+2. **Settings → Live mode ON**, keep **Dry-run ON** for the first runs.
+3. **Terminals → Add account**: set platform MT5 and the terminal path
+   (e.g. `C:\Program Files\IC Markets MT5`). Login/password/server are
+   optional if the terminal is already logged in.
+4. Assign master/slaves, check Symbol Mapping, press **Start copying**.
+5. Watch the Dashboard/Logs. When the dry-run trades look correct, turn
+   **Dry-run OFF** to place real orders.
+
+### Going live — MT4
+MT4 has no API, so each MT4 terminal needs the bridge EA:
+1. In MT4: **File → Open Data Folder**, copy
+   `live/ea/CopyTraderBridge.mq4` into `MQL4/Experts/`.
+2. MetaEditor → **Compile (F7)**, then drag the EA onto any chart and tick
+   **Allow live trading**.
+3. **Terminals → Add account**: platform MT4, and set **MT4 Files folder** to
+   that data folder's `MQL4/Files` path.
+4. Proceed as with MT5 (dry-run first).
+
+> ⚠️ **Safety:** dry-run is ON by default and the app starts in demo mode.
+> Always validate on **demo accounts** before going live. Copy-trade only
+> accounts you own or are authorized to operate.
+
+### Scaling note
+The MT5 client switches the (process-global) connection between terminals
+each cycle — fine for a handful of accounts at a 1–2s poll. For many accounts
+/ lower latency, the upgrade path is one worker **process** per terminal
+behind the same `BrokerClient` interface.

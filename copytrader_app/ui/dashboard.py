@@ -44,16 +44,16 @@ class DashboardPage(ctk.CTkFrame):
         ctk.CTkLabel(tcard, text="Recent copied trades", font=(w.FONT, 15, "bold"),
                      text_color=w.TEXT).pack(anchor="w", padx=16, pady=(14, 6))
         self.tree = w.make_table(tcard, [
-            ("Time", 90), ("Master", 90), ("Slave", 90), ("Symbol", 90),
-            ("Side", 70), ("Master lots", 100), ("Slave lots", 100), ("Status", 90),
+            ("Time", 80), ("Master", 80), ("Slave", 80), ("Symbol", 80),
+            ("Side", 60), ("Master lots", 90), ("Slave lots", 90), ("Status", 200),
         ])
         self.tree.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         self.refresh()
 
     def toggle(self):
-        self.state.copying = not self.state.copying
-        self.state.log(f"Copy engine {'STARTED' if self.state.copying else 'STOPPED'}")
+        # drive the real copy engine (falls back to simulated brokers in demo mode)
+        self.app.toggle_engine()
         self.refresh()
 
     def refresh(self):

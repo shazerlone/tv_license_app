@@ -50,6 +50,10 @@ class Account:
     connected: bool = True
     role: Role = Role.UNASSIGNED
     symbols: list[str] = field(default_factory=list)  # symbols available on this account
+    # live-connection details (MT5: optional login password; MT4: Files folder).
+    # The trade server name reuses the existing `server` field above.
+    password: str = ""
+    mt4_files_path: str = ""
 
     @property
     def display(self) -> str:
@@ -160,6 +164,10 @@ class AppState:
         # default global suffix rule applied when no explicit map matches
         self.global_slave_suffix: str = ""
         self.global_slave_prefix: str = ""
+        # ---- engine settings ----
+        self.live_mode: bool = False   # False = demo/simulated brokers
+        self.dry_run: bool = True      # True = read live trades but never send
+        self.poll_seconds: float = 2.0
         self._seed_stub_data()
 
     # ------------------------------------------------------------------ #

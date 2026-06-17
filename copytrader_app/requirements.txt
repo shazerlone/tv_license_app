@@ -5,5 +5,6 @@ psutil==5.9.8
 # Build tooling for producing the Windows .exe
 pyinstaller==6.6.0
 
-# --- Live trading (Windows only, add when wiring real connectors) ---
-# MetaTrader5==5.0.45   # official MT5 Python API (no MT4 equivalent)
+# Live MT5 trading — official API. Windows-only, so the marker keeps Linux/Mac
+# dev installs working while the Windows .exe build picks it up.
+MetaTrader5==5.0.4682 ; sys_platform == "win32"
