@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ATLAS — Global Liquidity Terminal</title>
+<!--
+  Animated terminal demo (institutional design language).
+  DATA: simulated locally for this demo. In the Windows/Electron build the
+  data layer (see js comment 'DATA LAYER') is swapped for real Yahoo Finance
+  quotes + a news feed fetched in the main process.
+  This is a visual prop: it displays data dramatically, it controls nothing.
+-->
+<style>
+  :root{
+    --bg:#090b0e; --panel:#0d1014; --head:#101318; --hair:#1c2128; --hair2:#161a20;
+    --txt:#d2d9e2; --mute:#6c7683; --faint:#465062; --acc:#e0a84a;
+    --green:#40c884; --red:#e45662; --white:#eef3f9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--txt); overflow:hidden;
+    font-family:"Helvetica Neue",Arial,"Segoe UI",sans-serif;
+    font-size:13px; -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:"SF Mono","Roboto Mono",Consolas,"DejaVu Sans Mono",monospace;
+        font-feature-settings:"tnum" 1; font-variant-numeric:tabular-nums;}
+  .caps{text-transform:uppercase; letter-spacing:.14em; font-size:10px;}
+  .green{color:var(--green)} .red{color:var(--red)} .acc{color:var(--acc)}
+  .mute{color:var(--mute)} .faint{color:var(--faint)} .white{color:var(--white)}
+
+  /* ---- command bar ---- */
+  #bar{height:46px; display:flex; align-items:center; background:var(--head);
+       border-bottom:1px solid var(--hair); padding:0 24px; gap:34px;}
+  #bar .tab{font-weight:700; font-size:13px; letter-spacing:.12em; color:var(--mute);
+            text-transform:uppercase; cursor:pointer; padding:14px 0; position:relative;}
+  #bar .tab.active{color:var(--white)}
+  #bar .tab.active::after{content:""; position:absolute; left:-2px; right:-2px; bottom:2px;
+            height:2px; background:var(--acc);}
+  #search{flex:0 0 360px; height:24px; background:var(--panel); border:1px solid var(--hair);
+          display:flex; align-items:center; padding:0 10px; gap:8px; color:var(--faint);}
+  #search .dot{width:10px;height:10px;border:1px solid var(--mute);border-radius:50%}
+  #rightbar{margin-left:auto; display:flex; align-items:center; gap:14px;}
+  #conn{display:flex;align-items:center;gap:8px}
+  #conn .led{width:8px;height:8px;border-radius:50%;background:var(--green);
+             box-shadow:0 0 8px var(--green)}
+  #clock{text-align:right}
+
+  /* ---- ticker ---- */
+  #ticker{height:34px; display:flex; border-bottom:1px solid var(--hair); overflow:hidden}
+  #ticker .ti{flex:1; padding:5px 14px; border-right:1px solid var(--hair2); min-width:0}
+  #ticker .ti .sym{color:var(--mute)}
+  #ticker .ti .row{display:flex; gap:10px; align-items:baseline}
+
+  /* ---- layout ---- */
+  #main{display:flex; gap:12px; padding:12px; height:calc(100vh - 46px - 34px - 22px)}
+  .col{display:flex; flex-direction:column; gap:12px; min-width:0}
+  .col.a{flex:0 0 320px} .col.b{flex:1 1 auto} .col.c{flex:0 0 380px} .col.d{flex:0 0 430px}
+  .panel{background:var(--panel); border:1px solid var(--hair); display:flex; flex-direction:column;
+         min-height:0; overflow:hidden}
+  .panel>h2{height:26px; background:var(--head); border-bottom:1px solid var(--hair);
+            display:flex; align-items:center; padding:0 12px; font-weight:700; font-size:12px;
+            letter-spacing:.12em; text-transform:uppercase; color:var(--txt); position:relative; gap:8px}
+  .panel>h2::before{content:""; position:absolute; left:0; top:7px; bottom:7px; width:2px; background:var(--acc)}
+  .panel>h2 .r{margin-left:auto; font-weight:400; color:var(--mute); letter-spacing:.14em; font-size:10px}
+  .body{flex:1 1 auto; min-height:0; padding:10px 12px; overflow:hidden; position:relative}
+
+  table{width:100%; border-collapse:collapse}
+  td,th{padding:0; text-align:left; font-weight:inherit}
+  .rowline td{border-bottom:1px solid var(--hair2); padding:6px 0}
+  th{color:var(--faint); font-size:10px; letter-spacing:.12em; text-transform:uppercase; padding-bottom:6px}
+  .ralign{text-align:right}
+
+  canvas{display:block; width:100%; height:100%}
+  #status{height:22px; background:var(--head); border-top:1px solid var(--hair);
+          display:flex; align-items:center; gap:18px; padding:0 16px; color:var(--faint);}
+  #status .led{width:8px;height:8px;border-radius:50%;background:var(--green)}
+  .flash{animation:fl .6s ease-out}
+  @keyframes fl{0%{background:rgba(224,168,74,.18)}100%{background:transparent}}
+  .bararea{height:8px;background:var(--hair);position:relative;margin-top:5px}
+  .bararea>i{position:absolute;left:0;top:0;bottom:0;display:block}
+  .tag{display:inline-block;border:1px solid var(--acc);color:var(--acc);padding:1px 6px;
+       font-size:10px;letter-spacing:.12em}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <span class="tab active">Overview</span>
+  <span class="tab">Flows</span>
+  <span class="tab">Execution</span>
+  <span class="tab">Risk</span>
+  <span class="tab">Wire</span>
+  <div id="search"><span class="dot"></span><span class="caps">Search markets · funds · instruments</span></div>
+  <div id="rightbar">
+    <div id="conn"><span class="led"></span><span class="caps mute">Connected</span></div>
+    <div id="clock"><div class="mono white" id="clk" style="font-size:15px">00:00:00</div>
+      <div class="caps faint" id="date">GMT</div></div>
+  </div>
+</div>
+
+<div id="ticker"></div>
+
+<div id="main">
+  <!-- COL A -->
+  <div class="col a">
+    <div class="panel" style="flex:1.05">
+      <h2>Active Book <span class="r">7 Instruments</span></h2>
+      <div class="body"><table id="book"></table></div>
+    </div>
+    <div class="panel" style="flex:1">
+      <h2>Exposure by Asset Class <span class="r" id="netexp">Net $4.82B</span></h2>
+      <div class="body" id="exposure"></div>
+    </div>
+    <div class="panel" style="flex:.85">
+      <h2>Risk Monitor <span class="r">Real-time</span></h2>
+      <div class="body" id="risk" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 10px;align-content:start"></div>
+    </div>
+  </div>
+
+  <!-- COL B -->
+  <div class="col b">
+    <div class="panel" style="flex:1.15">
+      <h2>BTC / USD · Spot <span class="r">1H · Yahoo Finance</span></h2>
+      <div class="body" style="padding:0">
+        <div style="display:flex;align-items:baseline;gap:16px;padding:10px 14px 4px">
+          <span class="mono green" id="btcpx" style="font-size:24px">104,820.40</span>
+          <span class="mono green" id="btcchg" style="font-size:13px;font-weight:700">+2,468.10 (+2.41%)</span>
+          <span class="caps mute" style="margin-left:auto;text-align:right;line-height:1.5"
+            id="btcohlc">O 102,410&nbsp;&nbsp;H 105,180<br>L 101,980&nbsp;&nbsp;V 38.4K</span>
+        </div>
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+    <div class="panel" style="flex:1.35">
+      <h2>Global Liquidity · Cross-border Flow <span class="r" id="flowvol">$4.82T / 24H</span></h2>
+      <div class="body" style="padding:0"><canvas id="globe"></canvas></div>
+    </div>
+  </div>
+
+  <!-- COL C -->
+  <div class="col c">
+    <div class="panel" style="flex:1.15">
+      <h2>BTC Order Book <span class="r">Consolidated</span></h2>
+      <div class="body" style="padding:8px 12px"><table id="obook" class="mono"></table></div>
+    </div>
+    <div class="panel" style="flex:.6">
+      <h2>Market Depth</h2>
+      <div class="body" style="padding:0"><canvas id="depth"></canvas></div>
+    </div>
+    <div class="panel" style="flex:1.25">
+      <h2>Time &amp; Sales · Block &gt; $1B <span class="r">Live</span></h2>
+      <div class="body" style="padding:6px 12px"><table id="tape" class="mono"></table></div>
+    </div>
+  </div>
+
+  <!-- COL D -->
+  <div class="col d">
+    <div class="panel" style="flex:1.55">
+      <h2>Market Screener · Top Movers <span class="r">Sort ▾ %Chg</span></h2>
+      <div class="body" style="padding:4px 12px;overflow:hidden"><table id="screener"></table></div>
+    </div>
+    <div class="panel" style="flex:1">
+      <h2>News Wire · Priority <span class="r">Filtered</span></h2>
+      <div class="body" id="wire" style="padding:8px 12px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="status">
+  <span class="led"></span><span class="caps">Market data streaming</span>
+  <span class="caps faint">Source · Yahoo Finance / consolidated wires</span>
+  <span class="caps faint" style="margin-left:auto" id="lat">Latency 2ms · 1,284 nodes</span>
+</div>
+
+<script>
+/* ============================ DATA LAYER ============================
+   Simulated for the demo. In Electron, replace these generators with
+   real Yahoo Finance quotes (yahoo-finance2) + a scraped/reworded news
+   feed pushed from the main process over IPC.                          */
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const fmt=(n,d=2)=>n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+/* ---- ticker ---- */
+const tickers=[
+ {s:'BTC',v:104820.4,d:2.41},{s:'XAU',v:2398.6,d:0.86},{s:'S&P',v:5612.4,d:-0.32},
+ {s:'NDX',v:18944.1,d:0.54},{s:'ETH',v:5512.0,d:3.18},{s:'WTI',v:78.42,d:-1.12},
+ {s:'EUR',v:1.0914,d:0.07},{s:'DXY',v:104.10,d:-0.21},{s:'UST10Y',v:4.214,d:-0.03},
+ {s:'VIX',v:18.60,d:-2.40}];
+const tickerEl=document.getElementById('ticker');
+tickers.forEach((t,i)=>{
+  const dec=t.v<10?4:2;
+  tickerEl.insertAdjacentHTML('beforeend',
+   `<div class="ti"><div class="caps sym">${t.s}</div>
+     <div class="row mono"><span class="white" id="tv${i}">${fmt(t.v,dec)}</span>
+     <span id="tc${i}" class="${t.d>=0?'green':'red'}">${t.d>=0?'+':''}${t.d.toFixed(2)}%</span></div></div>`);
+});
+function stepTickers(){
+  tickers.forEach((t,i)=>{
+    const dec=t.v<10?4:2;
+    t.v*= 1+rnd(-0.0007,0.0008); t.d+=rnd(-0.05,0.05);
+    document.getElementById('tv'+i).textContent=fmt(t.v,dec);
+    const c=document.getElementById('tc'+i);
+    c.textContent=(t.d>=0?'+':'')+t.d.toFixed(2)+'%'; c.className=t.d>=0?'green':'red';
+  });
+}
+
+/* ---- active book ---- */
+const book=[
+ {s:'XAU/USD',c:'Bullion',side:'LONG',pnl:1.18,cf:.92},
+ {s:'BTC/USD',c:'Crypto',side:'LONG',pnl:2.40,cf:.78},
+ {s:'S&P 500',c:'Index',side:'SHORT',pnl:-0.88,cf:.46},
+ {s:'NDX 100',c:'Index',side:'LONG',pnl:0.64,cf:.61},
+ {s:'EUR/USD',c:'FX',side:'FLAT',pnl:0.04,cf:.33},
+ {s:'ETH/USD',c:'Crypto',side:'LONG',pnl:0.41,cf:.84},
+ {s:'WTI',c:'Energy',side:'SHORT',pnl:-0.22,cf:.27}];
+const sideColor=s=>s==='LONG'?'green':s==='SHORT'?'red':'mute';
+function renderBook(){
+  const t=document.getElementById('book');
+  t.innerHTML=`<tr><th>Instrument</th><th>Side</th><th class="ralign">P&L USD</th></tr>`+
+   book.map((b,i)=>{
+     const col=b.pnl>0?'green':b.pnl<0?'red':'mute';
+     return `<tr class="rowline"><td><div class="white" style="font-weight:700">${b.s}</div>
+       <div class="caps faint">${b.c}</div></td>
+       <td class="mono ${sideColor(b.side)}" style="vertical-align:top;font-weight:700">${b.side}
+         <div class="bararea" style="width:90px"><i style="background:var(--${col});width:${b.cf*100}%"></i></div></td>
+       <td class="ralign mono ${col}" style="vertical-align:top;font-weight:700" id="pnl${i}">${b.pnl>=0?'+':''}${b.pnl.toFixed(2)}B</td></tr>`;
+   }).join('');
+}
+function stepBook(){
+  book.forEach((b,i)=>{ if(b.side!=='FLAT') b.pnl+=rnd(-0.04,0.045);
+    const el=document.getElementById('pnl'+i); if(el){const col=b.pnl>0?'green':b.pnl<0?'red':'mute';
+    el.className='ralign mono '+col+' flash'; el.textContent=(b.pnl>=0?'+':'')+b.pnl.toFixed(2)+'B';
+    setTimeout(()=>el.classList.remove('flash'),600);}});
+}
+
+/* ---- exposure ---- */
+const exposure=[['Crypto',34,'green'],['Equities',27,'red'],['Bullion',21,'green'],
+ ['Rates',10,'mute'],['FX',5,'mute'],['Energy',3,'red']];
+document.getElementById('exposure').innerHTML=exposure.map(e=>
+ `<div style="margin-bottom:13px"><div style="display:flex"><span class="caps mute">${e[0]}</span>
+   <span class="mono" style="margin-left:auto">${e[1]}%</span></div>
+   <div class="bararea"><i style="background:var(--${e[2]});width:${e[1]}%"></i></div></div>`).join('');
+
+/* ---- risk ---- */
+const risk=[['Value at Risk','$212.4M','green'],['Gross Leverage','3.8x','acc'],
+ ['Liquidity','HIGH','green'],['Drawdown','-1.2%','red']];
+document.getElementById('risk').innerHTML=risk.map(r=>
+ `<div><div class="caps mute">${r[0]}</div><div class="mono ${r[2]}" style="font-size:22px;font-weight:700">${r[1]}</div></div>`).join('');
+
+/* ---- screener ---- */
+let screener=[
+ ['NVDA',1284.5,8.42],['PLTR',78.20,12.61],['MSTR',2210.0,6.77],['COIN',388.40,9.04],
+ ['TSLA',412.80,5.11],['SMCI',902.0,4.40],['ARM',148.20,6.10],['AMD',214.90,-3.18],
+ ['INTC',41.20,-4.62],['BABA',112.80,2.05],['RIOT',18.40,11.20],['MARA',26.10,9.80],
+ ['AVAX',58.10,-2.44],['SOL',248.60,7.31],['MU',132.40,3.92],['HOOD',42.80,5.55]];
+const spark={}; screener.forEach(r=>spark[r[0]]=Array.from({length:24},()=>rnd(.2,.8)));
+function renderScreener(){
+  const t=document.getElementById('screener');
+  t.innerHTML=`<tr><th>Symbol</th><th class="ralign">Last</th><th class="ralign">Chg%</th><th class="ralign">Intraday</th></tr>`+
+   screener.map(r=>{const col=r[2]>=0?'green':'red';
+    return `<tr class="rowline"><td style="font-weight:700">${r[0]}</td>
+      <td class="ralign mono">${fmt(r[1])}</td>
+      <td class="ralign mono ${col}" style="font-weight:700">${r[2]>=0?'+':''}${r[2].toFixed(2)}</td>
+      <td class="ralign"><canvas class="spk" data-s="${r[0]}" width="90" height="20" style="width:90px;height:20px"></canvas></td></tr>`;
+   }).join('');
+  drawSparks();
+}
+function drawSparks(){
+  document.querySelectorAll('.spk').forEach(cv=>{
+    const arr=spark[cv.dataset.s]; const r=screener.find(x=>x[0]===cv.dataset.s);
+    const ctx=cv.getContext('2d'); const dpr=devicePixelRatio||1;
+    cv.width=90*dpr; cv.height=20*dpr; ctx.scale(dpr,dpr);
+    ctx.clearRect(0,0,90,20); ctx.strokeStyle=r[2]>=0?'#40c884':'#e45662'; ctx.lineWidth=1; ctx.beginPath();
+    arr.forEach((v,i)=>{const x=i/(arr.length-1)*88+1, y=20-v*18-1; i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.stroke();
+  });
+}
+function stepScreener(){
+  screener.forEach(r=>{ r[2]+=rnd(-0.25,0.27); r[1]*=1+rnd(-0.002,0.002);
+    const a=spark[r[0]]; a.push(Math.max(.1,Math.min(.9,a[a.length-1]+rnd(-0.12,r[2]>=0?.14:.1)))); a.shift();});
+  screener.sort((x,y)=>y[2]-x[2]); renderScreener();
+}
+
+/* ---- order book ---- */
+function renderOBook(){
+  const mid=104820, t=document.getElementById('obook'); let h='';
+  let tot=0; const asks=[];
+  for(let i=6;i>=0;i--) asks.push([mid+10+i*10, rnd(2,30)]);
+  let cum=0; asks.forEach(a=>{}); // compute totals top-down
+  // asks displayed high->low, totals accumulate downward
+  let runa=0;
+  const arows=asks.map(a=>{runa+=a[1];return [a[0],a[1],runa];});
+  h+=arows.map(a=>`<tr><td class="red">${fmt(a[0],0)}</td><td>${a[1].toFixed(2)}</td>
+     <td class="ralign mute">${a[2].toFixed(1)}</td>
+     <td style="width:40%"><div class="bararea" style="margin:0"><i style="background:rgba(228,86,98,.28);width:${a[1]/30*100}%"></i></div></td></tr>`).join('');
+  h+=`<tr><td class="green" style="font-weight:700;padding-top:5px">104,820</td>
+       <td colspan="3" class="mute caps" style="padding-top:5px">Spread 5.0 · Mid 104,817</td></tr>`;
+  let runb=0; const bids=[];
+  for(let i=0;i<7;i++) bids.push([mid-10-i*10, rnd(2,30)]);
+  h+=bids.map(b=>{runb+=b[1];return `<tr><td class="green">${fmt(b[0],0)}</td><td>${b[1].toFixed(2)}</td>
+     <td class="ralign mute">${runb.toFixed(1)}</td>
+     <td style="width:40%"><div class="bararea" style="margin:0"><i style="background:rgba(64,200,132,.28);width:${b[1]/30*100}%"></i></div></td></tr>`;}).join('');
+  t.innerHTML=`<tr><th>Price</th><th>Size</th><th class="ralign">Total</th><th></th></tr>`+h;
+}
+
+/* ---- time & sales ---- */
+const venues=['CB PRIME','LBMA','BINANCE','XCBT','KRAKEN','COMEX','XCME','OKX'];
+const assets=['BTC','XAU','ETH','SPX','NDX'];
+let tape=[];
+function newTrade(){
+  const now=new Date();
+  const tm=now.toTimeString().slice(0,8);
+  const side=Math.random()>0.4?'BUY':'SELL';
+  tape.unshift({tm,a:pick(assets),side,amt:rnd(1.0,3.4).toFixed(2),ven:pick(venues),isnew:true});
+  if(tape.length>9) tape.pop();
+  renderTape();
+}
+function renderTape(){
+  const t=document.getElementById('tape');
+  t.innerHTML=`<tr><th>Time</th><th>Sym</th><th>Notional</th><th class="ralign">Venue</th></tr>`+
+   tape.map(r=>`<tr class="rowline ${r.isnew?'flash':''}"><td class="mute">${r.tm}</td>
+     <td class="white" style="font-weight:700">${r.a}</td>
+     <td class="${r.side==='BUY'?'green':'red'}" style="font-weight:700">${r.side} $${r.amt}B</td>
+     <td class="ralign mute">${r.ven}</td></tr>`).join('');
+  tape.forEach(r=>r.isnew=false);
+}
+
+/* ---- wire ---- */
+const wire=[
+ ['21:48','MACRO','Central bank signals surprise liquidity facility; futures bid'],
+ ['21:46','FLOW','Sovereign wealth fund rotates est. $40B into bullion'],
+ ['21:43','CRYPTO','Major exchange pauses withdrawals amid record volume'],
+ ['21:39','EQUITY','Mega-cap guides Q3 revenue materially above consensus'],
+ ['21:35','RATES','Curve steepens as desk flags duration unwind']];
+document.getElementById('wire').innerHTML=wire.map(w=>
+ `<div style="padding:6px 0;border-bottom:1px solid var(--hair2)">
+   <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">
+    <span class="mono mute">${w[0]}</span><span class="tag">${w[1]}</span></div>
+   <div>${w[2]}</div></div>`).join('');
+
+/* ============================ CHART (candles) ============================ */
+const chartCv=document.getElementById('chart'), cctx=chartCv.getContext('2d');
+let candles=[]; (function seed(){let p=104000;for(let i=0;i<70;i++){const o=p;p+=rnd(-260,290);
+  const c=p;candles.push({o,h:Math.max(o,c)+rnd(0,120),l:Math.min(o,c)-rnd(0,120),c});}})();
+function drawChart(){
+  const dpr=devicePixelRatio||1, w=chartCv.clientWidth, h=chartCv.clientHeight;
+  chartCv.width=w*dpr; chartCv.height=h*dpr; cctx.setTransform(dpr,0,0,dpr,0,0);
+  cctx.clearRect(0,0,w,h);
+  const padR=54, padB=18, gx=10, gw=w-padR-gx, gh=h-padB-6;
+  let lo=Math.min(...candles.map(c=>c.l)), hi=Math.max(...candles.map(c=>c.h));
+  const pad=(hi-lo)*0.08; lo-=pad; hi+=pad; const Y=v=>6+(hi-v)/(hi-lo)*gh;
+  cctx.strokeStyle='#161a20'; cctx.fillStyle='#465062'; cctx.font='11px monospace';
+  for(let i=0;i<5;i++){const yy=6+i*gh/4; cctx.beginPath();cctx.moveTo(gx,yy);cctx.lineTo(gx+gw,yy);cctx.stroke();
+    cctx.fillText(((hi-(i/4)*(hi-lo))/1000).toFixed(1)+'k', gx+gw+6, yy+4);}
+  const cw=gw/candles.length;
+  candles.forEach((c,i)=>{const x=gx+i*cw+cw/2; const up=c.c>=c.o; const col=up?'#40c884':'#e45662';
+    cctx.strokeStyle=col; cctx.fillStyle=col; cctx.beginPath();cctx.moveTo(x,Y(c.h));cctx.lineTo(x,Y(c.l));cctx.stroke();
+    const bw=Math.max(2,cw*0.6); const y1=Y(Math.max(c.o,c.c)), y2=Y(Math.min(c.o,c.c));
+    cctx.fillRect(x-bw/2,y1,bw,Math.max(1,y2-y1));});
+  const last=candles[candles.length-1].c, ly=Y(last);
+  cctx.strokeStyle='#3a4452'; cctx.setLineDash([3,3]); cctx.beginPath();cctx.moveTo(gx,ly);cctx.lineTo(gx+gw,ly);cctx.stroke();cctx.setLineDash([]);
+  cctx.fillStyle='#40c884'; cctx.fillRect(gx+gw,ly-8,padR-2,16);
+  cctx.fillStyle='#08120c'; cctx.fillText((last/1000).toFixed(1)+'k', gx+gw+4, ly+4);
+}
+function stepChart(){
+  const last=candles[candles.length-1];
+  if(Math.random()<0.25){ // close candle, open new
+    const o=last.c, p=o+rnd(-260,300), c=p;
+    candles.push({o,h:Math.max(o,c)+rnd(0,120),l:Math.min(o,c)-rnd(0,120),c}); candles.shift();
+  } else { // jitter last
+    last.c+=rnd(-90,100); last.h=Math.max(last.h,last.c); last.l=Math.min(last.l,last.c);
+  }
+  const px=candles[candles.length-1].c;
+  document.getElementById('btcpx').textContent=fmt(px);
+}
+
+/* ============================ DEPTH ============================ */
+const depthCv=document.getElementById('depth'), dctx=depthCv.getContext('2d');
+function drawDepth(){
+  const dpr=devicePixelRatio||1, w=depthCv.clientWidth, h=depthCv.clientHeight;
+  depthCv.width=w*dpr; depthCv.height=h*dpr; dctx.setTransform(dpr,0,0,dpr,0,0); dctx.clearRect(0,0,w,h);
+  const mid=w/2, baseY=h-6; let cum=0; const bids=[[mid,baseY]];
+  for(let i=0;i<22;i++){cum+=rnd(1,3.6); bids.push([mid-(i+1)*(mid-10)/22, baseY-Math.min(h-12,cum/70*(h-12))]);}
+  cum=0; const asks=[[mid,baseY]];
+  for(let i=0;i<22;i++){cum+=rnd(1,3.6); asks.push([mid+(i+1)*(mid-10)/22, baseY-Math.min(h-12,cum/70*(h-12))]);}
+  function area(pts,stroke,fill){dctx.beginPath();dctx.moveTo(pts[0][0],baseY);
+    pts.forEach(p=>dctx.lineTo(p[0],p[1]));dctx.lineTo(pts[pts.length-1][0],baseY);dctx.closePath();
+    dctx.fillStyle=fill;dctx.fill();dctx.beginPath();pts.forEach((p,i)=>i?dctx.lineTo(p[0],p[1]):dctx.moveTo(p[0],p[1]));
+    dctx.strokeStyle=stroke;dctx.lineWidth=1;dctx.stroke();}
+  area(bids,'#40c884','rgba(64,200,132,.16)'); area(asks,'#e45662','rgba(228,86,98,.16)');
+  dctx.strokeStyle='#1c2128';dctx.beginPath();dctx.moveTo(mid,6);dctx.lineTo(mid,baseY);dctx.stroke();
+}
+
+/* ============================ GLOBE (dotted continents) ============================ */
+const CONTINENTS=[
+ [[-168,66],[-158,71],[-128,71],[-95,73],[-82,73],[-78,63],[-80,52],[-66,60],[-56,52],[-66,46],[-70,41],[-74,40],[-81,31],[-81,25],[-90,29],[-97,26],[-97,18],[-105,20],[-110,23],[-114,30],[-124,34],[-124,40],[-124,48],[-130,54],[-140,60],[-152,59],[-165,60]],
+ [[-92,18],[-83,15],[-77,8],[-82,8],[-90,13],[-94,16]],
+ [[-78,8],[-71,11],[-62,10],[-50,5],[-35,-5],[-35,-12],[-39,-18],[-48,-25],[-53,-34],[-58,-39],[-63,-42],[-66,-45],[-69,-52],[-74,-53],[-73,-44],[-71,-33],[-71,-20],[-76,-14],[-81,-6],[-80,2],[-78,8]],
+ [[-46,60],[-30,60],[-20,70],[-22,78],[-40,83],[-58,80],[-55,68]],
+ [[-10,37],[-9,44],[-2,43],[-1,49],[-5,50],[2,51],[-4,58],[5,62],[10,64],[22,66],[30,62],[24,56],[30,52],[40,48],[28,44],[24,40],[15,40],[12,46],[6,44],[3,43],[-3,36]],
+ [[14,68],[20,70],[28,71],[24,64],[16,62]],
+ [[-17,15],[-16,21],[-12,28],[-2,35],[10,37],[11,33],[20,33],[33,31],[34,28],[43,12],[51,11],[48,2],[41,-2],[40,-10],[35,-18],[32,-26],[27,-34],[20,-35],[18,-29],[13,-17],[9,-2],[8,4],[-2,5],[-8,4],[-13,9],[-17,15]],
+ [[43,-13],[50,-15],[50,-25],[45,-25],[43,-18]],
+ [[28,44],[40,48],[48,52],[58,52],[58,46],[50,42],[52,38],[48,30],[44,38],[36,36],[35,30],[43,24],[58,24],[60,25],[67,25],[67,37],[72,33],[70,28],[78,24],[80,14],[78,8],[85,20],[90,22],[98,16],[106,10],[106,21],[112,22],[122,40],[127,52],[135,55],[142,60],[160,62],[180,66],[178,70],[140,73],[100,77],[70,72],[58,70],[48,66],[40,66],[34,60],[30,52]],
+ [[132,33],[140,36],[142,43],[138,38],[133,34]],
+ [[95,5],[105,2],[118,5],[120,-2],[132,-3],[140,-4],[141,-9],[128,-8],[115,-9],[104,-6],[98,2]],
+ [[114,-22],[122,-18],[130,-12],[137,-12],[143,-11],[146,-18],[151,-24],[153,-31],[149,-38],[140,-38],[131,-32],[123,-34],[115,-34],[114,-28]]
+];
+function inPoly(x,y,poly){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+  const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];
+  if(((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-9)+xi))inside=!inside;}return inside;}
+function isLand(lon,lat){return CONTINENTS.some(p=>inPoly(lon,lat,p));}
+const landPts=[]; for(let lat=-86;lat<=86;lat+=2.2){const cl=Math.max(0.12,Math.cos(lat*Math.PI/180));
+  for(let lon=-180;lon<180;lon+=2.2/cl){ if(isLand(lon,lat)) landPts.push([lat,lon]); }}
+const hubs={NY:[40,-74],LDN:[51,0],FRA:[50,8],DXB:[25,55],SAO:[-23,-46],SGP:[1,103],TKO:[35,139]};
+const arcs=[['LDN','NY'],['DXB','LDN'],['SAO','NY'],['FRA','NY'],['TKO','SGP']];
+const globeCv=document.getElementById('globe'), gctx=globeCv.getContext('2d');
+let rot=-0.5, packet=0;
+function project(lat,lon,cx,cy,R){const la=lat*Math.PI/180, lo=lon*Math.PI/180+rot;
+  const x=Math.cos(la)*Math.sin(lo), y=Math.sin(la), z=Math.cos(la)*Math.cos(lo);
+  return [cx+x*R, cy-y*R, z];}
+function drawGlobe(){
+  const dpr=devicePixelRatio||1, w=globeCv.clientWidth, h=globeCv.clientHeight;
+  globeCv.width=w*dpr; globeCv.height=h*dpr; gctx.setTransform(dpr,0,0,dpr,0,0); gctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h/2+6, R=Math.min(w,h)/2-30;
+  gctx.fillStyle='#0b0e13'; gctx.beginPath();gctx.arc(cx,cy,R,0,7); gctx.fill();
+  gctx.strokeStyle='#2a323e'; gctx.lineWidth=1; gctx.stroke();
+  for(const [lat,lon] of landPts){const [x,y,z]=project(lat,lon,cx,cy,R);
+    if(z>0.02){const b=0.30+0.70*z; const r=z<0.55?1:1.5;
+      gctx.fillStyle=`rgb(${48+150*b|0},${78+150*b|0},${96+150*b|0})`;
+      gctx.beginPath();gctx.arc(x,y,r,0,7);gctx.fill();}}
+  // arcs
+  for(const [a,b] of arcs){const A=project(...hubs[a],cx,cy,R), B=project(...hubs[b],cx,cy,R);
+    if(A[2]<=0&&B[2]<=0) continue;
+    const mx=(A[0]+B[0])/2, my=(A[1]+B[1])/2-70;
+    gctx.strokeStyle= (a==='DXB'||a==='SAO')?'#40c884':'#e0a84a'; gctx.lineWidth=1; gctx.beginPath();
+    for(let t=0;t<=1;t+=0.025){const X=(1-t)**2*A[0]+2*(1-t)*t*mx+t*t*B[0];
+      const Yv=(1-t)**2*A[1]+2*(1-t)*t*my+t*t*B[1]; t?gctx.lineTo(X,Yv):gctx.moveTo(X,Yv);} gctx.stroke();
+    const tt=packet; const X=(1-tt)**2*A[0]+2*(1-tt)*tt*mx+tt*tt*B[0];
+    const Yv=(1-tt)**2*A[1]+2*(1-tt)*tt*my+tt*tt*B[1];
+    gctx.fillStyle='#eef3f9'; gctx.beginPath();gctx.arc(X,Yv,2.2,0,7);gctx.fill();}
+  for(const k in hubs){const [x,y,z]=project(...hubs[k],cx,cy,R);
+    if(z>0){gctx.fillStyle='#e0a84a';gctx.beginPath();gctx.arc(x,y,3,0,7);gctx.fill();
+      gctx.strokeStyle='#e0a84a';gctx.beginPath();gctx.arc(x,y,5,0,7);gctx.stroke();}}
+}
+
+/* ============================ CLOCK + LOOP ============================ */
+function clock(){const n=new Date(); const u=new Date(n.getTime()+n.getTimezoneOffset()*60000);
+  document.getElementById('clk').textContent=u.toTimeString().slice(0,8);
+  document.getElementById('date').textContent='GMT · '+u.toDateString().toUpperCase();}
+
+renderBook(); renderScreener(); renderOBook(); for(let i=0;i<9;i++) newTrade();
+clock(); setInterval(clock,1000);
+
+let frame=0;
+function loop(){
+  rot+=0.0016; packet+=0.006; if(packet>1) packet=0;
+  drawGlobe(); drawChart(); drawDepth();
+  requestAnimationFrame(loop);
+}
+loop();
+setInterval(stepTickers,1200);
+setInterval(stepChart,700);
+setInterval(stepBook,1500);
+setInterval(()=>{renderOBook();},900);
+setInterval(newTrade,1700);
+setInterval(stepScreener,2500);
+</script>
+</body>
+</html>
