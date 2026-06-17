@@ -1,0 +1,42 @@
+name: Build Windows EXE
+
+# Builds CopyTraderPro.exe on a real Windows runner and publishes it as a
+# downloadable artifact. Runs automatically on push, and can be started
+# manually from the Actions tab (Run workflow).
+on:
+  push:
+    branches:
+      - claude/epic-babbage-u28g2i
+    paths:
+      - "copytrader_app/**"
+      - "run_copytrader.py"
+      - "build_exe.py"
+      - ".github/workflows/build-windows.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r copytrader_app/requirements.txt
+
+      - name: Build EXE
+        run: python build_exe.py
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CopyTraderPro-windows
+          path: dist/CopyTraderPro.exe
+          if-no-files-found: error
