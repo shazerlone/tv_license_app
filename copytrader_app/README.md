@@ -17,8 +17,12 @@ on any machine before the live trading engine is wired in.
   - Enable / disable
   - Lot mode: Multiplier · Fixed lot · Balance ratio · Equity ratio
   - Lot value, Reverse (mirror direction), Copy SL/TP
-- **Symbol Mapping** — per-symbol map (e.g. `EURUSD → EURUSD.m`,
-  `XAUUSD → GOLD`) plus a global prefix/suffix rule for slave brokers.
+- **Symbol Mapping** — **auto-maps** symbols across brokers by matching the
+  base instrument and ignoring common suffixes/prefixes
+  (`XAUUSD` ↔ `XAUUSDz` / `XAUUSD.m` / `XAUUSD.r`, `EURUSD` ↔ `EUR/USD`).
+  Names that can't be matched (e.g. `XAUUSD` vs `GOLD_CASH`) show as
+  **Unmapped** and get a per-slave **manual** map. See `auto_match_symbol()`
+  in `models.py`.
 - **Logs** — rolling activity log.
 
 ## Run from source

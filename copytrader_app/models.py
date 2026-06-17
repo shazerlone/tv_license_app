@@ -9,6 +9,7 @@ UI does not need to change.
 from __future__ import annotations
 
 import itertools
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -48,6 +49,7 @@ class Account:
     terminal_path: str = ""
     connected: bool = True
     role: Role = Role.UNASSIGNED
+    symbols: list[str] = field(default_factory=list)  # symbols available on this account
 
     @property
     def display(self) -> str:
@@ -79,15 +81,57 @@ class MasterGroup:
 
 @dataclass
 class SymbolMap:
-    """Translate a symbol name from master to a slave broker.
+    """Manual override translating a master symbol to a slave symbol.
 
-    Example: master trades ``EURUSD`` but the slave broker lists it as
-    ``EURUSD.m`` — so master ``EURUSD`` maps to slave ``EURUSD.m``.
-    A prefix/suffix rule can cover many symbols at once.
+    Auto-mapping (common suffix/prefix matching) handles most symbols on its
+    own. A manual map is only needed when names differ beyond suffixes, e.g.
+    master ``XAUUSD`` -> slave ``GOLD_CASH``. ``slave_login`` scopes the map
+    to one slave account (broker-specific); empty string = applies to all.
     """
     master_symbol: str
     slave_symbol: str
+    slave_login: str = ""
     enabled: bool = True
+
+
+# Separators brokers commonly use before a suffix (XAUUSD.m, XAUUSD_pro, ...)
+_SEP_RE = re.compile(r"[^A-Z0-9]")
+
+
+def base_symbol(sym: str) -> str:
+    """Normalise a symbol for comparison: upper-case, strip separators."""
+    return _SEP_RE.sub("", sym.upper())
+
+
+def auto_match_symbol(master_symbol: str, slave_symbols: list[str],
+                      max_affix: int = 4) -> Optional[str]:
+    """Find the slave symbol that is the same instrument as ``master_symbol``.
+
+    Matches common broker variants by stripping suffix/prefix affixes:
+        XAUUSD  ->  XAUUSD, XAUUSDz, XAUUSDr, XAUUSD.m, XAUUSD.r, mXAUUSD ...
+    Returns the best slave symbol, or ``None`` when nothing matches closely
+    enough (e.g. ``GOLD_CASH``), meaning a manual map is required.
+    """
+    target = base_symbol(master_symbol)
+    if not target:
+        return None
+
+    exact, affixed = [], []
+    for sym in slave_symbols:
+        base = base_symbol(sym)
+        if base == target:
+            exact.append(sym)
+        elif base.startswith(target) and 0 < len(base) - len(target) <= max_affix:
+            affixed.append(sym)
+        elif base.endswith(target) and 0 < len(base) - len(target) <= max_affix:
+            affixed.append(sym)
+
+    if exact:
+        return exact[0]
+    if affixed:
+        # prefer the closest (shortest) variant
+        return sorted(affixed, key=len)[0]
+    return None
 
 
 @dataclass
@@ -176,11 +220,69 @@ class AppState:
     # ------------------------------------------------------------------ #
     # symbol mapping
     # ------------------------------------------------------------------ #
-    def resolve_symbol(self, master_symbol: str) -> str:
-        for m in self.symbol_maps:
-            if m.enabled and m.master_symbol.upper() == master_symbol.upper():
-                return m.slave_symbol
-        return f"{self.global_slave_prefix}{master_symbol}{self.global_slave_suffix}"
+    def manual_map(self, master_symbol: str, slave_login: str) -> Optional[SymbolMap]:
+        """Return a manual override for (symbol, slave): slave-specific first."""
+        ms = master_symbol.upper()
+        scoped = [m for m in self.symbol_maps
+                  if m.enabled and m.master_symbol.upper() == ms
+                  and m.slave_login == slave_login]
+        if scoped:
+            return scoped[0]
+        glob = [m for m in self.symbol_maps
+                if m.enabled and m.master_symbol.upper() == ms and not m.slave_login]
+        return glob[0] if glob else None
+
+    def resolve_for_slave(self, master_symbol: str, slave_login: str) -> tuple[Optional[str], str]:
+        """Resolve a master symbol for a slave.
+
+        Returns ``(slave_symbol, kind)`` where kind is one of
+        ``"Manual"``, ``"Auto"`` or ``"Unmapped"``.
+        """
+        manual = self.manual_map(master_symbol, slave_login)
+        if manual:
+            return manual.slave_symbol, "Manual"
+        acc = self.account(slave_login)
+        symbols = acc.symbols if acc else []
+        matched = auto_match_symbol(master_symbol, symbols)
+        if matched:
+            return matched, "Auto"
+        return None, "Unmapped"
+
+    def mapping_rows(self) -> list[dict]:
+        """Flatten every (slave, master-symbol) pair into resolved rows.
+
+        Master symbols come from each master account's available symbols.
+        Used to render the Symbol Mapping table.
+        """
+        rows: list[dict] = []
+        for group in self.groups:
+            master = self.account(group.master_login)
+            if not master:
+                continue
+            for sc in group.slaves:
+                slave = self.account(sc.account_login)
+                if not slave:
+                    continue
+                for sym in master.symbols:
+                    resolved, kind = self.resolve_for_slave(sym, slave.login)
+                    rows.append({
+                        "slave_login": slave.login,
+                        "slave_name": slave.name,
+                        "master_symbol": sym,
+                        "slave_symbol": resolved or "—",
+                        "kind": kind,
+                    })
+        return rows
+
+    def auto_map_scan(self) -> tuple[int, int]:
+        """Log a scan summary. Returns (auto_matched, unmapped) counts."""
+        rows = self.mapping_rows()
+        auto = sum(1 for r in rows if r["kind"] == "Auto")
+        manual = sum(1 for r in rows if r["kind"] == "Manual")
+        unmapped = sum(1 for r in rows if r["kind"] == "Unmapped")
+        self.log(f"Auto-map scan: {auto} auto-matched, {manual} manual, "
+                 f"{unmapped} need manual mapping")
+        return auto, unmapped
 
     # ------------------------------------------------------------------ #
     # stub seed data (replace with live scanner output)
@@ -188,15 +290,25 @@ class AppState:
     def _seed_stub_data(self) -> None:
         self.accounts = [
             Account("8125660", "Majid Lone", "Exness", "Exness-MT5Real8",
-                    Platform.MT5, 25430.55, 25890.12, terminal_path=r"C:\Program Files\MetaTrader 5"),
+                    Platform.MT5, 25430.55, 25890.12,
+                    terminal_path=r"C:\Program Files\MetaTrader 5",
+                    symbols=["XAUUSDz", "EURUSDz", "GBPUSDz", "US30z"]),
             Account("5510233", "Strategy A", "IC Markets", "ICMarketsSC-MT5",
-                    Platform.MT5, 102300.00, 101980.40, terminal_path=r"C:\Program Files\ICMarkets MT5"),
+                    Platform.MT5, 102300.00, 101980.40,
+                    terminal_path=r"C:\Program Files\ICMarkets MT5",
+                    symbols=["XAUUSD", "EURUSD", "GBPUSD", "US30"]),
             Account("400917", "Client - Khan", "XM", "XMGlobal-Real 12",
-                    Platform.MT4, 5120.20, 5044.90, terminal_path=r"C:\Program Files\XM MT4"),
+                    Platform.MT4, 5120.20, 5044.90,
+                    terminal_path=r"C:\Program Files\XM MT4",
+                    symbols=["GOLD", "EURUSDm", "GBPUSDm", "US30Cash"]),
             Account("733019", "Client - Sara", "FBS", "FBS-Real-15",
-                    Platform.MT4, 1990.00, 2012.75, terminal_path=r"C:\Program Files\FBS MT4"),
+                    Platform.MT4, 1990.00, 2012.75,
+                    terminal_path=r"C:\Program Files\FBS MT4",
+                    symbols=["XAUUSD.r", "EURUSD.r", "GBPUSD.r"]),
             Account("9920481", "Client - Omar", "Pepperstone", "Pepperstone-MT5",
-                    Platform.MT5, 7800.00, 7795.10, terminal_path=r"C:\Program Files\Pepperstone MT5"),
+                    Platform.MT5, 7800.00, 7795.10,
+                    terminal_path=r"C:\Program Files\Pepperstone MT5",
+                    symbols=["GOLD_CASH", "EUR/USD", "GBPUSD.pro", "US30.cash"]),
         ]
         # a default master group: first MT5 account masters two slaves
         self.set_master("5510233")
@@ -208,12 +320,10 @@ class AppState:
             grp.slave("8125660").lot_mode = LotMode.BALANCE_RATIO
             grp.slave("8125660").lot_value = 1.0
 
-        self.symbol_maps = [
-            SymbolMap("EURUSD", "EURUSD.m"),
-            SymbolMap("XAUUSD", "GOLD"),
-            SymbolMap("US30", "US30.cash"),
-        ]
-        self.global_slave_suffix = ""
+        # Most symbols auto-map by suffix. The odd one out — Pepperstone lists
+        # gold as GOLD_CASH (no XAUUSD base) — starts UNMAPPED so the manual
+        # mapping workflow is visible. Add a SymbolMap to resolve it.
+        self.symbol_maps = []
 
         now = datetime.now()
         self.events = [

@@ -26,7 +26,7 @@ NAV = [
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light")
         self.title(f"{APP_NAME} v{__version__}")
         self.geometry("1180x720")
         self.minsize(1000, 640)
@@ -42,23 +42,24 @@ class App(ctk.CTk):
 
     # ------------------------------------------------------------------ #
     def _build_sidebar(self):
-        bar = ctk.CTkFrame(self, fg_color=w.CARD, width=220, corner_radius=0)
+        bar = ctk.CTkFrame(self, fg_color=w.SIDEBAR, width=230, corner_radius=0,
+                           border_width=1, border_color=w.CARD_BORDER)
         bar.pack(side="left", fill="y")
         bar.pack_propagate(False)
 
-        ctk.CTkLabel(bar, text=f"  ⚡ {APP_NAME}", font=(w.FONT, 18, "bold"),
-                     text_color=w.TEXT).pack(anchor="w", padx=16, pady=(22, 4))
+        ctk.CTkLabel(bar, text=f"  ⚡ {APP_NAME}", font=(w.FONT, 19, "bold"),
+                     text_color=w.ACCENT).pack(anchor="w", padx=16, pady=(24, 2))
         ctk.CTkLabel(bar, text="  MT4 / MT5 copy trading", font=(w.FONT, 11),
-                     text_color=w.MUTED).pack(anchor="w", padx=16, pady=(0, 18))
+                     text_color=w.MUTED).pack(anchor="w", padx=16, pady=(0, 20))
 
         for name, icon, _ in NAV:
             b = ctk.CTkButton(
-                bar, text=f"  {icon}  {name}", anchor="w", height=42,
-                fg_color="transparent", hover_color=w.BG, text_color=w.TEXT,
-                font=(w.FONT, 14), corner_radius=8,
+                bar, text=f"   {icon}   {name}", anchor="w", height=44,
+                fg_color="transparent", hover_color=w.HOVER, text_color=w.TEXT,
+                font=(w.FONT, 14), corner_radius=10,
                 command=lambda n=name: self.show(n),
             )
-            b.pack(fill="x", padx=10, pady=2)
+            b.pack(fill="x", padx=12, pady=3)
             self.nav_buttons[name] = b
 
         self.engine_lbl = ctk.CTkLabel(bar, text="● Engine stopped",
@@ -80,7 +81,9 @@ class App(ctk.CTk):
         if hasattr(self.pages[name], "refresh"):
             self.pages[name].refresh()
         for n, b in self.nav_buttons.items():
-            b.configure(fg_color=w.ACCENT if n == name else "transparent")
+            selected = n == name
+            b.configure(fg_color=w.ACCENT if selected else "transparent",
+                        text_color="#ffffff" if selected else w.TEXT)
         self._update_engine_label()
 
     def refresh_all(self):
