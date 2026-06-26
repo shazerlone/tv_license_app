@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
-import '../widgets/millimore_logo.dart';
-import 'home_screen.dart';
+import '../services/image_picker_service.dart';
+import 'otp_screen.dart';
 
 enum UserType { trader, follower }
 
@@ -16,29 +17,42 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _isLoading = false;
+  final _phoneController = TextEditingController();
+
   UserType _selectedType = UserType.follower;
+  String? _photoDataUrl;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
-  Future<void> _register() async {
+  Future<void> _pickPhoto() async {
+    final url = await ImagePickerService.pickImageAsDataUrl();
+    if (url != null && mounted) {
+      setState(() => _photoDataUrl = url);
+    }
+  }
+
+  Future<void> _continue() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1400));
+    await Future.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
     setState(() => _isLoading = false);
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-      (_) => false,
+
+    final phone = '+91 ${_phoneController.text.trim()}';
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OtpScreen(
+          phoneNumber: phone,
+          name: _nameController.text.trim(),
+        ),
+      ),
     );
   }
 
@@ -47,7 +61,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -61,7 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   'Create account.',
                   style: GoogleFonts.inter(
@@ -79,97 +92,116 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 32),
-                Text(
-                  'I am a...',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 28),
+                Center(child: _PhotoPicker(
+                  dataUrl: _photoDataUrl,
+                  onTap: _pickPhoto,
+                )),
+                const SizedBox(height: 28),
+                _Label('I am a'),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
-                      child: _UserTypeCard(
-                        type: UserType.follower,
-                        icon: '\u{1F441}',
+                      child: _TypeCard(
+                        icon: Icons.visibility_outlined,
                         title: 'Follower',
-                        subtitle: 'Copy trades & watch live',
+                        subtitle: 'Copy & watch',
                         selected: _selectedType == UserType.follower,
-                        onTap: () => setState(() => _selectedType = UserType.follower),
+                        onTap: () => setState(
+                            () => _selectedType = UserType.follower),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _UserTypeCard(
-                        type: UserType.trader,
-                        icon: '\u{1F4C8}',
+                      child: _TypeCard(
+                        icon: Icons.show_chart_rounded,
                         title: 'Trader',
-                        subtitle: 'Stream, share & earn',
+                        subtitle: 'Stream & earn',
                         selected: _selectedType == UserType.trader,
-                        onTap: () => setState(() => _selectedType = UserType.trader),
+                        onTap: () => setState(
+                            () => _selectedType = UserType.trader),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
-                _FieldLabel(label: 'Full name'),
+                const SizedBox(height: 24),
+                _Label('Full name'),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                  style: GoogleFonts.inter(
+                      fontSize: 15, color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: 'Marcus Sterling'),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Enter your name' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Please enter your name'
+                      : null,
                 ),
                 const SizedBox(height: 20),
-                _FieldLabel(label: 'Email'),
+                _Label('Mobile number'),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
-                  textInputAction: TextInputAction.next,
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: const InputDecoration(hintText: 'you@example.com'),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter your email';
-                    if (!v.contains('@')) return 'Enter a valid email';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                _FieldLabel(label: 'Password'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _register(),
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'At least 8 characters',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: AppColors.textMuted,
-                        size: 20,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 54,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '+91',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter a password';
-                    if (v.length < 8) return 'Password must be at least 8 characters';
-                    return null;
-                  },
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _continue(),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        style: GoogleFonts.inter(
+                            fontSize: 15, color: AppColors.textPrimary),
+                        decoration:
+                            const InputDecoration(hintText: '98765 43210'),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Enter your mobile number';
+                          }
+                          if (v.trim().length < 10) {
+                            return 'Enter a valid 10-digit number';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 10),
+                Text(
+                  'We will send a 6-digit code to verify this number.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 28),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
+                  onPressed: _isLoading ? null : _continue,
                   child: _isLoading
                       ? const SizedBox(
                           width: 20,
@@ -179,12 +211,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Create Account'),
+                      : const Text('Continue'),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Center(
                   child: Text(
-                    'By creating an account you agree to our\nTerms of Service and Privacy Policy.',
+                    'By continuing you agree to our\nTerms of Service and Privacy Policy.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 12,
@@ -193,7 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -203,16 +235,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-class _UserTypeCard extends StatelessWidget {
-  final UserType type;
-  final String icon;
+class _PhotoPicker extends StatelessWidget {
+  final String? dataUrl;
+  final VoidCallback onTap;
+  const _PhotoPicker({required this.dataUrl, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.border, width: 1.5),
+                  image: dataUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(dataUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: dataUrl == null
+                    ? const Icon(Icons.person_outline_rounded,
+                        size: 34, color: AppColors.textMuted)
+                    : null,
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      size: 14, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          dataUrl == null ? 'Add photo (optional)' : 'Change photo',
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TypeCard extends StatelessWidget {
+  final IconData icon;
   final String title;
   final String subtitle;
   final bool selected;
   final VoidCallback onTap;
-
-  const _UserTypeCard({
-    required this.type,
+  const _TypeCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -225,10 +318,12 @@ class _UserTypeCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withOpacity(0.05) : AppColors.surface,
+          color: selected
+              ? AppColors.primary.withOpacity(0.05)
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -238,7 +333,9 @@ class _UserTypeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(icon, style: const TextStyle(fontSize: 24)),
+            Icon(icon,
+                size: 22,
+                color: selected ? AppColors.primary : AppColors.textSecondary),
             const SizedBox(height: 10),
             Text(
               title,
@@ -263,14 +360,14 @@ class _UserTypeCard extends StatelessWidget {
   }
 }
 
-class _FieldLabel extends StatelessWidget {
-  final String label;
-  const _FieldLabel({required this.label});
+class _Label extends StatelessWidget {
+  final String text;
+  const _Label(this.text);
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      label,
+      text,
       style: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w500,
