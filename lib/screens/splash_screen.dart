@@ -2,7 +2,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../services/storage_service.dart';
 import 'onboarding_screen.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,7 +31,6 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-
     _taglineController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -38,15 +39,12 @@ class _SplashScreenState extends State<SplashScreen>
     _logoScale = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic),
     );
-
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _logoController, curve: Curves.easeOut),
     );
-
     _taglineFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _taglineController, curve: Curves.easeOut),
     );
-
     _taglineSlide = Tween<Offset>(
       begin: const Offset(0, 0.5),
       end: Offset.zero,
@@ -64,12 +62,15 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 600));
     _taglineController.forward();
 
-    await Future.delayed(const Duration(milliseconds: 2200));
+    await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
+
+    final hasSeenOnboarding = StorageService.hasSeenOnboarding();
+    final next = hasSeenOnboarding ? const LoginScreen() : const OnboardingScreen();
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const OnboardingScreen(),
+        pageBuilder: (_, __, ___) => next,
         transitionsBuilder: (_, anim, __, child) => FadeTransition(
           opacity: CurvedAnimation(parent: anim, curve: Curves.easeInOut),
           child: child,
@@ -150,8 +151,6 @@ class _MillimoreLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Once you add your logo PNG to assets/images/, swap this whole widget for:
-    // return Image.asset('assets/images/logo.png', width: 140, height: 140);
     const double letterSize = 96;
     const double starSize = 28;
 
