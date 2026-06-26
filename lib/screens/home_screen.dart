@@ -5,6 +5,7 @@ import '../models/trader.dart';
 import '../models/post.dart';
 import '../models/trade.dart';
 import '../state/session.dart';
+import '../state/app_state.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/millimore_logo.dart';
@@ -82,9 +83,11 @@ class FollowerHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
+    final store = AppStateScope.of(context);
     final name = session.user?.name.split(' ').first ?? 'there';
-    final posts = mockPosts(mockTraders);
-    final liveTraders = mockTraders.where((t) => t.isLive).toList();
+    final subscribedIds = store.subscribedTraderIds;
+    final posts = mockPosts(mockTraders).where((p) => subscribedIds.contains(p.trader.id)).toList();
+    final liveTraders = mockTraders.where((t) => t.isLive && subscribedIds.contains(t.id)).toList();
     final openCopied = mockTrades.where((t) => t.status == TradeStatus.open).toList();
     final totalPnl = openCopied.fold<double>(0, (s, t) => s + t.pnlPercent);
 
@@ -126,7 +129,7 @@ class FollowerHome extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-            child: _PortfolioCard(totalPnl: totalPnl, openCount: openCopied.length),
+            child: _PortfolioCard(totalPnl: totalPnl, openCount: openCopied.length, following: store.subscriptionCount),
           ),
         ),
         if (liveTraders.isNotEmpty) ...[
@@ -149,19 +152,41 @@ class FollowerHome extends StatelessWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
-        SliverToBoxAdapter(child: _SectionHeader(title: 'From traders you follow')),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (_, i) => FeedPost(
-              post: posts[i],
-              onOpenProfile: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+        SliverToBoxAdapter(child: _SectionHeader(title: 'From your subscriptions')),
+        if (posts.isEmpty)
+          SliverToBoxAdapter(child: _EmptyFeed())
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (_, i) => FeedPost(
+                post: posts[i],
+                onOpenProfile: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+              ),
+              childCount: posts.length,
             ),
-            childCount: posts.length,
           ),
-        ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
+    );
+  }
+}
+
+class _EmptyFeed extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        children: [
+          Icon(Icons.dynamic_feed_rounded, size: 44, color: AppColors.textMuted.withOpacity(0.5)),
+          const SizedBox(height: 14),
+          Text('Your feed is quiet', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          const SizedBox(height: 6),
+          Text('Subscribe to traders in Discover to see their posts here.',
+              textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted, height: 1.5)),
+        ],
+      ),
     );
   }
 }
@@ -169,7 +194,8 @@ class FollowerHome extends StatelessWidget {
 class _PortfolioCard extends StatelessWidget {
   final double totalPnl;
   final int openCount;
-  const _PortfolioCard({required this.totalPnl, required this.openCount});
+  final int following;
+  const _PortfolioCard({required this.totalPnl, required this.openCount, required this.following});
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +231,7 @@ class _PortfolioCard extends StatelessWidget {
             children: [
               _MiniStat(label: 'Open positions', value: '$openCount'),
               const SizedBox(width: 28),
-              _MiniStat(label: 'Traders followed', value: '${mockTraders.length}'),
+              _MiniStat(label: 'Subscriptions', value: '$following'),
             ],
           ),
         ],
@@ -588,6 +614,8 @@ class _TraderListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final store = AppStateScope.of(context);
+    final subscribed = store.isSubscribed(trader.id);
     final isPositive = trader.returnPercent >= 0;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -602,19 +630,42 @@ class _TraderListItem extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(trader.name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    Flexible(
+                      child: Text(trader.name, overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    ),
                     if (trader.isVerified) ...[
                       const SizedBox(width: 4),
                       const VerifiedBadge(size: 14),
                     ],
                   ],
                 ),
-                Text('${trader.formattedFollowers} followers', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                Text('${trader.formattedFollowers} followers · ${trader.formattedReturn}',
+                    style: GoogleFonts.inter(fontSize: 12, color: isPositive ? AppColors.green : AppColors.red, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
-          Text(trader.formattedReturn,
-              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: isPositive ? AppColors.green : AppColors.red)),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () => store.toggleSubscribe(trader.id),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: subscribed ? Colors.transparent : AppColors.textPrimary,
+                borderRadius: BorderRadius.circular(20),
+                border: subscribed ? Border.all(color: AppColors.border) : null,
+              ),
+              child: Text(
+                subscribed ? 'Subscribed' : 'Subscribe',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: subscribed ? AppColors.textSecondary : Colors.white,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

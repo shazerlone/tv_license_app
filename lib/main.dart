@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'state/session.dart';
+import 'state/app_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,10 +25,12 @@ class MillimoreApp extends StatefulWidget {
 
 class _MillimoreAppState extends State<MillimoreApp> {
   final SessionController _session = SessionController();
+  final AppState _appState = AppState();
 
   @override
   void dispose() {
     _session.dispose();
+    _appState.dispose();
     super.dispose();
   }
 
@@ -35,11 +38,14 @@ class _MillimoreAppState extends State<MillimoreApp> {
   Widget build(BuildContext context) {
     return SessionScope(
       controller: _session,
-      child: MaterialApp(
-        title: 'millimore',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.theme,
-        home: const SplashScreen(),
+      child: AppStateScope(
+        controller: _appState,
+        child: MaterialApp(
+          title: 'millimore',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.theme,
+          home: const SplashScreen(),
+        ),
       ),
     );
   }
