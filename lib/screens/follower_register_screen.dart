@@ -52,7 +52,10 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     setState(() => _isLoading = false);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OtpScreen(phone: _phoneController.text.trim()),
+        builder: (_) => OtpScreen(
+          phoneNumber: _phoneController.text.trim(),
+          name: _nameController.text.trim(),
+        ),
       ),
     );
   }
@@ -191,15 +194,9 @@ class _FollowerHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Copy top traders',
-                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
+              Text('Copy top traders', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
-              Text(
-                'Auto-mirror verified PnL strategies',
-                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
-              ),
+              Text('Auto-mirror verified PnL strategies', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
             ],
           ),
           const Spacer(),
@@ -226,14 +223,8 @@ class _StatPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: color),
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
     );
   }
 }
