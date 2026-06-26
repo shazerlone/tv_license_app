@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -292,90 +291,57 @@ class _TypeCard extends StatelessWidget {
 class _FollowerVisual extends StatelessWidget {
   const _FollowerVisual();
   @override
-  Widget build(BuildContext context) => CustomPaint(painter: _FollowerPainter());
-}
-
-class _FollowerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(16)),
-      Paint()..color = AppColors.green.withOpacity(0.08),
+  Widget build(BuildContext context) {
+    return _IconTile(
+      color: AppColors.green,
+      icon: Icons.auto_graph_rounded,
+      badgeIcon: Icons.copy_all_rounded,
     );
-    final linePaint = Paint()
-      ..color = AppColors.green
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final pts = [
-      Offset(size.width * 0.1, size.height * 0.75),
-      Offset(size.width * 0.3, size.height * 0.6),
-      Offset(size.width * 0.5, size.height * 0.45),
-      Offset(size.width * 0.7, size.height * 0.35),
-      Offset(size.width * 0.9, size.height * 0.2),
-    ];
-    final path = Path()..moveTo(pts[0].dx, pts[0].dy);
-    for (int i = 1; i < pts.length; i++) {
-      final cx = (pts[i - 1].dx + pts[i].dx) / 2;
-      path.cubicTo(cx, pts[i - 1].dy, cx, pts[i].dy, pts[i].dx, pts[i].dy);
-    }
-    canvas.drawPath(path, linePaint);
-    for (final p in pts) {
-      canvas.drawCircle(p, 3, Paint()..color = AppColors.green);
-    }
-    final tp = TextPainter(
-      text: TextSpan(
-        text: 'Copy',
-        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.green),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset(size.width * 0.1, size.height * 0.84));
   }
-  @override
-  bool shouldRepaint(_FollowerPainter old) => false;
 }
 
 class _TraderVisual extends StatelessWidget {
   const _TraderVisual();
   @override
-  Widget build(BuildContext context) => CustomPaint(painter: _TraderMiniPainter());
+  Widget build(BuildContext context) {
+    return _IconTile(
+      color: AppColors.primary,
+      icon: Icons.sensors_rounded,
+      badgeIcon: Icons.verified_rounded,
+    );
+  }
 }
 
-class _TraderMiniPainter extends CustomPainter {
+class _IconTile extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final IconData badgeIcon;
+  const _IconTile({required this.color, required this.icon, required this.badgeIcon});
+
   @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(16)),
-      Paint()..color = AppColors.primary.withOpacity(0.06),
-    );
-    final rng = math.Random(7);
-    const count = 5;
-    final candleW = (size.width * 0.8) / count;
-    for (int i = 0; i < count; i++) {
-      final x = size.width * 0.1 + candleW * i + candleW / 2;
-      final bull = rng.nextBool();
-      final color = bull ? AppColors.green : AppColors.red;
-      final top = size.height * (0.2 + rng.nextDouble() * 0.3);
-      final bot = size.height * (0.55 + rng.nextDouble() * 0.25);
-      final bodyH = (bot - top).abs().clamp(4.0, double.infinity);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x - candleW * 0.3, top, candleW * 0.6, bodyH),
-          const Radius.circular(2),
-        ),
-        Paint()..color = color.withOpacity(0.9),
-      );
-    }
-    final tp = TextPainter(
-      text: TextSpan(
-        text: '● LIVE',
-        style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.red),
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(18),
       ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset(size.width * 0.1, size.height * 0.05));
+      child: Stack(
+        children: [
+          Center(child: Icon(icon, size: 34, color: color)),
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(badgeIcon, size: 11, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
-  @override
-  bool shouldRepaint(_TraderMiniPainter old) => false;
 }

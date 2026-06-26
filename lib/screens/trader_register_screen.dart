@@ -3,7 +3,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../data/countries.dart';
+import '../widgets/phone_field.dart';
+import '../services/image_picker_service.dart';
 import 'home_screen.dart';
+
+/// Brokers that expose an investor (read-only) password, so we can verify
+/// results automatically. Others require a manual statement upload.
+const _credentialBrokers = {
+  'MetaTrader 5 (MT5)',
+  'MetaTrader 4 (MT4)',
+  'cTrader',
+};
+
+const _allBrokers = [
+  'MetaTrader 5 (MT5)',
+  'MetaTrader 4 (MT4)',
+  'cTrader',
+  'Zerodha',
+  'Upstox',
+  'Interactive Brokers',
+  'Other',
+];
 
 class TraderRegisterScreen extends StatefulWidget {
   const TraderRegisterScreen({super.key});
@@ -14,70 +35,102 @@ class TraderRegisterScreen extends StatefulWidget {
 
 class _TraderRegisterScreenState extends State<TraderRegisterScreen>
     with TickerProviderStateMixin {
-  int _step = 0;
+  int _step = 0; // 0=intro 1=personal 2=verify 3=pending
 
   late final AnimationController _stepController;
   late Animation<Offset> _stepSlide;
   late Animation<double> _stepFade;
 
+  // Personal
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  Country _country = countryByIso('IN');
   final _formKey1 = GlobalKey<FormState>();
 
-  String? _selectedBroker;
-  final _accountIdController = TextEditingController();
+  // Verify
+  String? _broker;
+  final _serverController = TextEditingController();
+  final _accountController = TextEditingController();
+  final _investorPwController = TextEditingController();
+  String? _uploadedFileName;
+  bool _confirm = false;
   final _formKey2 = GlobalKey<FormState>();
 
-  String? _uploadedFileName;
-  bool _hasMinData = false;
   bool _isLoading = false;
-
-  final _brokers = ['MetaTrader 5 (MT5)', 'MetaTrader 4 (MT4)', 'cTrader', 'Interactive Brokers', 'Zerodha', 'Other'];
 
   @override
   void initState() {
     super.initState();
     _stepController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: const Duration(milliseconds: 420),
     );
-    _updateStepAnimations();
+    _setAnims();
     _stepController.forward();
   }
 
-  void _updateStepAnimations() {
-    _stepSlide = Tween<Offset>(begin: const Offset(0.06, 0), end: Offset.zero)
+  void _setAnims() {
+    _stepSlide = Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero)
         .animate(CurvedAnimation(parent: _stepController, curve: Curves.easeOutCubic));
     _stepFade = Tween<double>(begin: 0.0, end: 1.0)
         .animate(CurvedAnimation(parent: _stepController, curve: Curves.easeOut));
   }
 
-  Future<void> _nextStep() async {
+  bool get _usesCredentials => _credentialBrokers.contains(_broker);
+
+  Future<void> _go(int next) async {
+    await _stepController.reverse();
+    setState(() => _step = next);
+    _setAnims();
+    _stepController.forward();
+  }
+
+  void _next() {
     if (_step == 1 && !_formKey1.currentState!.validate()) return;
-    if (_step == 2 && !_formKey2.currentState!.validate()) return;
-    await _stepController.reverse();
-    setState(() => _step++);
-    _updateStepAnimations();
-    _stepController.forward();
+    if (_step == 2) {
+      if (_broker == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select your broker')),
+        );
+        return;
+      }
+      if (_usesCredentials) {
+        if (!_formKey2.currentState!.validate()) return;
+      } else {
+        if (_uploadedFileName == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please upload your verified P&L statement')),
+          );
+          return;
+        }
+      }
+      if (!_confirm) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please confirm the account is real & live')),
+        );
+        return;
+      }
+      _submit();
+      return;
+    }
+    _go(_step + 1);
   }
 
-  Future<void> _prevStep() async {
-    if (_step == 0) { Navigator.pop(context); return; }
-    await _stepController.reverse();
-    setState(() => _step--);
-    _updateStepAnimations();
-    _stepController.forward();
-  }
-
-  Future<void> _submitApplication() async {
+  Future<void> _submit() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1400));
+    await Future.delayed(const Duration(milliseconds: 1300));
     if (!mounted) return;
     setState(() => _isLoading = false);
-    await _stepController.reverse();
-    setState(() => _step = 4);
-    _updateStepAnimations();
-    _stepController.forward();
+    _go(3);
+  }
+
+  void _back() {
+    if (_step == 0) {
+      Navigator.pop(context);
+      return;
+    }
+    if (_step == 3) return; // pending is terminal
+    _go(_step - 1);
   }
 
   @override
@@ -85,7 +138,9 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
     _stepController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
-    _accountIdController.dispose();
+    _serverController.dispose();
+    _accountController.dispose();
+    _investorPwController.dispose();
     super.dispose();
   }
 
@@ -97,36 +152,32 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(_step == 0 ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: _prevStep,
-                  ),
-                  const SizedBox(width: 12),
-                  if (_step > 0 && _step < 4) ...
-                    [
-                      Expanded(child: _StepProgress(current: _step, total: 3)),
-                      const SizedBox(width: 12),
-                      Text('Step $_step of 3',
-                          style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-                    ]
+                  if (_step != 3)
+                    IconButton(
+                      icon: Icon(_step == 0 ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded,
+                          size: 20),
+                      onPressed: _back,
+                    )
                   else
+                    const SizedBox(width: 48),
+                  if (_step >= 1 && _step <= 2) ...[
+                    Expanded(child: _StepProgress(current: _step, total: 2)),
+                    const SizedBox(width: 12),
+                    Text('Step $_step of 2',
+                        style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                  ] else
                     const Spacer(),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Expanded(
               child: SlideTransition(
                 position: _stepSlide,
-                child: FadeTransition(
-                  opacity: _stepFade,
-                  child: _buildStep(),
-                ),
+                child: FadeTransition(opacity: _stepFade, child: _content()),
               ),
             ),
           ],
@@ -135,41 +186,54 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
     );
   }
 
-  Widget _buildStep() {
+  Widget _content() {
     switch (_step) {
-      case 0: return _StepIntro(onContinue: _nextStep);
-      case 1: return _StepPersonal(
-        formKey: _formKey1,
-        nameController: _nameController,
-        phoneController: _phoneController,
-        onContinue: _nextStep,
-      );
-      case 2: return _StepBroker(
-        formKey: _formKey2,
-        brokers: _brokers,
-        selectedBroker: _selectedBroker,
-        accountIdController: _accountIdController,
-        onBrokerSelected: (v) => setState(() => _selectedBroker = v),
-        onContinue: _nextStep,
-      );
-      case 3: return _StepPnl(
-        uploadedFileName: _uploadedFileName,
-        hasMinData: _hasMinData,
-        isLoading: _isLoading,
-        onUpload: () => setState(() => _uploadedFileName = 'trading_statement_6mo.xlsx'),
-        onToggleConfirm: (v) => setState(() => _hasMinData = v ?? false),
-        onSubmit: _uploadedFileName != null && _hasMinData ? _submitApplication : null,
-      );
-      case 4: return _StepPending(
-        onGoHome: () => Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (_) => false,
-        ),
-      );
-      default: return const SizedBox();
+      case 0:
+        return _StepIntro(onContinue: _next);
+      case 1:
+        return _StepPersonal(
+          formKey: _formKey1,
+          nameController: _nameController,
+          phoneController: _phoneController,
+          country: _country,
+          onCountryChanged: (c) => setState(() => _country = c),
+          onContinue: _next,
+        );
+      case 2:
+        return _StepVerify(
+          formKey: _formKey2,
+          broker: _broker,
+          onBroker: (v) => setState(() => _broker = v),
+          usesCredentials: _usesCredentials,
+          serverController: _serverController,
+          accountController: _accountController,
+          investorPwController: _investorPwController,
+          uploadedFileName: _uploadedFileName,
+          onUpload: () async {
+            final f = await ImagePickerService.pickImageAsDataUrl();
+            if (f != null && mounted) {
+              setState(() => _uploadedFileName = 'verified_pnl_statement');
+            }
+          },
+          confirm: _confirm,
+          onConfirm: (v) => setState(() => _confirm = v),
+          isLoading: _isLoading,
+          onSubmit: _next,
+        );
+      case 3:
+        return _StepPending(
+          onGoHome: () => Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (_) => false,
+          ),
+        );
+      default:
+        return const SizedBox();
     }
   }
 }
+
+// ── Progress ───────────────────────────────────────────────────────────────────
 
 class _StepProgress extends StatelessWidget {
   final int current;
@@ -182,7 +246,8 @@ class _StepProgress extends StatelessWidget {
       children: List.generate(total, (i) {
         final active = i < current;
         return Expanded(
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
             margin: const EdgeInsets.only(right: 4),
             height: 4,
             decoration: BoxDecoration(
@@ -196,338 +261,488 @@ class _StepProgress extends StatelessWidget {
   }
 }
 
+// ── Step 0: Intro ──────────────────────────────────────────────────────────────
+
 class _StepIntro extends StatelessWidget {
   final VoidCallback onContinue;
   const _StepIntro({required this.onContinue});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 24),
           Container(
-            padding: const EdgeInsets.all(20),
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.06),
+              color: const Color(0xFF0B1120),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primary.withOpacity(0.15)),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 120, child: CustomPaint(painter: _VerifiedChartPainter())),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.verified_rounded, size: 13, color: AppColors.primary),
+                      const SizedBox(width: 5),
+                      Text('VERIFIED CREATOR',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                            letterSpacing: 0.8,
+                          )),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Text(
-                  'Become a verified trader on millimore',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.3),
+                  'Turn your track\nrecord into income',
+                  style: GoogleFonts.inter(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.15,
+                    letterSpacing: -0.6,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'We verify every creator\'s real account data to maintain trust on the platform.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.55),
+                  'Stream live, share verified trades, and earn from followers who copy you.',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 28),
-          Text('What you\'ll need', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          const SizedBox(height: 14),
-          _RequirementRow(icon: Icons.history_rounded, title: '6+ months of real account history', sub: 'Live trading account — no demo data accepted'),
-          const SizedBox(height: 10),
-          _RequirementRow(icon: Icons.show_chart_rounded, title: 'Positive verified PnL', sub: 'Statement from MT5, MT4, cTrader or equivalent'),
-          const SizedBox(height: 10),
-          _RequirementRow(icon: Icons.verified_outlined, title: 'Identity verification', sub: 'Basic KYC to comply with regulations'),
-          const Spacer(),
+          Text('What you\'ll need',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              )),
+          const SizedBox(height: 16),
+          _Req(
+            icon: Icons.history_rounded,
+            title: '6+ months of live history',
+            sub: 'A real money account — demo results aren\'t accepted.',
+          ),
+          _Req(
+            icon: Icons.shield_outlined,
+            title: 'Read-only verification',
+            sub: 'MT4/MT5/cTrader connect via investor password. Others upload a verified P&L.',
+          ),
+          _Req(
+            icon: Icons.badge_outlined,
+            title: 'Basic identity check',
+            sub: 'Light KYC so followers can trust your track record.',
+            last: true,
+          ),
+          const SizedBox(height: 24),
           ElevatedButton(onPressed: onContinue, child: const Text('Start Application')),
           const SizedBox(height: 12),
-          Center(child: Text('Review takes 24–48 hours. You\'ll be notified by email.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted))),
-          const SizedBox(height: 28),
+          Center(
+            child: Text('Review takes 24–48 hours.',
+                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+          ),
         ],
       ),
     );
   }
 }
 
-class _RequirementRow extends StatelessWidget {
+class _Req extends StatelessWidget {
   final IconData icon;
   final String title;
   final String sub;
-  const _RequirementRow({required this.icon, required this.title, required this.sub});
+  final bool last;
+  const _Req({required this.icon, required this.title, required this.sub, this.last = false});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Padding(
+      padding: EdgeInsets.only(bottom: last ? 0 : 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: AppColors.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.inter(
+                        fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                const SizedBox(height: 3),
+                Text(sub,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: AppColors.textSecondary, height: 1.45)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Step 1: Personal ───────────────────────────────────────────────────────────
+
+class _StepPersonal extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final TextEditingController nameController;
+  final TextEditingController phoneController;
+  final Country country;
+  final ValueChanged<Country> onCountryChanged;
+  final VoidCallback onContinue;
+
+  const _StepPersonal({
+    required this.formKey,
+    required this.nameController,
+    required this.phoneController,
+    required this.country,
+    required this.onCountryChanged,
+    required this.onContinue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('About you',
+              style: GoogleFonts.inter(
+                  fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.6)),
+          const SizedBox(height: 6),
+          Text('This appears on your public creator profile.',
+              style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+          const SizedBox(height: 28),
+          Form(
+            key: formKey,
+            child: Column(
+              children: [
+                _FieldLabel('Full name'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: nameController,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                  decoration: const InputDecoration(hintText: 'e.g. Marcus Sterling'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Enter your name' : null,
+                ),
+                const SizedBox(height: 20),
+                _FieldLabel('Phone number'),
+                const SizedBox(height: 8),
+                PhoneField(
+                  controller: phoneController,
+                  country: country,
+                  onCountryChanged: onCountryChanged,
+                  onSubmitted: onContinue,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(onPressed: onContinue, child: const Text('Continue')),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Step 2: Verify ──────────────────────────────────────────────────────────────
+
+class _StepVerify extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final String? broker;
+  final ValueChanged<String?> onBroker;
+  final bool usesCredentials;
+  final TextEditingController serverController;
+  final TextEditingController accountController;
+  final TextEditingController investorPwController;
+  final String? uploadedFileName;
+  final VoidCallback onUpload;
+  final bool confirm;
+  final ValueChanged<bool> onConfirm;
+  final bool isLoading;
+  final VoidCallback onSubmit;
+
+  const _StepVerify({
+    required this.formKey,
+    required this.broker,
+    required this.onBroker,
+    required this.usesCredentials,
+    required this.serverController,
+    required this.accountController,
+    required this.investorPwController,
+    required this.uploadedFileName,
+    required this.onUpload,
+    required this.confirm,
+    required this.onConfirm,
+    required this.isLoading,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Verify your\ntrading',
+              style: GoogleFonts.inter(
+                  fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.6, height: 1.15)),
+          const SizedBox(height: 6),
+          Text('Choose your broker — we\'ll ask only for what we need to verify safely.',
+              style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted, height: 1.4)),
+          const SizedBox(height: 24),
+
+          _FieldLabel('Your broker'),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: broker,
+            isExpanded: true,
+            items: _allBrokers
+                .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                .toList(),
+            onChanged: onBroker,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(
+              hintText: 'Select your broker',
+              prefixIcon: Icon(Icons.account_balance_outlined, size: 20, color: AppColors.textMuted),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          if (broker == null)
+            _InfoNote(
+              icon: Icons.info_outline_rounded,
+              text: 'Select a broker to see how to verify your account.',
+            )
+          else if (usesCredentials)
+            _CredentialFields(
+              formKey: formKey,
+              broker: broker!,
+              serverController: serverController,
+              accountController: accountController,
+              investorPwController: investorPwController,
+            )
+          else
+            _UploadFields(
+              broker: broker!,
+              uploadedFileName: uploadedFileName,
+              onUpload: onUpload,
+            ),
+
+          if (broker != null) ...[
+            const SizedBox(height: 20),
+            _ConfirmCheck(value: confirm, onChanged: onConfirm),
+            const SizedBox(height: 28),
+            ElevatedButton(
+              onPressed: isLoading ? null : onSubmit,
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Submit Application'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CredentialFields extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final String broker;
+  final TextEditingController serverController;
+  final TextEditingController accountController;
+  final TextEditingController investorPwController;
+
+  const _CredentialFields({
+    required this.formKey,
+    required this.broker,
+    required this.serverController,
+    required this.accountController,
+    required this.investorPwController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FieldLabel('Broker server'),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: serverController,
+            textInputAction: TextInputAction.next,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(hintText: 'e.g. ICMarkets-Live12'),
+            validator: (v) => (v == null || v.isEmpty) ? 'Enter your broker server' : null,
+          ),
+          const SizedBox(height: 16),
+          _FieldLabel('Account / Login number'),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: accountController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            textInputAction: TextInputAction.next,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(hintText: 'e.g. 50231487'),
+            validator: (v) => (v == null || v.isEmpty) ? 'Enter your account number' : null,
+          ),
+          const SizedBox(height: 16),
+          _FieldLabel('Investor (read-only) password'),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: investorPwController,
+            obscureText: true,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(hintText: 'Read-only password'),
+            validator: (v) => (v == null || v.isEmpty) ? 'Enter your investor password' : null,
+          ),
+          const SizedBox(height: 14),
+          _InfoNote(
+            icon: Icons.lock_outline_rounded,
+            text:
+                'The investor password is read-only. It lets us verify your results — it can never place trades or withdraw funds. It\'s different from your master password.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UploadFields extends StatelessWidget {
+  final String broker;
+  final String? uploadedFileName;
+  final VoidCallback onUpload;
+
+  const _UploadFields({
+    required this.broker,
+    required this.uploadedFileName,
+    required this.onUpload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final done = uploadedFileName != null;
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, size: 18, color: AppColors.primary),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-              const SizedBox(height: 2),
-              Text(sub, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-            ],
+        _FieldLabel('Verified P&L statement'),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: onUpload,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+            decoration: BoxDecoration(
+              color: done ? AppColors.green.withOpacity(0.05) : AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: done ? AppColors.green : AppColors.border,
+                width: done ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(done ? Icons.check_circle_outline_rounded : Icons.cloud_upload_outlined,
+                    size: 30, color: done ? AppColors.green : AppColors.textMuted),
+                const SizedBox(height: 10),
+                Text(done ? 'Statement uploaded' : 'Tap to upload',
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: done ? AppColors.green : AppColors.textSecondary)),
+                const SizedBox(height: 4),
+                Text(done ? 'You can replace it by tapping again' : 'PDF or screenshot • last 6 months',
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+              ],
+            ),
           ),
+        ),
+        const SizedBox(height: 14),
+        _InfoNote(
+          icon: Icons.privacy_tip_outlined,
+          text:
+              'For $broker, upload an official P&L / tradebook statement (Console → Reports for Zerodha) or a clear screenshot. Never share your login password or OTP — we will never ask for it.',
         ),
       ],
     );
   }
 }
 
-class _StepPersonal extends StatelessWidget {
-  final GlobalKey<FormState> formKey;
-  final TextEditingController nameController;
-  final TextEditingController phoneController;
-  final VoidCallback onContinue;
-  const _StepPersonal({required this.formKey, required this.nameController, required this.phoneController, required this.onContinue});
+class _ConfirmCheck extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _ConfirmCheck({required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 24),
-          Text('Personal info', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.6)),
-          const SizedBox(height: 6),
-          Text('This will appear on your public profile.', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-          const SizedBox(height: 28),
-          Form(
-            key: formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'Full name',
-                    prefixIcon: Icon(Icons.person_outline_rounded, size: 20, color: AppColors.textMuted),
-                  ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Enter your name' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Mobile number',
-                    prefixIcon: const Icon(Icons.phone_outlined, size: 20, color: AppColors.textMuted),
-                    prefixText: '+91  ',
-                    prefixStyle: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter your mobile';
-                    if (v.length < 10) return 'Enter a valid 10-digit number';
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          ElevatedButton(onPressed: onContinue, child: const Text('Continue')),
-          const SizedBox(height: 28),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepBroker extends StatelessWidget {
-  final GlobalKey<FormState> formKey;
-  final List<String> brokers;
-  final String? selectedBroker;
-  final TextEditingController accountIdController;
-  final ValueChanged<String?> onBrokerSelected;
-  final VoidCallback onContinue;
-  const _StepBroker({required this.formKey, required this.brokers, required this.selectedBroker, required this.accountIdController, required this.onBrokerSelected, required this.onContinue});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 24),
-          Text('Connect your\nbroker', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.6, height: 1.15)),
-          const SizedBox(height: 6),
-          Text('We verify data directly from your broker.', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-          const SizedBox(height: 28),
-          Form(
-            key: formKey,
-            child: Column(
-              children: [
-                DropdownButtonFormField<String>(
-                  value: selectedBroker,
-                  items: brokers.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                  onChanged: onBrokerSelected,
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'Select your broker',
-                    prefixIcon: Icon(Icons.account_balance_outlined, size: 20, color: AppColors.textMuted),
-                  ),
-                  validator: (v) => v == null ? 'Select a broker' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: accountIdController,
-                  textInputAction: TextInputAction.done,
-                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'Account / Login ID',
-                    prefixIcon: Icon(Icons.tag_rounded, size: 20, color: AppColors.textMuted),
-                  ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Enter your account ID' : null,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(14),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 22,
+            height: 22,
+            margin: const EdgeInsets.only(top: 1),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+              color: value ? AppColors.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: value ? AppColors.primary : AppColors.border, width: 1.5),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.primary),
-                const SizedBox(width: 10),
-                Expanded(child: Text('Read-only access only. We never trade on your behalf.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary))),
-              ],
+            child: value ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'I confirm this is a real, live account with at least 6 months of trading history.',
+              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.45),
             ),
           ),
-          const Spacer(),
-          ElevatedButton(onPressed: onContinue, child: const Text('Continue')),
-          const SizedBox(height: 28),
         ],
       ),
     );
   }
 }
 
-class _StepPnl extends StatelessWidget {
-  final String? uploadedFileName;
-  final bool hasMinData;
-  final bool isLoading;
-  final VoidCallback onUpload;
-  final ValueChanged<bool?> onToggleConfirm;
-  final VoidCallback? onSubmit;
-  const _StepPnl({required this.uploadedFileName, required this.hasMinData, required this.isLoading, required this.onUpload, required this.onToggleConfirm, required this.onSubmit});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 24),
-          Text('Upload trading\nstatement', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.6, height: 1.15)),
-          const SizedBox(height: 6),
-          Text('Minimum 6 months of real account history required.', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-          const SizedBox(height: 28),
-          GestureDetector(
-            onTap: onUpload,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-              decoration: BoxDecoration(
-                color: uploadedFileName != null ? AppColors.green.withOpacity(0.05) : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: uploadedFileName != null ? AppColors.green : AppColors.border, width: uploadedFileName != null ? 1.5 : 1),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    uploadedFileName != null ? Icons.check_circle_outline_rounded : Icons.upload_file_outlined,
-                    size: 32,
-                    color: uploadedFileName != null ? AppColors.green : AppColors.textMuted,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    uploadedFileName ?? 'Tap to upload statement',
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: uploadedFileName != null ? AppColors.green : AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    uploadedFileName != null ? 'Statement uploaded successfully' : 'PDF, XLS or CSV • Max 20 MB',
-                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8, runSpacing: 6,
-            children: ['MT5 Report', 'MT4 Report', 'cTrader PDF', 'Bank CSV'].map((f) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
-              child: Text(f, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-            )).toList(),
-          ),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: () => onToggleConfirm(!hasMinData),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 22, height: 22,
-                  decoration: BoxDecoration(
-                    color: hasMinData ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: hasMinData ? AppColors.primary : AppColors.border, width: 1.5),
-                  ),
-                  child: hasMinData ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'I confirm this is from a real live account with at least 6 months of history',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          AnimatedOpacity(
-            opacity: onSubmit != null ? 1.0 : 0.4,
-            duration: const Duration(milliseconds: 200),
-            child: ElevatedButton(
-              onPressed: isLoading ? null : onSubmit,
-              child: isLoading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Submit Application'),
-            ),
-          ),
-          const SizedBox(height: 28),
-        ],
-      ),
-    );
-  }
-}
+// ── Step 3: Pending ─────────────────────────────────────────────────────────────
 
 class _StepPending extends StatelessWidget {
   final VoidCallback onGoHome;
@@ -535,96 +750,118 @@ class _StepPending extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       child: Column(
         children: [
-          const SizedBox(height: 40),
-          SizedBox(height: 140, child: CustomPaint(painter: _PendingPainter())),
-          const SizedBox(height: 32),
-          Text('Application submitted!', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.6)),
+          const SizedBox(height: 24),
+          SizedBox(height: 130, child: CustomPaint(painter: _PendingPainter())),
+          const SizedBox(height: 28),
+          Text('Application submitted',
+              style: GoogleFonts.inter(
+                  fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
           const SizedBox(height: 10),
           Text(
-            'Our team will review your trading data and PnL within 24–48 hours. You\'ll get an email once approved.',
+            'We\'re verifying your trading data. You\'ll get an email and an in-app alert within 24–48 hours.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.6),
+            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.55),
           ),
-          const SizedBox(height: 32),
-          _PendingStep(icon: Icons.pending_outlined, title: 'Under review', sub: 'PnL data & account history being verified', color: AppColors.primary),
-          const SizedBox(height: 12),
-          _PendingStep(icon: Icons.notifications_outlined, title: 'We\'ll notify you', sub: 'Email + in-app notification when approved', color: AppColors.green),
-          const SizedBox(height: 12),
-          _PendingStep(icon: Icons.live_tv_outlined, title: 'Go live', sub: 'Stream, share trades, and earn from followers', color: AppColors.textMuted, muted: true),
-          const Spacer(),
-          ElevatedButton(onPressed: onGoHome, child: const Text('Browse the app')),
-          const SizedBox(height: 12),
-          Center(child: Text('Track your application in Profile → Creator Status', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted))),
           const SizedBox(height: 28),
+          _Timeline(icon: Icons.search_rounded, title: 'Under review', sub: 'Verifying your account & PnL', color: AppColors.primary),
+          _Timeline(icon: Icons.notifications_active_outlined, title: 'You\'ll be notified', sub: 'Email + in-app when approved', color: AppColors.green),
+          _Timeline(icon: Icons.live_tv_rounded, title: 'Go live', sub: 'Stream, share trades & earn', color: AppColors.textMuted, muted: true, last: true),
+          const SizedBox(height: 28),
+          ElevatedButton(onPressed: onGoHome, child: const Text('Explore millimore')),
         ],
       ),
     );
   }
 }
 
-class _PendingStep extends StatelessWidget {
+class _Timeline extends StatelessWidget {
   final IconData icon;
   final String title;
   final String sub;
   final Color color;
   final bool muted;
-  const _PendingStep({required this.icon, required this.title, required this.sub, required this.color, this.muted = false});
+  final bool last;
+  const _Timeline({
+    required this.icon,
+    required this.title,
+    required this.sub,
+    required this.color,
+    this.muted = false,
+    this.last = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Opacity(
-      opacity: muted ? 0.4 : 1.0,
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, size: 20, color: color),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-              Text(sub, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          ),
-        ],
+      opacity: muted ? 0.45 : 1,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: last ? 0 : 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(width: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                Text(sub, style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _VerifiedChartPainter extends CustomPainter {
+// ── Shared bits ─────────────────────────────────────────────────────────────────
+
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
   @override
-  void paint(Canvas canvas, Size size) {
-    final rng = math.Random(5);
-    const count = 8;
-    final w = size.width / count;
-    double price = size.height * 0.6;
-    final pts = <Offset>[];
-    for (int i = 0; i < count; i++) {
-      final x = w * i + w / 2;
-      price = (price + (rng.nextDouble() - 0.38) * size.height * 0.12).clamp(size.height * 0.1, size.height * 0.9);
-      pts.add(Offset(x, price));
-    }
-    final path = Path()..moveTo(pts[0].dx, pts[0].dy);
-    for (int i = 1; i < pts.length; i++) {
-      final cx = (pts[i - 1].dx + pts[i].dx) / 2;
-      path.cubicTo(cx, pts[i - 1].dy, cx, pts[i].dy, pts[i].dx, pts[i].dy);
-    }
-    canvas.drawPath(path, Paint()..color = AppColors.primary..strokeWidth = 2.5..style = PaintingStyle.stroke..strokeCap = StrokeCap.round);
-    final fill = Path.from(path)..lineTo(pts.last.dx, size.height)..lineTo(pts.first.dx, size.height)..close();
-    canvas.drawPath(fill, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppColors.primary.withOpacity(0.2), Colors.transparent]).createShader(Rect.fromLTWH(0, 0, size.width, size.height)));
-    canvas.drawCircle(pts.last, 7, Paint()..color = AppColors.primary);
-    canvas.drawCircle(pts.last, 5, Paint()..color = Colors.white);
+  Widget build(BuildContext context) {
+    return Text(text,
+        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary));
   }
+}
+
+class _InfoNote extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _InfoNote({required this.icon, required this.text});
+
   @override
-  bool shouldRepaint(_VerifiedChartPainter old) => false;
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary, height: 1.5)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PendingPainter extends CustomPainter {
@@ -634,20 +871,22 @@ class _PendingPainter extends CustomPainter {
     final cy = size.height / 2;
     final r = math.min(cx, cy) * 0.85;
     canvas.drawCircle(Offset(cx, cy), r, Paint()..color = AppColors.primary.withOpacity(0.08));
-    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = AppColors.primary.withOpacity(0.2)..style = PaintingStyle.stroke..strokeWidth = 2);
-    final handPaint = Paint()..color = AppColors.primary..strokeWidth = 3..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(cx, cy), Offset(cx, cy - r * 0.45), handPaint);
-    canvas.drawLine(Offset(cx, cy), Offset(cx + r * 0.35, cy + 0.1 * r), handPaint);
+    canvas.drawCircle(Offset(cx, cy), r,
+        Paint()..color = AppColors.primary.withOpacity(0.2)..style = PaintingStyle.stroke..strokeWidth = 2);
+    final hand = Paint()..color = AppColors.primary..strokeWidth = 3..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx, cy), Offset(cx, cy - r * 0.45), hand);
+    canvas.drawLine(Offset(cx, cy), Offset(cx + r * 0.35, cy + 0.1 * r), hand);
     canvas.drawCircle(Offset(cx, cy), 4, Paint()..color = AppColors.primary);
     for (int i = 0; i < 12; i++) {
-      final angle = i * 30 * math.pi / 180;
+      final a = i * 30 * math.pi / 180;
       canvas.drawLine(
-        Offset(cx + r * 0.82 * math.cos(angle), cy + r * 0.82 * math.sin(angle)),
-        Offset(cx + r * 0.95 * math.cos(angle), cy + r * 0.95 * math.sin(angle)),
+        Offset(cx + r * 0.82 * math.cos(a), cy + r * 0.82 * math.sin(a)),
+        Offset(cx + r * 0.95 * math.cos(a), cy + r * 0.95 * math.sin(a)),
         Paint()..color = AppColors.primary.withOpacity(0.3)..strokeWidth = 1.5,
       );
     }
   }
+
   @override
   bool shouldRepaint(_PendingPainter old) => false;
 }

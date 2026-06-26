@@ -654,48 +654,8 @@ class _SocialButton extends StatelessWidget {
 class _AppleIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 18,
-      height: 18,
-      child: CustomPaint(painter: _AppleIconPainter()),
-    );
+    return const Icon(Icons.apple, size: 22, color: Colors.white);
   }
-}
-
-class _AppleIconPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final path = Path();
-    final w = size.width;
-    final h = size.height;
-    path.moveTo(w * 0.5, h * 0.08);
-    path.cubicTo(w * 0.62, h * 0.08, w * 0.72, h * 0.15, w * 0.72, h * 0.15);
-    path.cubicTo(w * 0.72, h * 0.15, w * 0.82, h * 0.07, w * 0.85, h * 0.04);
-    path.cubicTo(w * 0.73, h * -0.02, w * 0.62, h * 0.03, w * 0.62, h * 0.03);
-    path.cubicTo(w * 0.62, h * 0.03, w * 0.62, h * 0.0, w * 0.6, h * 0.0);
-    path.cubicTo(w * 0.55, h * 0.0, w * 0.5, h * 0.04, w * 0.5, h * 0.08);
-    path.close();
-    path.moveTo(w * 0.15, h * 0.32);
-    path.cubicTo(w * 0.05, h * 0.5, w * 0.1, h * 0.72, w * 0.22, h * 0.88);
-    path.cubicTo(w * 0.3, h * 0.98, w * 0.38, h * 1.0, w * 0.46, h * 0.98);
-    path.cubicTo(w * 0.54, h * 0.96, w * 0.58, h * 0.9, w * 0.66, h * 0.9);
-    path.cubicTo(w * 0.74, h * 0.9, w * 0.78, h * 0.96, w * 0.86, h * 0.98);
-    path.cubicTo(w * 0.94, h * 1.0, w * 1.0, h * 0.94, w * 1.0, h * 0.86);
-    path.cubicTo(w * 1.0, h * 0.78, w * 0.85, h * 0.64, w * 0.85, h * 0.52);
-    path.cubicTo(w * 0.85, h * 0.4, w * 0.95, h * 0.28, w * 0.95, h * 0.18);
-    path.cubicTo(w * 0.95, h * 0.1, w * 0.88, h * 0.06, w * 0.82, h * 0.08);
-    path.cubicTo(w * 0.74, h * 0.1, w * 0.68, h * 0.18, w * 0.6, h * 0.18);
-    path.cubicTo(w * 0.52, h * 0.18, w * 0.46, h * 0.12, w * 0.38, h * 0.12);
-    path.cubicTo(w * 0.28, h * 0.12, w * 0.2, h * 0.2, w * 0.15, h * 0.32);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_AppleIconPainter old) => false;
 }
 
 class _GoogleIcon extends StatelessWidget {
@@ -704,40 +664,49 @@ class _GoogleIcon extends StatelessWidget {
     return SizedBox(
       width: 18,
       height: 18,
-      child: CustomPaint(painter: _GoogleIconPainter()),
+      child: CustomPaint(painter: _GoogleGPainter()),
     );
   }
 }
 
-class _GoogleIconPainter extends CustomPainter {
+/// Draws a recognisable multi-colour Google "G".
+class _GoogleGPainter extends CustomPainter {
+  static const _blue = Color(0xFF4285F4);
+  static const _red = Color(0xFFEA4335);
+  static const _yellow = Color(0xFFFBBC05);
+  static const _green = Color(0xFF34A853);
+
+  double _deg(double d) => d * math.pi / 180;
+
   @override
   void paint(Canvas canvas, Size size) {
+    final stroke = size.width * 0.26;
+    final rect = Rect.fromCircle(
+      center: Offset(size.width / 2, size.height / 2),
+      radius: size.width / 2 - stroke / 2,
+    );
+
+    Paint arc(Color c) => Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    // Ring segments (gap at the upper-right where the bar sits).
+    canvas.drawArc(rect, _deg(-16), _deg(76), false, arc(_blue));   // right
+    canvas.drawArc(rect, _deg(64), _deg(88), false, arc(_green));   // bottom
+    canvas.drawArc(rect, _deg(156), _deg(76), false, arc(_yellow)); // left
+    canvas.drawArc(rect, _deg(236), _deg(84), false, arc(_red));    // top
+
+    // The blue horizontal bar from centre to the right edge.
     final cx = size.width / 2;
     final cy = size.height / 2;
-    final r = size.width / 2;
-    final colors = [
-      const Color(0xFF4285F4),
-      const Color(0xFF34A853),
-      const Color(0xFFFBBC05),
-      const Color(0xFFEA4335),
-    ];
-    final starts = [0.0, math.pi / 2, math.pi, 3 * math.pi / 2];
-    for (int i = 0; i < 4; i++) {
-      canvas.drawArc(
-        Rect.fromCircle(center: Offset(cx, cy), radius: r),
-        starts[i],
-        math.pi / 2,
-        false,
-        Paint()
-          ..color = colors[i]
-          ..strokeWidth = size.width * 0.3
-          ..style = PaintingStyle.stroke,
-      );
-    }
+    final barRect = Rect.fromLTRB(cx, cy - stroke / 2, rect.right + stroke / 2, cy + stroke / 2);
+    canvas.drawRect(barRect, Paint()..color = _blue);
   }
 
   @override
-  bool shouldRepaint(_GoogleIconPainter old) => false;
+  bool shouldRepaint(_GoogleGPainter old) => false;
 }
 
 class _OrDivider extends StatelessWidget {
