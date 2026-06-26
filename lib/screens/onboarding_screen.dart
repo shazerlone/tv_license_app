@@ -16,44 +16,48 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-
-  late final List<AnimationController> _slideControllers;
-  late final List<Animation<double>> _slideFades;
-  late final List<Animation<Offset>> _slideOffsets;
-
   static const int _pageCount = 3;
+
+  late final List<AnimationController> _textControllers;
+  late final List<Animation<double>> _textFades;
+  late final List<Animation<Offset>> _textSlides;
 
   @override
   void initState() {
     super.initState();
-
-    _slideControllers = List.generate(
+    _textControllers = List.generate(
       _pageCount,
       (_) => AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 700),
+        duration: const Duration(milliseconds: 650),
       ),
     );
-
-    _slideFades = _slideControllers.map((c) {
-      return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: c, curve: Curves.easeOut),
-      );
-    }).toList();
-
-    _slideOffsets = _slideControllers.map((c) {
-      return Tween<Offset>(
-        begin: const Offset(0, 0.06),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: c, curve: Curves.easeOutCubic));
-    }).toList();
-
-    _slideControllers[0].forward();
+    _textFades = _textControllers
+        .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOut))
+        .toList();
+    _textSlides = _textControllers
+        .map((c) => Tween<Offset>(
+              begin: const Offset(0, 0.12),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: c, curve: Curves.easeOutCubic)))
+        .toList();
+    _textControllers[0].forward();
   }
 
   void _onPageChanged(int index) {
     setState(() => _currentPage = index);
-    _slideControllers[index].forward(from: 0);
+    _textControllers[index].forward(from: 0);
+  }
+
+  void _next() {
+    if (_currentPage < _pageCount - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOutCubic,
+      );
+    } else {
+      _finish();
+    }
   }
 
   Future<void> _finish() async {
@@ -71,106 +75,207 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  void _next() {
-    if (_currentPage < _pageCount - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      _finish();
-    }
-  }
-
   @override
   void dispose() {
-    for (final c in _slideControllers) {
+    for (final c in _textControllers) {
       c.dispose();
     }
     _pageController.dispose();
     super.dispose();
   }
 
+  static const List<_SlideData> _slides = [
+    _SlideData(
+      label: 'COPY TRADING',
+      headline: 'Follow traders\nwho actually win.',
+      body:
+          'Every position is verified straight from MT5 — no screenshots, no edits. Mirror a pro with a single tap and trade exactly as they do.',
+    ),
+    _SlideData(
+      label: 'LIVE STREAMS',
+      headline: 'Watch the move\nas it happens.',
+      body:
+          'Top traders stream their charts in real time. See the setup, hear the reasoning, and copy the entry before the candle closes.',
+    ),
+    _SlideData(
+      label: 'CREATOR ECONOMY',
+      headline: 'Turn your edge\ninto income.',
+      body:
+          'Connect your broker, publish a verified track record, and earn from every follower who copies your trades. Skill pays.',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          PageView(
-            controller: _pageController,
-            onPageChanged: _onPageChanged,
-            children: [
-              _OnboardingPage(
-                fadeAnim: _slideFades[0],
-                slideAnim: _slideOffsets[0],
-                visual: _CopyTradingVisual(),
-                label: 'COPY TRADING',
-                headline: 'Follow traders\nwho actually win.',
-                body: 'Every trade is verified directly from MT5. No screenshots. No fakes. Just real, audited performance you can copy with one tap.',
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top bar with brand mark + Skip, fixed height for stable layout.
+            SizedBox(
+              height: 56,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _MiniWordmark(),
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _currentPage < _pageCount - 1 ? 1 : 0,
+                      child: TextButton(
+                        onPressed:
+                            _currentPage < _pageCount - 1 ? _finish : null,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Skip',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              _OnboardingPage(
-                fadeAnim: _slideFades[1],
-                slideAnim: _slideOffsets[1],
-                visual: _LiveStreamVisual(),
-                label: 'LIVE STREAMS',
-                headline: 'Watch the trade\nhappen live.',
-                body: 'The best traders stream their screens in real time. See the setup, hear the reasoning, copy the entry — all before the move happens.',
+            ),
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                itemCount: _pageCount,
+                itemBuilder: (_, i) => _OnboardingPage(
+                  data: _slides[i],
+                  index: i,
+                  fade: _textFades[i],
+                  slide: _textSlides[i],
+                ),
               ),
-              _OnboardingPage(
-                fadeAnim: _slideFades[2],
-                slideAnim: _slideOffsets[2],
-                visual: _EarnVisual(),
-                label: 'CREATOR ECONOMY',
-                headline: 'Your edge is\nyour income.',
-                body: 'Connect your broker, share your verified record, and earn from every follower who copies your trades. The market rewards skill.',
-              ),
-            ],
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: AppColors.background,
-              padding: EdgeInsets.fromLTRB(
-                  28, 20, 28, MediaQuery.of(context).padding.bottom + 32),
+            ),
+            // Footer: indicator + primary action, consistent 24px gutters.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
               child: Column(
                 children: [
                   _PageIndicator(count: _pageCount, current: _currentPage),
                   const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      if (_currentPage < _pageCount - 1)
-                        Expanded(
-                          child: TextButton(
-                            onPressed: _finish,
-                            child: Text(
-                              'Skip',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textMuted,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (_currentPage < _pageCount - 1)
-                        const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: _next,
-                          child: Text(
-                            _currentPage == _pageCount - 1
-                                ? 'Get Started'
-                                : 'Continue',
-                          ),
-                        ),
-                      ),
-                    ],
+                  ElevatedButton(
+                    onPressed: _next,
+                    child: Text(
+                      _currentPage == _pageCount - 1
+                          ? 'Get Started'
+                          : 'Continue',
+                    ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SlideData {
+  final String label;
+  final String headline;
+  final String body;
+  const _SlideData({
+    required this.label,
+    required this.headline,
+    required this.body,
+  });
+}
+
+class _OnboardingPage extends StatelessWidget {
+  final _SlideData data;
+  final int index;
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+
+  const _OnboardingPage({
+    required this.data,
+    required this.index,
+    required this.fade,
+    required this.slide,
+  });
+
+  Widget _buildVisual() {
+    switch (index) {
+      case 0:
+        return const _CopyTradingVisual();
+      case 1:
+        return const _LiveStreamVisual();
+      default:
+        return const _EarnVisual();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          // Visual hero card takes the upper region.
+          Expanded(
+            flex: 55,
+            child: _buildVisual(),
+          ),
+          const SizedBox(height: 32),
+          // Text block takes the lower region, top-aligned.
+          Expanded(
+            flex: 45,
+            child: FadeTransition(
+              opacity: fade,
+              child: SlideTransition(
+                position: slide,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.label,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                        letterSpacing: 2.2,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      data.headline,
+                      style: GoogleFonts.inter(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -1.0,
+                        height: 1.12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      data.body,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.textSecondary,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -180,79 +285,434 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-class _OnboardingPage extends StatelessWidget {
-  final Animation<double> fadeAnim;
-  final Animation<Offset> slideAnim;
-  final Widget visual;
-  final String label;
-  final String headline;
-  final String body;
+// ══ Hero card wrapper ══════════════════════════════════════════
 
-  const _OnboardingPage({
-    required this.fadeAnim,
-    required this.slideAnim,
-    required this.visual,
-    required this.label,
-    required this.headline,
-    required this.body,
+class _HeroCard extends StatelessWidget {
+  final Color background;
+  final Color borderColor;
+  final Widget child;
+  const _HeroCard({
+    required this.background,
+    required this.borderColor,
+    required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: size.height * 0.46,
-          width: double.infinity,
-          child: visual,
-        ),
-        Expanded(
-          child: FadeTransition(
-            opacity: fadeAnim,
-            child: SlideTransition(
-              position: slideAnim,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(28, 24, 28, 140),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: child,
+      ),
+    );
+  }
+}
+
+// ══ Slide 1 — Copy trading candlestick chart ═════════════════════════
+
+class _CopyTradingVisual extends StatefulWidget {
+  const _CopyTradingVisual();
+  @override
+  State<_CopyTradingVisual> createState() => _CopyTradingVisualState();
+}
+
+class _CopyTradingVisualState extends State<_CopyTradingVisual>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _a;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1600));
+    _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    _c.forward();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _HeroCard(
+      background: const Color(0xFFFBFCFE),
+      borderColor: AppColors.border,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _a,
+              builder: (_, __) => CustomPaint(
+                painter: _CandlePainter(
+                  progress: _a.value,
+                  candles: _upTrend,
+                  bullColor: AppColors.green,
+                  bearColor: AppColors.red,
+                  lineColor: AppColors.primary,
+                  gridColor: AppColors.border.withOpacity(0.7),
+                  dark: false,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: _Pill(
+              text: 'EUR/USD',
+              textColor: AppColors.textSecondary,
+              bg: Colors.white,
+              border: AppColors.border,
+            ),
+          ),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: _Pill(
+              text: '+24.3%',
+              textColor: AppColors.green,
+              bg: AppColors.green.withOpacity(0.10),
+              border: Colors.transparent,
+              bold: true,
+            ),
+          ),
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: _VerifiedRow(color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══ Slide 2 — Live stream (dark candles) ════════════════════════════
+
+class _LiveStreamVisual extends StatefulWidget {
+  const _LiveStreamVisual();
+  @override
+  State<_LiveStreamVisual> createState() => _LiveStreamVisualState();
+}
+
+class _LiveStreamVisualState extends State<_LiveStreamVisual>
+    with TickerProviderStateMixin {
+  late final AnimationController _draw;
+  late final Animation<double> _drawA;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _draw = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1600));
+    _drawA = CurvedAnimation(parent: _draw, curve: Curves.easeOutCubic);
+    _draw.forward();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _draw.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _HeroCard(
+      background: const Color(0xFF0B1120),
+      borderColor: const Color(0xFF1E293B),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _drawA,
+              builder: (_, __) => CustomPaint(
+                painter: _CandlePainter(
+                  progress: _drawA.value,
+                  candles: _liveTrend,
+                  bullColor: const Color(0xFF34D399),
+                  bearColor: const Color(0xFFF87171),
+                  lineColor: AppColors.primaryLight,
+                  gridColor: Colors.white.withOpacity(0.05),
+                  dark: true,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Row(
+              children: [
+                FadeTransition(
+                  opacity: _pulse,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 9, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 6,
+                          height: 6,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'LIVE',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '12.4K watching',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary.withOpacity(0.25),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.15)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'M',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Marcus Sterling',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Icon(Icons.verified_rounded,
+                    size: 14, color: AppColors.primaryLight),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══ Slide 3 — Earnings bars ══════════════════════════════════════
+
+class _EarnVisual extends StatefulWidget {
+  const _EarnVisual();
+  @override
+  State<_EarnVisual> createState() => _EarnVisualState();
+}
+
+class _EarnVisualState extends State<_EarnVisual>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _a;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1500));
+    _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    _c.forward();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _HeroCard(
+      background: const Color(0xFFFBFCFE),
+      borderColor: AppColors.border,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _a,
+              builder: (_, __) => CustomPaint(
+                painter: _BarPainter(progress: _a.value),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total earnings',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      label,
+                      '\$85,230',
                       style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        letterSpacing: 2.0,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      headline,
-                      style: GoogleFonts.inter(
-                        fontSize: 32,
+                        fontSize: 26,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
-                        letterSpacing: -1.0,
-                        height: 1.15,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      body,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textSecondary,
-                        height: 1.65,
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: _Pill(
+                        text: '+12.6%',
+                        textColor: AppColors.green,
+                        bg: AppColors.green.withOpacity(0.10),
+                        border: Colors.transparent,
+                        bold: true,
                       ),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══ Shared small widgets ═════════════════════════════════════
+
+class _Pill extends StatelessWidget {
+  final String text;
+  final Color textColor;
+  final Color bg;
+  final Color border;
+  final bool bold;
+  const _Pill({
+    required this.text,
+    required this.textColor,
+    required this.bg,
+    required this.border,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _VerifiedRow extends StatelessWidget {
+  final Color color;
+  const _VerifiedRow({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.verified_rounded, size: 14, color: AppColors.primary),
+        const SizedBox(width: 5),
+        Text(
+          'Verified on MT5',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: color,
           ),
         ),
       ],
@@ -260,418 +720,33 @@ class _OnboardingPage extends StatelessWidget {
   }
 }
 
-// ── Slide 1: Copy Trading Visual ─────────────────────────────────────────────
-
-class _CopyTradingVisual extends StatefulWidget {
-  @override
-  State<_CopyTradingVisual> createState() => _CopyTradingVisualState();
-}
-
-class _CopyTradingVisualState extends State<_CopyTradingVisual>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1400));
-    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
+class _MiniWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF0F5FF),
-      child: AnimatedBuilder(
-        animation: _anim,
-        builder: (_, __) => CustomPaint(
-          painter: _CopyTradingPainter(progress: _anim.value),
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
-  }
-}
-
-class _CopyTradingPainter extends CustomPainter {
-  final double progress;
-  const _CopyTradingPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final barData = [
-      [0.10, 0.75, 0.58, 0.52, 0.80, 1],
-      [0.22, 0.68, 0.50, 0.46, 0.72, 0],
-      [0.34, 0.58, 0.40, 0.36, 0.65, 1],
-      [0.46, 0.48, 0.28, 0.24, 0.55, 1],
-      [0.58, 0.35, 0.18, 0.14, 0.42, 1],
-      [0.70, 0.28, 0.14, 0.10, 0.34, 0],
-      [0.82, 0.20, 0.08, 0.05, 0.26, 1],
-    ];
-
-    final barBodyPaint = Paint()..style = PaintingStyle.fill;
-    final wickPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-
-    for (int i = 0; i < barData.length; i++) {
-      final p = ((progress - i * 0.09) / 0.37).clamp(0.0, 1.0);
-      if (p <= 0) continue;
-
-      final d = barData[i];
-      final bullish = d[5] == 1;
-      final color = bullish ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-      barBodyPaint.color = color.withOpacity(0.9);
-      wickPaint.color = color.withOpacity(0.5);
-
-      final bx = w * d[0];
-      final bw = w * 0.048;
-      final openY = h * d[1];
-      final closeY = h * (d[1] + (d[2] - d[1]) * p);
-      final highY = h * d[3];
-      final lowY = h * d[4];
-
-      canvas.drawLine(Offset(bx, highY), Offset(bx, lowY), wickPaint);
-
-      final top = math.min(openY, closeY);
-      final bot = math.max(openY, closeY);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTRB(bx - bw / 2, top, bx + bw / 2, math.max(bot, top + 3)),
-          const Radius.circular(3),
-        ),
-        barBodyPaint,
-      );
-    }
-
-    // Rising trend line
-    if (progress > 0.4) {
-      final lp = ((progress - 0.4) / 0.6).clamp(0.0, 1.0);
-      final linePaint = Paint()
-        ..color = AppColors.primary.withOpacity(0.45)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round;
-      final path = Path()
-        ..moveTo(w * 0.08, h * 0.78)
-        ..lineTo(w * (0.08 + 0.78 * lp), h * (0.78 - 0.60 * lp));
-      canvas.drawPath(path, linePaint);
-    }
-
-    // Return badge
-    if (progress > 0.75) {
-      final op = ((progress - 0.75) / 0.25).clamp(0.0, 1.0);
-      final bgP = Paint()
-        ..color = const Color(0xFF22C55E).withOpacity(0.10 * op);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.60, h * 0.07, w * 0.32, h * 0.13),
-          const Radius.circular(10),
-        ),
-        bgP,
-      );
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '+18.45%',
-          style: TextStyle(
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Text(
+          'millimore',
+          style: GoogleFonts.inter(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF22C55E).withOpacity(op),
-            fontFamily: 'Inter',
+            color: AppColors.textPrimary,
+            letterSpacing: -0.8,
           ),
         ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(w * 0.62, h * 0.09));
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CopyTradingPainter old) => old.progress != progress;
-}
-
-// ── Slide 2: Live Stream Visual ───────────────────────────────────────────────
-
-class _LiveStreamVisual extends StatefulWidget {
-  @override
-  State<_LiveStreamVisual> createState() => _LiveStreamVisualState();
-}
-
-class _LiveStreamVisualState extends State<_LiveStreamVisual>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF080D1A),
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) => CustomPaint(
-          painter: _LiveStreamPainter(t: _controller.value),
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveStreamPainter extends CustomPainter {
-  final double t;
-  const _LiveStreamPainter({required this.t});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final cy = h / 2;
-
-    for (int i = 0; i < 4; i++) {
-      final phase = (t + i * 0.25) % 1.0;
-      final radius = phase * math.min(w, h) * 0.46;
-      final opacity = (1.0 - phase) * 0.18;
-      canvas.drawCircle(
-        Offset(cx, cy),
-        radius,
-        Paint()
-          ..color = AppColors.primary.withOpacity(opacity)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      );
-    }
-
-    const barCount = 36;
-    for (int i = 0; i < barCount; i++) {
-      final angle = (i / barCount) * 2 * math.pi;
-      final wave = math.sin(angle * 3 + t * 2 * math.pi) * 0.5 + 0.5;
-      final innerR = h * 0.13;
-      final outerR = innerR + wave * h * 0.09 + 4;
-      final x1 = cx + innerR * math.cos(angle);
-      final y1 = cy + innerR * math.sin(angle);
-      final x2 = cx + outerR * math.cos(angle);
-      final y2 = cy + outerR * math.sin(angle);
-      canvas.drawLine(
-        Offset(x1, y1),
-        Offset(x2, y2),
-        Paint()
-          ..color = AppColors.primary.withOpacity(0.25 + wave * 0.55)
-          ..strokeWidth = 2.5
-          ..strokeCap = StrokeCap.round,
-      );
-    }
-
-    canvas.drawCircle(
-      Offset(cx, cy),
-      h * 0.12,
-      Paint()..color = const Color(0xFF0D1526),
-    );
-    canvas.drawCircle(
-      Offset(cx, cy),
-      h * 0.12,
-      Paint()
-        ..color = AppColors.primary.withOpacity(0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.06, h * 0.07, w * 0.22, h * 0.08),
-        const Radius.circular(6),
-      ),
-      Paint()..color = const Color(0xFFEF4444),
-    );
-
-    TextPainter(
-      text: const TextSpan(
-        text: '  LIVE',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-          letterSpacing: 1,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )
-      ..layout()
-      ..paint(canvas, Offset(w * 0.07, h * 0.082));
-
-    TextPainter(
-      text: TextSpan(
-        text: '12.4K watching',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.white.withOpacity(0.45),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )
-      ..layout()
-      ..paint(canvas, Offset(w * 0.06, h * 0.17));
-  }
-
-  @override
-  bool shouldRepaint(_LiveStreamPainter old) => old.t != t;
-}
-
-// ── Slide 3: Earn Visual ──────────────────────────────────────────────────────
-
-class _EarnVisual extends StatefulWidget {
-  @override
-  State<_EarnVisual> createState() => _EarnVisualState();
-}
-
-class _EarnVisualState extends State<_EarnVisual>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1400));
-    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF0F7F2),
-      child: AnimatedBuilder(
-        animation: _anim,
-        builder: (_, __) => CustomPaint(
-          painter: _EarnPainter(progress: _anim.value),
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
-  }
-}
-
-class _EarnPainter extends CustomPainter {
-  final double progress;
-  const _EarnPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final bars = [0.22, 0.35, 0.28, 0.50, 0.42, 0.65, 0.58, 0.88];
-    final barW = w * 0.062;
-    final baseY = h * 0.82;
-    final maxH = h * 0.58;
-
-    for (int i = 0; i < bars.length; i++) {
-      final p = ((progress - i * 0.07) / 0.44).clamp(0.0, 1.0);
-      if (p <= 0) continue;
-
-      final bh = bars[i] * maxH * p;
-      final xPos = w * 0.055 + i * (w * 0.117);
-      final isHighlight = i == bars.length - 1;
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(xPos, baseY - bh, barW, bh),
-          const Radius.circular(5),
-        ),
-        Paint()
-          ..color = isHighlight
-              ? const Color(0xFF22C55E)
-              : const Color(0xFF22C55E).withOpacity(0.20 + i * 0.09),
-      );
-    }
-
-    canvas.drawLine(
-      Offset(w * 0.04, baseY),
-      Offset(w * 0.96, baseY),
-      Paint()
-        ..color = const Color(0xFF22C55E).withOpacity(0.15)
-        ..strokeWidth = 1,
-    );
-
-    if (progress > 0.55) {
-      final op = ((progress - 0.55) / 0.45).clamp(0.0, 1.0);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.22, h * 0.09, w * 0.56, h * 0.18),
-          const Radius.circular(14),
-        ),
-        Paint()..color = const Color(0xFF22C55E).withOpacity(0.08 * op),
-      );
-      TextPainter(
-        text: TextSpan(
-          text: '\$85,230',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF22C55E).withOpacity(op),
-            fontFamily: 'Inter',
+        Positioned(
+          top: -3,
+          left: 23,
+          child: CustomPaint(
+            size: const Size(7, 7),
+            painter: _StarPainter(color: AppColors.primary),
           ),
         ),
-        textDirection: TextDirection.ltr,
-      )
-        ..layout()
-        ..paint(canvas, Offset(w * 0.28, h * 0.10));
-      TextPainter(
-        text: TextSpan(
-          text: 'Total earnings this month',
-          style: TextStyle(
-            fontSize: 12,
-            color: const Color(0xFF22C55E).withOpacity(op * 0.55),
-            fontFamily: 'Inter',
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )
-        ..layout()
-        ..paint(canvas, Offset(w * 0.26, h * 0.215));
-    }
+      ],
+    );
   }
-
-  @override
-  bool shouldRepaint(_EarnPainter old) => old.progress != progress;
 }
-
-// ── Page Indicator ────────────────────────────────────────────────────────────
 
 class _PageIndicator extends StatelessWidget {
   final int count;
@@ -688,7 +763,7 @@ class _PageIndicator extends StatelessWidget {
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
           margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: active ? 28 : 7,
+          width: active ? 26 : 7,
           height: 7,
           decoration: BoxDecoration(
             color: active ? AppColors.primary : AppColors.border,
@@ -698,4 +773,262 @@ class _PageIndicator extends StatelessWidget {
       }),
     );
   }
+}
+
+// ══ Painters ══════════════════════════════════════════════
+
+class _Candle {
+  final double open, high, low, close;
+  const _Candle(this.open, this.high, this.low, this.close);
+}
+
+const List<_Candle> _upTrend = [
+  _Candle(40, 44, 38, 43),
+  _Candle(43, 45, 41, 42),
+  _Candle(42, 47, 41, 46),
+  _Candle(46, 49, 44, 45),
+  _Candle(45, 51, 44, 50),
+  _Candle(50, 53, 48, 49),
+  _Candle(49, 56, 48, 55),
+  _Candle(55, 58, 53, 54),
+  _Candle(54, 62, 53, 61),
+  _Candle(61, 65, 59, 64),
+  _Candle(64, 70, 62, 69),
+];
+
+const List<_Candle> _liveTrend = [
+  _Candle(50, 54, 47, 48),
+  _Candle(48, 50, 44, 49),
+  _Candle(49, 55, 48, 54),
+  _Candle(54, 57, 51, 52),
+  _Candle(52, 58, 51, 57),
+  _Candle(57, 60, 54, 55),
+  _Candle(55, 63, 54, 62),
+  _Candle(62, 66, 60, 61),
+  _Candle(61, 68, 60, 67),
+  _Candle(67, 71, 64, 70),
+  _Candle(70, 76, 68, 75),
+];
+
+class _CandlePainter extends CustomPainter {
+  final double progress;
+  final List<_Candle> candles;
+  final Color bullColor;
+  final Color bearColor;
+  final Color lineColor;
+  final Color gridColor;
+  final bool dark;
+
+  const _CandlePainter({
+    required this.progress,
+    required this.candles,
+    required this.bullColor,
+    required this.bearColor,
+    required this.lineColor,
+    required this.gridColor,
+    required this.dark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    const padL = 18.0;
+    const padR = 18.0;
+    final padT = h * 0.20;
+    final padB = h * 0.16;
+    final chartH = h - padT - padB;
+    final chartW = w - padL - padR;
+
+    double minP = candles.first.low, maxP = candles.first.high;
+    for (final c in candles) {
+      minP = math.min(minP, c.low);
+      maxP = math.max(maxP, c.high);
+    }
+    final range = maxP - minP;
+    double mapY(double p) => padT + chartH * (1 - (p - minP) / range);
+
+    // Horizontal gridlines.
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+    for (int i = 0; i < 4; i++) {
+      final y = padT + chartH * i / 3;
+      canvas.drawLine(Offset(padL, y), Offset(w - padR, y), gridPaint);
+    }
+
+    final n = candles.length;
+    final slot = chartW / n;
+    final bodyW = slot * 0.46;
+
+    final visible = progress * n;
+
+    final bodyPaint = Paint()..style = PaintingStyle.fill;
+    final wickPaint = Paint()
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
+
+    final closePoints = <Offset>[];
+
+    for (int i = 0; i < n; i++) {
+      final reveal = (visible - i).clamp(0.0, 1.0);
+      if (reveal <= 0) break;
+
+      final c = candles[i];
+      final cx = padL + slot * (i + 0.5);
+      final bull = c.close >= c.open;
+      final color = bull ? bullColor : bearColor;
+
+      final highY = mapY(c.high);
+      final lowY = mapY(c.low);
+      final openY = mapY(c.open);
+      final closeY = mapY(c.close);
+
+      // Animate body growing from open toward close.
+      final animClose = openY + (closeY - openY) * reveal;
+      final animHigh = openY + (highY - openY) * reveal;
+      final animLow = openY + (lowY - openY) * reveal;
+
+      wickPaint.color = color.withOpacity(0.55 * reveal);
+      canvas.drawLine(Offset(cx, animHigh), Offset(cx, animLow), wickPaint);
+
+      bodyPaint.color = color.withOpacity(0.92 * reveal);
+      final top = math.min(openY, animClose);
+      final bot = math.max(openY, animClose);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(cx - bodyW / 2, top, cx + bodyW / 2,
+              math.max(bot, top + 2)),
+          const Radius.circular(2.5),
+        ),
+        bodyPaint,
+      );
+
+      if (reveal >= 1.0) closePoints.add(Offset(cx, closeY));
+    }
+
+    // Smooth trend line through closes.
+    if (closePoints.length >= 2) {
+      final linePaint = Paint()
+        ..color = lineColor.withOpacity(0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+
+      final path = Path()..moveTo(closePoints.first.dx, closePoints.first.dy);
+      for (int i = 0; i < closePoints.length - 1; i++) {
+        final p0 = closePoints[i];
+        final p1 = closePoints[i + 1];
+        final midX = (p0.dx + p1.dx) / 2;
+        path.cubicTo(midX, p0.dy, midX, p1.dy, p1.dx, p1.dy);
+      }
+      canvas.drawPath(path, linePaint);
+
+      // Glow dot at the leading close.
+      final last = closePoints.last;
+      canvas.drawCircle(
+          last, 7, Paint()..color = lineColor.withOpacity(0.18));
+      canvas.drawCircle(last, 3.5, Paint()..color = lineColor);
+      canvas.drawCircle(
+          last,
+          3.5,
+          Paint()
+            ..color = dark ? const Color(0xFF0B1120) : Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CandlePainter old) => old.progress != progress;
+}
+
+class _BarPainter extends CustomPainter {
+  final double progress;
+  const _BarPainter({required this.progress});
+
+  static const List<double> _bars = [
+    0.30, 0.42, 0.36, 0.55, 0.48, 0.66, 0.60, 0.82, 0.95
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    const padL = 18.0;
+    const padR = 18.0;
+    final baseY = h * 0.86;
+    final maxH = h * 0.46;
+    final n = _bars.length;
+    final slot = (w - padL - padR) / n;
+    final barW = slot * 0.5;
+
+    // Baseline.
+    canvas.drawLine(
+      Offset(padL, baseY),
+      Offset(w - padR, baseY),
+      Paint()
+        ..color = AppColors.green.withOpacity(0.18)
+        ..strokeWidth = 1,
+    );
+
+    final visible = progress * n;
+    for (int i = 0; i < n; i++) {
+      final reveal = (visible - i).clamp(0.0, 1.0);
+      if (reveal <= 0) break;
+      final cx = padL + slot * (i + 0.5);
+      final barH = _bars[i] * maxH * reveal;
+      final highlight = i >= n - 2;
+      final paint = Paint()
+        ..color = highlight
+            ? AppColors.green.withOpacity(0.95)
+            : AppColors.green.withOpacity(0.22 + i * 0.05);
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(cx - barW / 2, baseY - barH, barW, barH),
+          topLeft: const Radius.circular(5),
+          topRight: const Radius.circular(5),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BarPainter old) => old.progress != progress;
+}
+
+class _StarPainter extends CustomPainter {
+  final Color color;
+  const _StarPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final outer = size.width / 2;
+    final inner = size.width * 0.15;
+    final path = Path();
+    for (int i = 0; i < 4; i++) {
+      final oa = (i * 90 - 90) * math.pi / 180;
+      final ia = (i * 90 - 45) * math.pi / 180;
+      final ox = cx + outer * math.cos(oa);
+      final oy = cy + outer * math.sin(oa);
+      final ix = cx + inner * math.cos(ia);
+      final iy = cy + inner * math.sin(ia);
+      if (i == 0) {
+        path.moveTo(ox, oy);
+      } else {
+        path.lineTo(ox, oy);
+      }
+      path.lineTo(ix, iy);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_StarPainter old) => old.color != color;
 }
