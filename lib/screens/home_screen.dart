@@ -8,6 +8,7 @@ import '../state/session.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/millimore_logo.dart';
+import '../widgets/feed_post.dart';
 import 'trader_profile_screen.dart';
 import 'live_stream_screen.dart';
 import 'studio_screen.dart';
@@ -151,9 +152,10 @@ class FollowerHome extends StatelessWidget {
         SliverToBoxAdapter(child: _SectionHeader(title: 'From traders you follow')),
         SliverList(
           delegate: SliverChildBuilderDelegate(
-            (_, i) => Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-              child: _PostCard(post: posts[i]),
+            (_, i) => FeedPost(
+              post: posts[i],
+              onOpenProfile: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
             ),
             childCount: posts.length,
           ),
@@ -295,9 +297,10 @@ class CreatorHome extends StatelessWidget {
         SliverToBoxAdapter(child: _SectionHeader(title: 'Your recent posts')),
         SliverList(
           delegate: SliverChildBuilderDelegate(
-            (_, i) => Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-              child: _PostCard(post: posts[i]),
+            (_, i) => FeedPost(
+              post: posts[i],
+              onOpenProfile: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
             ),
             childCount: posts.length,
           ),
@@ -503,88 +506,6 @@ class _LiveTraderAvatar extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _PostCard extends StatelessWidget {
-  final Post post;
-  const _PostCard({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: post.trader))),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _TraderAvatar(name: post.trader.name, size: 40),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(post.trader.name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                          if (post.trader.isVerified) ...[
-                            const SizedBox(width: 4),
-                            const VerifiedBadge(size: 14),
-                          ],
-                        ],
-                      ),
-                      Text(post.timeAgo, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-                    ],
-                  ),
-                ),
-                if (post.pair != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
-                    child: Text(post.pair!, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(post.content, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary, height: 1.55)),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _ActionButton(icon: post.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, label: '${post.likes}', color: post.isLiked ? AppColors.red : AppColors.textMuted),
-                const SizedBox(width: 20),
-                _ActionButton(icon: Icons.chat_bubble_outline_rounded, label: '${post.comments}', color: AppColors.textMuted),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _ActionButton({required this.icon, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 5),
-        Text(label, style: GoogleFonts.inter(fontSize: 13, color: color, fontWeight: FontWeight.w500)),
-      ],
     );
   }
 }
