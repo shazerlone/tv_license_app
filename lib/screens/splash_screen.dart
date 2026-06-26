@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../config.dart';
 import '../theme/app_theme.dart';
 import '../services/storage_service.dart';
 import 'onboarding_screen.dart';
@@ -65,8 +66,10 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
 
-    final hasSeenOnboarding = StorageService.hasSeenOnboarding();
-    final next = hasSeenOnboarding ? const LoginScreen() : const OnboardingScreen();
+    // In dev mode always show onboarding so design changes are visible.
+    final showOnboarding = kDevMode || !StorageService.hasSeenOnboarding();
+    final next =
+        showOnboarding ? const OnboardingScreen() : const LoginScreen();
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
