@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../state/session.dart';
 import 'home_screen.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -78,6 +79,7 @@ class _OtpScreenState extends State<OtpScreen> {
     await Future.delayed(const Duration(milliseconds: 1100));
     if (!mounted) return;
     setState(() => _isLoading = false);
+    SessionScope.of(context).signInAsFollower(name: widget.name);
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,
