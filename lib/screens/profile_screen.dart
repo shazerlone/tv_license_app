@@ -9,6 +9,7 @@ import '../widgets/feed_post.dart';
 import '../widgets/verified_badge.dart';
 import 'trader_profile_screen.dart';
 import 'login_screen.dart';
+import 'accounts_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -135,6 +136,14 @@ class ProfileScreen extends StatelessWidget {
           children: [
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 20),
+            _SettingsRow(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Trading accounts',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
+              },
+            ),
             _SettingsRow(icon: Icons.person_outline_rounded, label: 'Edit profile'),
             _SettingsRow(icon: Icons.notifications_none_rounded, label: 'Notifications'),
             _SettingsRow(icon: Icons.shield_outlined, label: 'Privacy & security'),
@@ -293,12 +302,13 @@ class _Empty extends StatelessWidget {
 class _SettingsRow extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _SettingsRow({required this.icon, required this.label});
+  final VoidCallback? onTap;
+  const _SettingsRow({required this.icon, required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => Navigator.pop(context),
+      onTap: onTap ?? () => Navigator.pop(context),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 13),
         child: Row(

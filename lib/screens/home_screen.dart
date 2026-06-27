@@ -7,7 +7,6 @@ import '../models/trade.dart';
 import '../state/session.dart';
 import '../state/app_state.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/verified_badge.dart';
 import '../widgets/millimore_logo.dart';
 import '../widgets/feed_post.dart';
 import 'trader_profile_screen.dart';
@@ -15,6 +14,7 @@ import 'live_stream_screen.dart';
 import 'studio_screen.dart';
 import 'copied_trades_screen.dart';
 import 'profile_screen.dart';
+import 'discover_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -536,138 +536,3 @@ class _LiveTraderAvatar extends StatelessWidget {
   }
 }
 
-class _TraderAvatar extends StatelessWidget {
-  final String name;
-  final double size;
-  const _TraderAvatar({required this.name, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.1)),
-      child: Center(
-        child: Text(name[0], style: GoogleFonts.inter(fontSize: size * 0.4, fontWeight: FontWeight.w700, color: AppColors.primary)),
-      ),
-    );
-  }
-}
-
-// ── Discover (shared) ────────────────────────────────────────────────────────
-
-class DiscoverTab extends StatelessWidget {
-  const DiscoverTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          floating: true,
-          snap: true,
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          titleSpacing: 24,
-          title: Text('Discover', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-          sliver: SliverToBoxAdapter(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search traders, pairs, markets...',
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-          sliver: SliverToBoxAdapter(
-            child: Text('Top Traders', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          ),
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (_, i) => Padding(
-              padding: EdgeInsets.fromLTRB(24, i == 0 ? 12 : 0, 24, 12),
-              child: GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: mockTraders[i]))),
-                child: _TraderListItem(trader: mockTraders[i]),
-              ),
-            ),
-            childCount: mockTraders.length,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TraderListItem extends StatelessWidget {
-  final Trader trader;
-  const _TraderListItem({required this.trader});
-
-  @override
-  Widget build(BuildContext context) {
-    final store = AppStateScope.of(context);
-    final subscribed = store.isSubscribed(trader.id);
-    final isPositive = trader.returnPercent >= 0;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-      child: Row(
-        children: [
-          _TraderAvatar(name: trader.name, size: 44),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(trader.name, overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    ),
-                    if (trader.isVerified) ...[
-                      const SizedBox(width: 4),
-                      const VerifiedBadge(size: 14),
-                    ],
-                  ],
-                ),
-                Text('${trader.formattedFollowers} followers · ${trader.formattedReturn}',
-                    style: GoogleFonts.inter(fontSize: 12, color: isPositive ? AppColors.green : AppColors.red, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () => store.toggleSubscribe(trader.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: subscribed ? Colors.transparent : AppColors.textPrimary,
-                borderRadius: BorderRadius.circular(20),
-                border: subscribed ? Border.all(color: AppColors.border) : null,
-              ),
-              child: Text(
-                subscribed ? 'Subscribed' : 'Subscribe',
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: subscribed ? AppColors.textSecondary : Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

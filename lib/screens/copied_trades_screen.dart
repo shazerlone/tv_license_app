@@ -6,6 +6,7 @@ import '../models/copy_models.dart';
 import '../state/app_state.dart';
 import '../widgets/add_account_sheet.dart';
 import 'trader_profile_screen.dart';
+import 'accounts_screen.dart';
 
 /// Full copy-trading dashboard: net P/L, booked profit/loss, who you're copying,
 /// and every active / closed position.
@@ -29,9 +30,9 @@ class CopiedTradesScreen extends StatelessWidget {
                   Text('Copy trading', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.add_card_rounded, color: AppColors.textPrimary),
-                    tooltip: 'Add account',
-                    onPressed: () => AddAccountSheet.open(context),
+                    icon: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.textPrimary),
+                    tooltip: 'Manage accounts',
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen())),
                   ),
                 ],
               ),

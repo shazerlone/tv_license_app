@@ -387,16 +387,33 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPositive = trader.returnPercent >= 0;
+    final riskColor = trader.maxDrawdown <= 8
+        ? AppColors.green
+        : (trader.maxDrawdown <= 18 ? AppColors.primary : AppColors.red);
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+      child: Column(
         children: [
-          _StatCell(label: 'Return (${trader.returnDays}D)', value: trader.formattedReturn, valueColor: isPositive ? AppColors.green : AppColors.red),
-          _VDivider(),
-          _StatCell(label: 'Followers', value: trader.formattedFollowers),
-          _VDivider(),
-          _StatCell(label: 'AUM', value: trader.formattedAum),
+          Row(
+            children: [
+              _StatCell(label: 'Return (${trader.returnDays}D)', value: trader.formattedReturn, valueColor: isPositive ? AppColors.green : AppColors.red),
+              _VDivider(),
+              _StatCell(label: 'Win rate', value: '${trader.winRate.toStringAsFixed(0)}%'),
+              _VDivider(),
+              _StatCell(label: 'Copiers', value: trader.formattedCopiers),
+            ],
+          ),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 14), child: Divider(height: 1)),
+          Row(
+            children: [
+              _StatCell(label: 'Max DD', value: '-${trader.maxDrawdown.toStringAsFixed(1)}%'),
+              _VDivider(),
+              _StatCell(label: 'Risk', value: trader.riskLabel, valueColor: riskColor),
+              _VDivider(),
+              _StatCell(label: 'Trades', value: '${trader.totalTrades}'),
+            ],
+          ),
         ],
       ),
     );
