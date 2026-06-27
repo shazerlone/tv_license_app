@@ -3,9 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/trader.dart';
 import '../models/copy_models.dart';
+import '../data/brokers.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/add_account_sheet.dart';
+import '../widgets/broker_logo.dart';
 
 class CopyTradingScreen extends StatefulWidget {
   final Trader trader;
@@ -228,11 +230,7 @@ class _AccountSelector extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                    child: Center(child: Text(a.brokerName[0], style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary))),
-                  ),
+                  BrokerLogo(name: a.brokerName, logoUrl: brokerById(a.brokerId).logoUrl, size: 42),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

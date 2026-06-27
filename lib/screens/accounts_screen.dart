@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/copy_models.dart';
+import '../data/brokers.dart';
 import '../state/app_state.dart';
 import '../widgets/add_account_sheet.dart';
+import '../widgets/broker_logo.dart';
 
 class AccountsScreen extends StatelessWidget {
   const AccountsScreen({super.key});
@@ -54,11 +56,7 @@ class _AccountCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                child: Center(child: Text(account.brokerName[0], style: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.primary))),
-              ),
+              BrokerLogo(name: account.brokerName, logoUrl: brokerById(account.brokerId).logoUrl, size: 46),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

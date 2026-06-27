@@ -6,6 +6,7 @@ import '../data/brokers.dart';
 import '../models/copy_models.dart';
 import '../state/session.dart';
 import '../state/app_state.dart';
+import 'broker_logo.dart';
 
 /// Connect a broker account for copy trading. Brokers shown depend on the
 /// user's country of residence.
@@ -90,12 +91,39 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Connect a trading account',
-                              style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
-                          const SizedBox(height: 6),
-                          Text('Brokers available in $country. Pick where your live account is.',
-                              style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textMuted, height: 1.4)),
-                          const SizedBox(height: 20),
+                          // Hero header
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(color: const Color(0xFF0B1120), borderRadius: BorderRadius.circular(18)),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                                  child: const Icon(Icons.link_rounded, color: AppColors.primary, size: 22),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Connect a trading account', style: GoogleFonts.inter(fontSize: 16.5, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.3)),
+                                      const SizedBox(height: 3),
+                                      Text('Read-only mirror · disconnect anytime', style: GoogleFonts.inter(fontSize: 12.5, color: Colors.white.withOpacity(0.6))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Text('Available in $country', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           ...brokers.map((b) => _BrokerTile(
                                 broker: b,
                                 selected: _broker?.id == b.id,
@@ -195,11 +223,7 @@ class _BrokerTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-              child: Center(child: Text(broker.name[0], style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary))),
-            ),
+            BrokerLogo(name: broker.name, logoUrl: broker.logoUrl, size: 46),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

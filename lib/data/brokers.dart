@@ -4,14 +4,18 @@ class Broker {
   final String id;
   final String name;
   final String blurb;
+  final String domain;
   final bool recommended;
-  const Broker(this.id, this.name, this.blurb, {this.recommended = false});
+  const Broker(this.id, this.name, this.blurb, {required this.domain, this.recommended = false});
+
+  /// Logo via a public logo CDN (falls back gracefully in the UI).
+  String get logoUrl => 'https://logo.clearbit.com/$domain';
 }
 
-const Broker _century = Broker('century', 'Century', 'Our recommended partner — fast execution, low spreads', recommended: true);
-const Broker _xm = Broker('xm', 'XM', 'Global broker, widely available');
-const Broker _exness = Broker('exness', 'Exness', 'Low spreads, instant withdrawals');
-const Broker _vantage = Broker('vantage', 'Vantage', 'Trusted multi-asset broker');
+const Broker _century = Broker('century', 'Century', 'Our recommended partner — fast execution, low spreads', domain: 'centuryfinancial.ae', recommended: true);
+const Broker _xm = Broker('xm', 'XM', 'Global broker, widely available', domain: 'xm.com');
+const Broker _exness = Broker('exness', 'Exness', 'Low spreads, instant withdrawals', domain: 'exness.com');
+const Broker _vantage = Broker('vantage', 'Vantage', 'Trusted multi-asset broker', domain: 'vantagemarkets.com');
 
 const List<Broker> _allBrokers = [_century, _xm, _exness, _vantage];
 
