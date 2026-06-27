@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../state/session.dart';
+import 'go_live_screen.dart';
 
 class StudioScreen extends StatelessWidget {
   const StudioScreen({super.key});
@@ -29,7 +30,10 @@ class StudioScreen extends StatelessWidget {
             // Primary actions
             Row(
               children: [
-                Expanded(child: _BigAction(icon: Icons.podcasts_rounded, title: 'Go Live', sub: 'Stream to followers', color: AppColors.red, locked: pending, onTap: () => _action(context, 'Go Live'))),
+                Expanded(child: _BigAction(icon: Icons.podcasts_rounded, title: 'Go Live', sub: 'Stream to followers', color: AppColors.red, locked: pending, onTap: () {
+                  if (pending) { _action(context, 'Go Live'); return; }
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const GoLiveScreen()));
+                })),
                 const SizedBox(width: 12),
                 Expanded(child: _BigAction(icon: Icons.add_chart_rounded, title: 'Post Trade', sub: 'Share a setup', color: AppColors.primary, locked: pending, onTap: () => _action(context, 'Post Trade'))),
               ],

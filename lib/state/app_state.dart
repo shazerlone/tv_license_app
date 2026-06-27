@@ -217,6 +217,38 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // ── Live broadcasting (creator) ─────────────────────────────────────────────
+  // Backend (Cloudflare Stream Live) will supply the real ingest URL + key and
+  // manage simulcast Outputs to YouTube / Facebook.
+  final String streamKey = 'mlm_${(math.Random().nextInt(900000) + 100000)}_live';
+  String get ingestUrl => 'rtmps://live.millimore.app:443/live';
+
+  bool _isBroadcasting = false;
+  bool get isBroadcasting => _isBroadcasting;
+
+  int _viewers = 0;
+  int get viewers => _viewers;
+
+  // Connected simulcast destinations (besides Millimore, which is always on).
+  final Set<String> _destinations = {};
+  bool isDestinationOn(String id) => _destinations.contains(id);
+  void toggleDestination(String id) {
+    _destinations.contains(id) ? _destinations.remove(id) : _destinations.add(id);
+    notifyListeners();
+  }
+
+  void startBroadcast() {
+    _isBroadcasting = true;
+    _viewers = 1 + math.Random().nextInt(40);
+    notifyListeners();
+  }
+
+  void endBroadcast() {
+    _isBroadcasting = false;
+    _viewers = 0;
+    notifyListeners();
+  }
+
   List<Comment> _seedComments(Post post) {
     // A little realistic seed so the thread isn't empty.
     return [

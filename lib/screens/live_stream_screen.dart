@@ -1,8 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/trader.dart';
+import '../models/trade.dart';
+import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
+import 'copy_trading_screen.dart';
 
 class LiveStreamScreen extends StatefulWidget {
   final Trader? trader;
@@ -12,352 +16,303 @@ class LiveStreamScreen extends StatefulWidget {
   State<LiveStreamScreen> createState() => _LiveStreamScreenState();
 }
 
-class _LiveStreamScreenState extends State<LiveStreamScreen> {
-  final TextEditingController _chatController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  bool _isFollowing = false;
+class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerProviderStateMixin {
+  final _chatController = TextEditingController();
+  late final AnimationController _anim;
+  late final int _viewers;
 
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(user: 'alex_t', text: 'great setup on EURUSD!', time: '2m'),
-    _ChatMessage(user: 'jade_fx', text: 'following this one live', time: '1m'),
-    _ChatMessage(user: 'crypto_k', text: 'what is your SL here?', time: '1m'),
-    _ChatMessage(user: 'mark99', text: 'copied!', time: '45s'),
-    _ChatMessage(user: 'luna_t', text: 'amazing analysis as always', time: '30s'),
+  final List<_Msg> _messages = [
+    _Msg('alex_t', 'great setup on EURUSD!'),
+    _Msg('jade_fx', 'following this one live'),
+    _Msg('crypto_k', 'what is your SL here?'),
+    _Msg('mark99', 'copied! 🔥'),
+    _Msg('luna_t', 'clean analysis as always'),
   ];
 
-  final Trader _defaultTrader = mockTraders[0];
+  Trader get _trader => widget.trader ?? mockTraders[0];
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+    _viewers = 800 + math.Random().nextInt(11000);
+  }
 
   @override
   void dispose() {
     _chatController.dispose();
-    _scrollController.dispose();
+    _anim.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
-    final text = _chatController.text.trim();
-    if (text.isEmpty) return;
+  void _send() {
+    final t = _chatController.text.trim();
+    if (t.isEmpty) return;
     setState(() {
-      _messages.add(_ChatMessage(user: 'you', text: text, time: 'now'));
+      _messages.add(_Msg('you', t));
       _chatController.clear();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final trader = widget.trader ?? _defaultTrader;
+    final trader = _trader;
+    final store = AppStateScope.of(context);
+    final subscribed = store.isSubscribed(trader.id);
+    final liveTrade = mockTrades.firstWhere(
+      (t) => t.traderId == trader.id && t.status == TradeStatus.open,
+      orElse: () => mockTrades.first,
+    );
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Column(
+      backgroundColor: const Color(0xFF0B1120),
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        fit: StackFit.expand,
         children: [
-          Expanded(
-            flex: 3,
-            child: Stack(
-              fit: StackFit.expand,
+          // "Stream" — animated chart
+          AnimatedBuilder(animation: _anim, builder: (_, __) => CustomPaint(painter: _StreamPainter(progress: _anim.value))),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                colors: [Colors.black.withOpacity(0.55), Colors.transparent, Colors.black.withOpacity(0.85)],
+                stops: const [0, 0.4, 1],
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
               children: [
-                Container(
-                  color: const Color(0xFF0A0F1E),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.candlestick_chart_rounded, size: 72, color: Colors.white.withOpacity(0.1)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Live Chart Stream',
-                          style: GoogleFonts.inter(fontSize: 14, color: Colors.white.withOpacity(0.2)),
+                // Top bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.35), shape: BoxShape.circle),
+                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 38, height: 38,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.15), border: Border.all(color: Colors.white, width: 1.5)),
+                        child: Center(child: Text(trader.name[0], style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white))),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(children: [
+                              Flexible(child: Text(trader.name, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white))),
+                              if (trader.isVerified) ...[const SizedBox(width: 4), const VerifiedBadge(size: 13)],
+                            ]),
+                            Text('@${trader.username}', style: GoogleFonts.inter(fontSize: 11.5, color: Colors.white70)),
+                          ],
+                        ),
+                      ),
+                      if (!subscribed)
+                        GestureDetector(
+                          onTap: () => store.subscribe(trader.id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                            child: Text('Subscribe', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF0B1120))),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            if (widget.trader != null)
-                              IconButton(
-                                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                                onPressed: () => Navigator.pop(context),
-                              )
-                            else
-                              const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.red,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.circle, size: 8, color: Colors.white),
-                                  const SizedBox(width: 4),
-                                  Text('LIVE', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5)),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.remove_red_eye_outlined, size: 12, color: Colors.white),
-                                  const SizedBox(width: 4),
-                                  Text('12K', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
-                                ],
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, color: Colors.white),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                          ],
+                const SizedBox(height: 10),
+                // LIVE + viewers
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(6)),
+                        child: Text('LIVE', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.35), borderRadius: BorderRadius.circular(6)),
+                        child: Row(children: [
+                          const Icon(Icons.remove_red_eye_rounded, size: 13, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(_fmt(_viewers), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ]),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                // Live trade overlay
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _LiveTradeCard(trade: liveTrade),
+                ),
+                const SizedBox(height: 12),
+                // Chat
+                SizedBox(
+                  height: 150,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _messages.length,
+                    itemBuilder: (_, i) => _ChatLine(msg: _messages[i]),
+                  ),
+                ),
+                // Input row
+                Padding(
+                  padding: EdgeInsets.fromLTRB(12, 6, 12, 8 + MediaQuery.of(context).viewInsets.bottom * 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _chatController,
+                          onSubmitted: (_) => _send(),
+                          style: GoogleFonts.inter(fontSize: 14, color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Say something...',
+                            hintStyle: GoogleFonts.inter(fontSize: 14, color: Colors.white54),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.12),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                          ),
                         ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.primary.withOpacity(0.3),
-                                border: Border.all(color: Colors.white.withOpacity(0.3)),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  trader.name[0],
-                                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(trader.name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-                                    if (trader.isVerified) ...[
-                                      const SizedBox(width: 4),
-                                      const VerifiedBadge(size: 14),
-                                    ],
-                                  ],
-                                ),
-                                Text(
-                                  trader.formattedReturn + ' (30D)',
-                                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.green, fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: () => setState(() => _isFollowing = !_isFollowing),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _isFollowing ? Colors.white.withOpacity(0.15) : AppColors.primary,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _isFollowing ? 'Following' : 'Follow',
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: trader))),
+                        child: Container(
+                          height: 44, padding: const EdgeInsets.symmetric(horizontal: 16),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(24)),
+                          child: Row(children: [
+                            const Icon(Icons.copy_all_rounded, size: 16, color: Colors.white),
+                            const SizedBox(width: 6),
+                            Text('Copy', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                          ]),
                         ),
-                        const SizedBox(height: 8),
-                        _LiveTradeBar(trader: trader),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: Container(
-              color: AppColors.background,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      itemCount: _messages.length,
-                      itemBuilder: (_, i) => _ChatBubble(message: _messages[i]),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    decoration: const BoxDecoration(
-                      border: Border(top: BorderSide(color: AppColors.border)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _chatController,
-                            onSubmitted: (_) => _sendMessage(),
-                            style: GoogleFonts.inter(fontSize: 14),
-                            decoration: const InputDecoration(
-                              hintText: 'Say something...',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        GestureDetector(
-                          onTap: _sendMessage,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
+
+  String _fmt(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}K' : '$n';
 }
 
-class _LiveTradeBar extends StatelessWidget {
-  final Trader trader;
-  const _LiveTradeBar({required this.trader});
+class _LiveTradeCard extends StatelessWidget {
+  final Trade trade;
+  const _LiveTradeCard({required this.trade});
 
   @override
   Widget build(BuildContext context) {
+    final profit = trade.isProfit;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
       ),
       child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('EUR/USD', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-              Text('BUY 1.08764  +0.47%', style: GoogleFonts.inter(fontSize: 12, color: AppColors.green, fontWeight: FontWeight.w500)),
-            ],
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(7),
-              ),
-              child: Text('Copy Trade', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: Text('Oppose', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChatMessage {
-  final String user;
-  final String text;
-  final String time;
-  const _ChatMessage({required this.user, required this.text, required this.time});
-}
-
-class _ChatBubble extends StatelessWidget {
-  final _ChatMessage message;
-  const _ChatBubble({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withOpacity(0.1),
-            ),
-            child: Center(
-              child: Text(
-                message.user[0].toUpperCase(),
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
-              ),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(6)),
+            child: Text('LIVE TRADE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
           ),
+          const SizedBox(width: 12),
+          Text(trade.pair, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
           const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(message.user, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    const SizedBox(width: 6),
-                    Text(message.time, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(message.text, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary)),
-              ],
-            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(color: (trade.direction == TradeDirection.buy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
+            child: Text(trade.directionLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: trade.direction == TradeDirection.buy ? AppColors.green : AppColors.red)),
           ),
+          const Spacer(),
+          Text(trade.formattedPnl, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
         ],
       ),
     );
   }
+}
+
+class _ChatLine extends StatelessWidget {
+  final _Msg msg;
+  const _ChatLine({required this.msg});
+
+  @override
+  Widget build(BuildContext context) {
+    final me = msg.user == 'you';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(text: '${msg.user}  ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: me ? AppColors.primary : Colors.white.withOpacity(0.85))),
+            TextSpan(text: msg.text, style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Msg {
+  final String user;
+  final String text;
+  _Msg(this.user, this.text);
+}
+
+class _StreamPainter extends CustomPainter {
+  final double progress;
+  _StreamPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), Paint()..color = const Color(0xFF0B1120));
+    final grid = Paint()..color = Colors.white.withOpacity(0.04)..strokeWidth = 1;
+    for (int i = 1; i < 12; i++) {
+      final y = size.height * i / 12;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+    final rng = math.Random(3);
+    const n = 22;
+    final w = size.width / n;
+    double price = size.height * 0.5;
+    for (int i = 0; i < n; i++) {
+      final x = w * i + w / 2;
+      final open = price;
+      price = (price + (rng.nextDouble() - 0.5) * size.height * 0.05).clamp(size.height * 0.3, size.height * 0.7);
+      final bull = price <= open;
+      final c = bull ? AppColors.green : AppColors.red;
+      final top = math.min(open, price);
+      final h = (open - price).abs().clamp(2.0, double.infinity);
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x - w * 0.3, top, w * 0.6, h), const Radius.circular(2)), Paint()..color = c.withOpacity(0.4));
+    }
+    // moving price dot
+    final px = size.width * progress;
+    canvas.drawCircle(Offset(px, size.height * 0.45), 4, Paint()..color = AppColors.primary);
+  }
+
+  @override
+  bool shouldRepaint(_StreamPainter old) => old.progress != progress;
 }
