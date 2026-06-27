@@ -30,7 +30,7 @@ class _PhoneFieldState extends State<PhoneField> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _CountryPickerSheet(),
+      builder: (_) => const CountryPickerSheet(),
     );
     if (selected != null) widget.onCountryChanged(selected);
   }
@@ -103,14 +103,59 @@ class _PhoneFieldState extends State<PhoneField> {
   }
 }
 
-class _CountryPickerSheet extends StatefulWidget {
-  const _CountryPickerSheet();
+/// A labelled, tappable country selector field (for country of residence).
+class CountryField extends StatelessWidget {
+  final Country? country;
+  final ValueChanged<Country> onChanged;
+  final String hint;
+  const CountryField({super.key, required this.country, required this.onChanged, this.hint = 'Select country'});
+
+  Future<void> _open(BuildContext context) async {
+    final selected = await showModalBottomSheet<Country>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const CountryPickerSheet(),
+    );
+    if (selected != null) onChanged(selected);
+  }
 
   @override
-  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _open(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            if (country != null) ...[
+              Text(country!.flag, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 10),
+              Text(country!.name, style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary, fontWeight: FontWeight.w500)),
+            ] else
+              Text(hint, style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
+            const Spacer(),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppColors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+class CountryPickerSheet extends StatefulWidget {
+  const CountryPickerSheet({super.key});
+
+  @override
+  State<CountryPickerSheet> createState() => CountryPickerSheetState();
+}
+
+class CountryPickerSheetState extends State<CountryPickerSheet> {
   String _query = '';
 
   @override

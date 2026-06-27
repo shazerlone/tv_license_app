@@ -11,6 +11,8 @@ class UserProfile {
   final UserRole role;
   final String? market; // e.g. 'Forex', 'US', 'India'
   final String? platform; // e.g. 'MetaTrader 5'
+  final String? residenceIso; // e.g. 'IN'
+  final String? residenceCountry; // e.g. 'India'
   final CreatorStatus creatorStatus;
 
   const UserProfile({
@@ -19,6 +21,8 @@ class UserProfile {
     required this.role,
     this.market,
     this.platform,
+    this.residenceIso,
+    this.residenceCountry,
     this.creatorStatus = CreatorStatus.none,
   });
 
@@ -30,6 +34,8 @@ class UserProfile {
     UserRole? role,
     String? market,
     String? platform,
+    String? residenceIso,
+    String? residenceCountry,
     CreatorStatus? creatorStatus,
   }) {
     return UserProfile(
@@ -38,6 +44,8 @@ class UserProfile {
       role: role ?? this.role,
       market: market ?? this.market,
       platform: platform ?? this.platform,
+      residenceIso: residenceIso ?? this.residenceIso,
+      residenceCountry: residenceCountry ?? this.residenceCountry,
       creatorStatus: creatorStatus ?? this.creatorStatus,
     );
   }
@@ -52,8 +60,14 @@ class SessionController extends ChangeNotifier {
   bool get isSignedIn => _user != null;
   bool get isCreator => _user?.isCreator ?? false;
 
-  void signInAsFollower({required String name, String? photoUrl}) {
-    _user = UserProfile(name: name, photoUrl: photoUrl, role: UserRole.follower);
+  void signInAsFollower({required String name, String? photoUrl, String? residenceIso, String? residenceCountry}) {
+    _user = UserProfile(
+      name: name,
+      photoUrl: photoUrl,
+      role: UserRole.follower,
+      residenceIso: residenceIso,
+      residenceCountry: residenceCountry,
+    );
     notifyListeners();
   }
 
@@ -62,6 +76,8 @@ class SessionController extends ChangeNotifier {
     String? photoUrl,
     String? market,
     String? platform,
+    String? residenceIso,
+    String? residenceCountry,
     CreatorStatus status = CreatorStatus.pending,
   }) {
     _user = UserProfile(
@@ -70,6 +86,8 @@ class SessionController extends ChangeNotifier {
       role: UserRole.creator,
       market: market,
       platform: platform,
+      residenceIso: residenceIso,
+      residenceCountry: residenceCountry,
       creatorStatus: status,
     );
     notifyListeners();

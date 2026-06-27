@@ -30,6 +30,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   Country _country = countryByIso('IN');
+  Country? _residence;
   final _formKey1 = GlobalKey<FormState>();
 
   // Market & platform
@@ -75,6 +76,10 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
     switch (_step) {
       case 1:
         if (!_formKey1.currentState!.validate()) return;
+        if (_residence == null) {
+          _toast('Please select your country of residence');
+          return;
+        }
         _go(2);
         break;
       case 2:
@@ -131,6 +136,8 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
       name: _nameController.text.trim().isEmpty ? 'Creator' : _nameController.text.trim(),
       market: _market?.name,
       platform: _platform?.name,
+      residenceIso: _residence?.iso,
+      residenceCountry: _residence?.name,
       status: CreatorStatus.pending,
     );
     Navigator.of(context).pushAndRemoveUntil(
@@ -202,6 +209,8 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
           phoneController: _phoneController,
           country: _country,
           onCountryChanged: (c) => setState(() => _country = c),
+          residence: _residence,
+          onResidenceChanged: (c) => setState(() => _residence = c),
           onContinue: _next,
         );
       case 2:
@@ -396,6 +405,8 @@ class _StepPersonal extends StatelessWidget {
   final TextEditingController phoneController;
   final Country country;
   final ValueChanged<Country> onCountryChanged;
+  final Country? residence;
+  final ValueChanged<Country> onResidenceChanged;
   final VoidCallback onContinue;
 
   const _StepPersonal({
@@ -404,6 +415,8 @@ class _StepPersonal extends StatelessWidget {
     required this.phoneController,
     required this.country,
     required this.onCountryChanged,
+    required this.residence,
+    required this.onResidenceChanged,
     required this.onContinue,
   });
 
@@ -442,6 +455,14 @@ class _StepPersonal extends StatelessWidget {
                   country: country,
                   onCountryChanged: onCountryChanged,
                   onSubmitted: onContinue,
+                ),
+                const SizedBox(height: 20),
+                _FieldLabel('Country of residence'),
+                const SizedBox(height: 8),
+                CountryField(
+                  country: residence,
+                  hint: 'Where do you live?',
+                  onChanged: onResidenceChanged,
                 ),
               ],
             ),

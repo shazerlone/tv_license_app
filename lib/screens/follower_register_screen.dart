@@ -20,6 +20,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   final _phoneController = TextEditingController();
 
   Country _country = countryByIso('IN');
+  Country? _residence;
   String? _photoDataUrl;
   String? _experience;
   final Set<String> _interests = {};
@@ -71,6 +72,12 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
 
   Future<void> _continue() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_residence == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your country of residence')),
+      );
+      return;
+    }
     if (_experience == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select your trading experience')),
@@ -86,6 +93,8 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
         builder: (_) => OtpScreen(
           phoneNumber: '${_country.dialCode} ${_phoneController.text.trim()}',
           name: _nameController.text.trim(),
+          residenceIso: _residence!.iso,
+          residenceCountry: _residence!.name,
         ),
       ),
     );
@@ -163,6 +172,15 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
                           country: _country,
                           onCountryChanged: (c) => setState(() => _country = c),
                           onSubmitted: _continue,
+                        ),
+                        const SizedBox(height: 20),
+
+                        _Label('Country of residence'),
+                        const SizedBox(height: 8),
+                        CountryField(
+                          country: _residence,
+                          hint: 'Where do you live?',
+                          onChanged: (c) => setState(() => _residence = c),
                         ),
                         const SizedBox(height: 20),
 

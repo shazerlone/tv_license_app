@@ -9,7 +9,15 @@ import 'home_screen.dart';
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
   final String name;
-  const OtpScreen({super.key, required this.phoneNumber, required this.name});
+  final String? residenceIso;
+  final String? residenceCountry;
+  const OtpScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.name,
+    this.residenceIso,
+    this.residenceCountry,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -79,7 +87,11 @@ class _OtpScreenState extends State<OtpScreen> {
     await Future.delayed(const Duration(milliseconds: 1100));
     if (!mounted) return;
     setState(() => _isLoading = false);
-    SessionScope.of(context).signInAsFollower(name: widget.name);
+    SessionScope.of(context).signInAsFollower(
+      name: widget.name,
+      residenceIso: widget.residenceIso,
+      residenceCountry: widget.residenceCountry,
+    );
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,

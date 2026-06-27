@@ -1,6 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
+import '../models/trader.dart';
+import '../models/copy_models.dart';
 
 /// The app's reactive data store: subscriptions, saved posts, likes and
 /// comments. Swap the in-memory maps for a backend later — the UI only talks
@@ -90,6 +93,128 @@ class AppState extends ChangeNotifier {
       ),
     );
     notifyListeners();
+  }
+
+  // ── Trading accounts ─────────────────────────────────────────────────────
+  final List<TradingAccount> _accounts = [];
+  List<TradingAccount> get accounts => List.unmodifiable(_accounts);
+  bool get hasAccount => _accounts.isNotEmpty;
+
+  TradingAccount addAccount({
+    required String brokerId,
+    required String brokerName,
+    required String accountNumber,
+    required String server,
+    double balance = 5000,
+  }) {
+    final acc = TradingAccount(
+      id: 'acc_${DateTime.now().millisecondsSinceEpoch}',
+      brokerId: brokerId,
+      brokerName: brokerName,
+      accountNumber: accountNumber,
+      server: server,
+      balance: balance,
+      connectedAt: DateTime.now(),
+    );
+    _accounts.add(acc);
+    notifyListeners();
+    return acc;
+  }
+
+  void removeAccount(String id) {
+    _accounts.removeWhere((a) => a.id == id);
+    notifyListeners();
+  }
+
+  // ── Copy engine ───────────────────────────────────────────────────────────
+  final Map<String, CopyConfig> _copying = {};
+  final List<CopyPosition> _positions = [];
+
+  bool isCopying(String traderId) => _copying.containsKey(traderId);
+  CopyConfig? copyConfig(String traderId) => _copying[traderId];
+  List<CopyConfig> get activeCopies => _copying.values.toList();
+  int get copyingCount => _copying.length;
+
+  List<CopyPosition> get positions => List.unmodifiable(_positions);
+  List<CopyPosition> get activePositions =>
+      _positions.where((p) => p.status == PositionStatus.active).toList();
+  List<CopyPosition> get closedPositions =>
+      _positions.where((p) => p.status == PositionStatus.closed).toList();
+
+  double get openPnl => activePositions.fold(0, (s, p) => s + p.pnlAmount);
+  double get bookedProfit =>
+      closedPositions.where((p) => p.pnlAmount >= 0).fold(0, (s, p) => s + p.pnlAmount);
+  double get bookedLoss =>
+      closedPositions.where((p) => p.pnlAmount < 0).fold(0, (s, p) => s + p.pnlAmount);
+  double get netPnl => openPnl + bookedProfit + bookedLoss;
+  double get totalInvested => _copying.values.fold(0, (s, c) => s + c.amount);
+
+  void startCopy(Trader trader, {required String accountId, required double amount, required double risk, required bool autoCopy}) {
+    _copying[trader.id] = CopyConfig(
+      traderId: trader.id,
+      accountId: accountId,
+      amount: amount,
+      risk: risk,
+      autoCopy: autoCopy,
+      startedAt: DateTime.now(),
+    );
+    _seedPositions(trader, accountId, amount);
+    notifyListeners();
+  }
+
+  void stopCopy(String traderId) {
+    _copying.remove(traderId);
+    notifyListeners();
+  }
+
+  void _seedPositions(Trader trader, String accountId, double amount) {
+    final rng = math.Random(trader.id.hashCode ^ DateTime.now().millisecond);
+    final pairs = trader.tags.where((t) => t.contains('/')).toList();
+    final symbols = pairs.isNotEmpty ? pairs : ['EUR/USD', 'XAU/USD', 'GBP/USD'];
+
+    // 2 active
+    for (int i = 0; i < 2; i++) {
+      final pct = (rng.nextDouble() * 3 - 1);
+      _positions.insert(
+        0,
+        CopyPosition(
+          id: 'pos_${DateTime.now().microsecondsSinceEpoch}_$i',
+          traderId: trader.id,
+          traderName: trader.name,
+          pair: symbols[rng.nextInt(symbols.length)],
+          isBuy: rng.nextBool(),
+          status: PositionStatus.active,
+          entryPrice: 1 + rng.nextDouble(),
+          pnlAmount: amount * pct / 100,
+          pnlPercent: pct,
+          lots: (0.05 + rng.nextDouble() * 0.4),
+          openedAt: DateTime.now().subtract(Duration(hours: rng.nextInt(20) + 1)),
+          accountId: accountId,
+        ),
+      );
+    }
+    // 2 closed
+    for (int i = 0; i < 2; i++) {
+      final pct = (rng.nextDouble() * 4 - 1.3);
+      _positions.add(
+        CopyPosition(
+          id: 'pos_c_${DateTime.now().microsecondsSinceEpoch}_$i',
+          traderId: trader.id,
+          traderName: trader.name,
+          pair: symbols[rng.nextInt(symbols.length)],
+          isBuy: rng.nextBool(),
+          status: PositionStatus.closed,
+          entryPrice: 1 + rng.nextDouble(),
+          exitPrice: 1 + rng.nextDouble(),
+          pnlAmount: amount * pct / 100,
+          pnlPercent: pct,
+          lots: (0.05 + rng.nextDouble() * 0.4),
+          openedAt: DateTime.now().subtract(Duration(days: rng.nextInt(6) + 1)),
+          closedAt: DateTime.now().subtract(Duration(hours: rng.nextInt(20) + 1)),
+          accountId: accountId,
+        ),
+      );
+    }
   }
 
   List<Comment> _seedComments(Post post) {
