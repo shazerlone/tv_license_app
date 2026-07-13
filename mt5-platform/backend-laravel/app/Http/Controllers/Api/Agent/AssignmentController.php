@@ -24,6 +24,7 @@ class AssignmentController extends Controller
         $server = $request->attributes->get('vps_server');
 
         $accounts = $server->tradingAccounts()
+            ->where('is_managed', true)   // never touch discovered/unmanaged terminals
             ->with('terminal:id,trading_account_id,status,instance_key')
             ->get()
             ->map(function ($account) {

@@ -177,7 +177,7 @@
 
     document.getElementById('accounts-body').innerHTML = d.accounts.length ? d.accounts.map(a => `
       <tr>
-        <td><b>${esc(a.login)}</b><br><span class="muted" style="font-size:11px">${esc(a.broker_server)}</span></td>
+        <td><b>${esc(a.login)}</b>${a.managed?'':' <span class="pill" style="background:#334155;color:#94a3b8;font-size:10px">discovered</span>'}<br><span class="muted" style="font-size:11px">${esc(a.broker_server)}</span></td>
         <td>${esc(a.label||'—')}</td>
         <td>${a.server ? esc(a.server) : '<span class="muted">unassigned</span>'}</td>
         <td><span class="pill" style="background:${statusColor(a.status)}22;color:${statusColor(a.status)}">
@@ -187,12 +187,13 @@
         <td>${a.ram!=null?a.ram+' MB':'—'}</td>
         <td>${a.restarts}</td>
         <td style="white-space:nowrap">
+          ${a.managed ? `
           <form class="inline" method="POST" action="/dashboard/accounts/${a.id}/restart">
             <input type="hidden" name="_token" value="${CSRF}"><button class="btn sm">↻</button></form>
           ${a.desired==='running'
             ? `<form class="inline" method="POST" action="/dashboard/accounts/${a.id}/stop"><input type="hidden" name="_token" value="${CSRF}"><button class="btn sm">■ stop</button></form>`
-            : `<form class="inline" method="POST" action="/dashboard/accounts/${a.id}/start"><input type="hidden" name="_token" value="${CSRF}"><button class="btn sm">▶ start</button></form>`}
-          <form class="inline" method="POST" action="/dashboard/accounts/${a.id}" onsubmit="return confirm('Delete ${esc(a.login)}?')">
+            : `<form class="inline" method="POST" action="/dashboard/accounts/${a.id}/start"><input type="hidden" name="_token" value="${CSRF}"><button class="btn sm">▶ start</button></form>`}` : `<span class="muted" style="font-size:11px">monitor-only</span>`}
+          <form class="inline" method="POST" action="/dashboard/accounts/${a.id}" onsubmit="return confirm('Remove ${esc(a.login)} from the list?')">
             <input type="hidden" name="_token" value="${CSRF}"><input type="hidden" name="_method" value="DELETE">
             <button class="btn sm danger">✕</button></form>
         </td>

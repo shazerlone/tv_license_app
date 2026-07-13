@@ -14,7 +14,7 @@ class TradingAccount extends Model
 
     protected $fillable = [
         'login', 'broker_server', 'password_encrypted', 'password_type',
-        'label', 'owner', 'license_id', 'desired_state', 'vps_server_id',
+        'label', 'owner', 'license_id', 'desired_state', 'is_managed', 'vps_server_id',
         'status', 'assigned_at', 'last_connected_at',
     ];
 
@@ -25,6 +25,7 @@ class TradingAccount extends Model
      */
     protected $casts = [
         'password_encrypted' => 'encrypted',
+        'is_managed'         => 'boolean',
         'assigned_at'        => 'datetime',
         'last_connected_at'  => 'datetime',
     ];

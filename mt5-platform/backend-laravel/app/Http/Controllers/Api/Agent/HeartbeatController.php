@@ -44,6 +44,15 @@ class HeartbeatController extends Controller
             'terminals.*.instance_key'    => ['nullable', 'string'],
             'terminals.*.data_dir'        => ['nullable', 'string'],
             'terminals.*.last_error'      => ['nullable', 'string'],
+
+            // Terminals discovered already running (started outside the platform).
+            'discovered'                  => ['sometimes', 'array'],
+            'discovered.*.login'          => ['required', 'string'],
+            'discovered.*.broker_server'  => ['nullable', 'string'],
+            'discovered.*.os_pid'         => ['nullable', 'integer'],
+            'discovered.*.cpu_pct'        => ['nullable', 'numeric'],
+            'discovered.*.ram_mb'         => ['nullable', 'integer'],
+            'discovered.*.data_dir'       => ['nullable', 'string'],
         ]);
 
         DB::transaction(function () use ($server, $data) {
@@ -105,6 +114,11 @@ class HeartbeatController extends Controller
                 }
             }
 
+            // Discovered (unmanaged) terminals already running on this VPS.
+            foreach ($data['discovered'] ?? [] as $d) {
+                $this->ingestDiscovered($server, $d);
+            }
+
             // Host-level time series + denormalised current values.
             HealthMetric::create([
                 'vps_server_id'    => $server->id,
@@ -130,6 +144,55 @@ class HeartbeatController extends Controller
         });
 
         return response()->json(['ok' => true, 'server_time' => now()->toIso8601String()]);
+    }
+
+    /**
+     * Upsert a monitor-only account + terminal for a terminal we found running
+     * but did not launch. Marked is_managed=false so the agent never controls it;
+     * no password is stored.
+     */
+    private function ingestDiscovered(VpsServer $server, array $d): void
+    {
+        $broker = $d['broker_server'] ?: 'unknown';
+
+        $account = TradingAccount::firstOrNew([
+            'login'         => $d['login'],
+            'broker_server' => $broker,
+        ]);
+
+        // Never override a real managed account that happens to match.
+        if ($account->exists && $account->is_managed) {
+            return;
+        }
+
+        if (! $account->exists) {
+            $account->password_encrypted = '';        // no credentials for discovered
+            $account->owner              = 'discovered';
+            $account->label              = 'Discovered';
+        }
+        $account->is_managed        = false;
+        $account->desired_state     = 'stopped';       // agent must not act on it
+        $account->vps_server_id     = $server->id;
+        $account->status            = 'connected';
+        $account->last_connected_at = now();
+        $account->save();
+
+        $instance = TerminalInstance::firstOrNew(['trading_account_id' => $account->id]);
+        $instance->fill([
+            'vps_server_id'     => $server->id,
+            'os_pid'            => $d['os_pid'] ?? null,
+            'instance_key'      => (string) $d['login'],
+            'data_dir'          => $d['data_dir'] ?? $instance->data_dir,
+            'status'            => 'connected',
+            'cpu_pct'           => $d['cpu_pct'] ?? null,
+            'ram_mb'            => $d['ram_mb'] ?? null,
+            'mt5_connected'     => true,
+            'last_heartbeat_at' => now(),
+        ]);
+        if (! $instance->started_at) {
+            $instance->started_at = now();
+        }
+        $instance->save();
     }
 
     private function accountStatusFrom(array $t): string

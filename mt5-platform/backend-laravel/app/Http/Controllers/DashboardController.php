@@ -205,6 +205,7 @@ class DashboardController extends Controller
                 'server'        => $a->server?->name,
                 'status'        => $a->status,
                 'desired'       => $a->desired_state,
+                'managed'       => (bool) $a->is_managed,
                 'cpu'           => $a->terminal?->cpu_pct,
                 'ram'           => $a->terminal?->ram_mb,
                 'connected'     => (bool) $a->terminal?->mt5_connected,

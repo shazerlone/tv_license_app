@@ -24,6 +24,7 @@ from logging.handlers import RotatingFileHandler
 
 import yaml
 
+import discovery
 import metrics
 from api_client import ApiClient
 from mt5_installer import Mt5Installer
@@ -248,10 +249,17 @@ class Agent:
                 "data_dir": inst.data_dir,
             })
 
+        # Discover MT5 terminals running on this box that we didn't launch.
+        managed_pids = {i.pid for i in self.instances.values() if i.pid}
+        discovered = []
+        if self.cfg.get("discovery", {}).get("enabled", True):
+            discovered = discovery.discover(managed_pids)
+
         payload = {
             "host": metrics.host_metrics(),
             "agent_version": self.cfg.get("agent_version", "1.0.0"),
             "terminals": terminals,
+            "discovered": discovered,
         }
         self.api.send_heartbeat(payload)
 
