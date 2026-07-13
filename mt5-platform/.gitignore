@@ -1,0 +1,15 @@
+# Agent runtime
+agent-python/config.yaml
+agent-python/logs/
+agent-python/events.buffer.json
+__pycache__/
+*.pyc
+
+# Laravel (when you build the real app around backend-laravel/)
+/vendor/
+/node_modules/
+.env
+.env.*
+!.env.example
+/storage/*.key
+*.log

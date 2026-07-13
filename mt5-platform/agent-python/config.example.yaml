@@ -1,0 +1,49 @@
+# ── MT5 Windows Agent config ────────────────────────────────────────────────
+# Copy to config.yaml and fill in. Keep this file readable ONLY by the service
+# account (see install-service.ps1 — it locks the ACL).
+
+api:
+  # Your Laravel control-plane base URL. HTTPS ONLY in production.
+  base_url: "https://panel.example.com/api"
+  # The per-VPS agent token shown ONCE when you registered this server
+  # (POST /api/servers). Rotate via POST /api/servers/{id}/rotate-token.
+  token: "vps_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  # Verify the control plane's TLS cert. Leave true. Point at a CA bundle if
+  # you use a private CA.
+  verify_tls: true
+  # ca_bundle: "C:\\mt5agent\\ca.pem"
+  timeout_seconds: 20
+
+poll:
+  assignments_interval: 15   # how often to reconcile desired state (seconds)
+  heartbeat_interval: 20     # how often to push host+terminal metrics (seconds)
+
+mt5:
+  # Path to the MetaTrader 5 executable used to spawn terminals.
+  terminal_exe: "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
+  # Root folder under which each account gets its own portable data dir.
+  data_root: "C:\\mt5data"
+  # Seconds to wait after launch before expecting a live process.
+  startup_grace: 25
+
+watchdog:
+  # Restart backoff: delay = base * 2**(consecutive_failures-1), capped at max.
+  restart_base_seconds: 5
+  restart_max_seconds: 300
+  # Circuit breaker: if a terminal restarts more than this in a rolling hour,
+  # stop restarting it and report it 'errored' for a human.
+  max_restarts_per_hour: 6
+
+limits:
+  # Resource-aware guard. The agent will NOT launch a new terminal while the
+  # host is at/over these. Match (or stay under) the server's soft limits.
+  ram_soft_limit_mb: 6500
+  cpu_soft_limit_pct: 85
+  # Minimum free RAM that must remain AFTER launching one more terminal.
+  ram_headroom_mb: 400
+
+logging:
+  file: "C:\\mt5agent\\logs\\agent.log"
+  level: "INFO"          # DEBUG for troubleshooting (never logs passwords)
+  max_bytes: 10485760    # 10 MB
+  backups: 5
