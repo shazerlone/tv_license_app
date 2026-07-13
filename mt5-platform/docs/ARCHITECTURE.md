@@ -126,9 +126,10 @@ mt5-platform/
 │   └── routes/api.php          # Phase 3 endpoints
 │
 └── agent-python/               # Windows Agent (Phase 4 & 5)
-    ├── agent.py                # entry point / supervisor loop
+    ├── agent.py                # entry point / supervisor loop + bootstrap
     ├── api_client.py           # talks to Laravel Agent API
-    ├── mt5_manager.py          # launch/stop terminal64.exe, write config.ini
+    ├── mt5_installer.py        # auto-download + silent-install MT5 on bare VPS
+    ├── mt5_manager.py          # launch/stop terminal64.exe, warm pool, config.ini
     ├── watchdog.py             # crash detection + restart policy
     ├── metrics.py              # psutil CPU/RAM per PID + host rollup
     ├── config.example.yaml     # per-VPS config
@@ -151,6 +152,11 @@ mt5-platform/
 - **At-least-once events.** Terminal events (crash, restart, login-failed) are queued
   locally on the agent and re-sent until Laravel ACKs, so a control-plane blip never
   loses an audit record.
+- **Zero-touch MT5 provisioning.** A bare VPS needs no MetaTrader pre-install: on first
+  boot the agent downloads and silent-installs MT5 (`mt5setup.exe /auto`), resolves the
+  real `terminal64.exe` path, and keeps `warm_count` spare terminal folders
+  pre-copied. Adding an account on the web is all it takes — the terminal is
+  provisioned (instantly from the warm pool) and launched with no manual VPS work.
 
 ## 1.7 Security posture (summary — see SECURITY.md)
 

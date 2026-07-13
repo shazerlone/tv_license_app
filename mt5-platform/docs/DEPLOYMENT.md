@@ -24,14 +24,23 @@ php artisan key:generate          # sets APP_KEY — this key decrypts MT5 passw
 php artisan migrate
 ```
 
-### Register the agent middleware alias
+### Register the agent middleware alias + JSON 401s
 Laravel 11+ — in `bootstrap/app.php`:
 ```php
 ->withMiddleware(function (Middleware $middleware) {
     $middleware->alias(['agent.auth' => \App\Http\Middleware\AuthenticateAgent::class]);
 })
+->withExceptions(function (Exceptions $exceptions) {
+    // Return 401 JSON for unauthenticated API calls even without an Accept header
+    // (otherwise guests get a 500 from the missing web 'login' route).
+    $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+        if ($request->is('api/*')) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+    });
+})
 ```
-Laravel 10 — add to `$middlewareAliases` in `app/Http/Kernel.php`.
+Laravel 10 — add the alias to `$middlewareAliases` in `app/Http/Kernel.php`.
 
 ### Schedule the background jobs
 `routes/console.php` (or `Kernel::schedule`):
@@ -66,12 +75,15 @@ Nginx/Apache + Let's Encrypt (or your CA). The agent **requires** a valid cert.
 ## B. Windows Agent (per VPS)
 
 ### Prereqs on the VPS
-- MetaTrader 5 installed at `C:\Program Files\MetaTrader 5\terminal64.exe`
-  (or point `mt5.terminal_exe` at wherever it lives).
+- **MetaTrader 5 does NOT need to be pre-installed.** With `mt5.auto_install: true`
+  (default) the agent downloads `mt5setup.exe` and silent-installs it (`/auto`) on
+  first boot, then keeps `warm_count` spare terminals pre-provisioned so new accounts
+  launch instantly. A bare Windows VPS is enough. (For a broker that requires its own
+  branded build, set `mt5.installer_urls["<Broker-Server>"]`.)
 - Python 3.11+ (`python.exe`).
 - NSSM (https://nssm.cc) for the service wrapper.
 - Enough disk for one MT5 copy per account (~few hundred MB each; budget ~10 GB for
-  ~25 accounts). If disk is tight, share one install via junctions instead of copies.
+  ~25 accounts) plus the warm spare(s). If disk is tight, lower `warm_count` to 0.
 
 ### Register the server, then install
 ```powershell
@@ -113,6 +125,48 @@ Assign an account (`POST /accounts`) and watch a `terminal64.exe` spawn.
   least-loaded online server.
 - To retire a box: `POST /servers/{id}/status {status:"draining"}` (no new
   assignments), move its accounts (stop → they re-place elsewhere), then `disabled`.
+
+## F. Everything on ONE Windows VPS (simplest test setup)
+
+Run the control plane **and** the agent on the same bare VPS. Fastest way to a real
+end-to-end test; MT5 installs itself.
+
+```powershell
+# 1. Install runtimes (Chocolatey makes this one-liner-ish)
+Set-ExecutionPolicy Bypass -Scope Process -Force
+iwr https://community.chocolatey.org/install.ps1 -UseBasicParsing | iex
+choco install -y php composer python nssm
+
+# 2. Control plane (SQLite = no MySQL to configure for a test)
+composer create-project laravel/laravel C:\mt5-panel
+cd C:\mt5-panel
+composer require laravel/sanctum
+#  copy backend-laravel\app\*, database\*, routes\api.php into C:\mt5-panel
+#  edit bootstrap\app.php (alias + 401 render, see above)
+#  add HasApiTokens to app\Models\User.php
+New-Item database\database.sqlite -ItemType File -Force
+#  in .env set: DB_CONNECTION=sqlite   (comment out the other DB_* lines)
+php artisan install:api --no-interaction
+php artisan key:generate           # APP_KEY — decrypts MT5 passwords. BACK IT UP.
+php artisan migrate
+#  serve it (behind IIS/Apache for prod; for a test:)
+Start-Process php -ArgumentList 'artisan','serve','--host=0.0.0.0','--port=8000'
+
+# 3. Register this VPS, grab the token
+#    POST http://127.0.0.1:8000/api/servers  (with a Sanctum token) → copy agent_token
+
+# 4. Agent — points at the local panel; auto-installs MT5 on first run
+cd path\to\agent-python
+copy config.example.yaml config.yaml
+#  set api.base_url = http://127.0.0.1:8000/api  and api.token = <agent_token>
+#  set api.verify_tls = false ONLY for this localhost test (use HTTPS in prod)
+.\install-service.ps1 -InstallDir "C:\mt5agent"
+```
+Then add an account via `POST /api/accounts` and watch the agent auto-install MT5,
+provision the terminal, and report it back. Move MySQL + HTTPS in once the flow works.
+
+> Getting a **Sanctum token** for the operator calls in a test: `php artisan tinker`
+> then `\App\Models\User::factory()->create()->createToken('t')->plainTextToken;`
 
 ## E. Operational runbook
 | Symptom | Check | Fix |

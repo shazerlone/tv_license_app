@@ -18,7 +18,9 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 
 import psutil
@@ -40,12 +42,22 @@ class Instance:
 
 
 class Mt5Manager:
-    def __init__(self, terminal_exe: str, data_root: str, startup_grace: int = 25):
+    def __init__(self, terminal_exe: str, data_root: str, startup_grace: int = 25,
+                 warm_count: int = 1):
         self.base_exe = terminal_exe
         self.base_dir = os.path.dirname(terminal_exe)
         self.data_root = data_root
         self.startup_grace = startup_grace
+        self.warm_count = warm_count
+        self.pool_dir = os.path.join(data_root, "_pool")
+        self._pool_lock = threading.Lock()
         os.makedirs(data_root, exist_ok=True)
+        os.makedirs(self.pool_dir, exist_ok=True)
+
+    def set_base_exe(self, terminal_exe: str) -> None:
+        """Point the manager at the base install the installer resolved."""
+        self.base_exe = terminal_exe
+        self.base_dir = os.path.dirname(terminal_exe)
 
     # ── paths ────────────────────────────────────────────────────────────────
     def instance_dir(self, login: str) -> str:
@@ -54,15 +66,10 @@ class Mt5Manager:
     def instance_exe(self, login: str) -> str:
         return os.path.join(self.instance_dir(login), "terminal64.exe")
 
-    # ── provisioning ─────────────────────────────────────────────────────────
-    def ensure_installed(self, login: str) -> None:
-        """Copy the base MT5 install into this account's folder once."""
-        target = self.instance_dir(login)
-        if os.path.isfile(self.instance_exe(login)):
-            return
-        log.info("Provisioning MT5 instance folder for %s", login)
+    # ── warm pool ────────────────────────────────────────────────────────────
+    def _copy_install(self, target: str) -> None:
+        """Copy the base MT5 install into `target` (robocopy on Windows)."""
         os.makedirs(target, exist_ok=True)
-        # robocopy is fast + robust on Windows; fall back to shutil elsewhere.
         try:
             subprocess.run(
                 ["robocopy", self.base_dir, target, "/E", "/NFL", "/NDL", "/NJH", "/NJS", "/NP"],
@@ -70,6 +77,47 @@ class Mt5Manager:
             )
         except FileNotFoundError:
             shutil.copytree(self.base_dir, target, dirs_exist_ok=True)
+
+    def _pool_slots(self) -> list[str]:
+        return [os.path.join(self.pool_dir, d) for d in os.listdir(self.pool_dir)
+                if os.path.isfile(os.path.join(self.pool_dir, d, "terminal64.exe"))]
+
+    def _claim_warm(self, login: str) -> bool:
+        """Atomically hand a pre-built pool slot to this account (fast rename)."""
+        with self._pool_lock:
+            slots = self._pool_slots()
+            if not slots:
+                return False
+            src = slots[0]
+            try:
+                os.rename(src, self.instance_dir(login))
+                log.info("Claimed warm MT5 instance for %s", login)
+                return True
+            except OSError:
+                return False
+
+    def refill_pool_async(self) -> None:
+        """Top the warm pool back up to `warm_count` in a background thread."""
+        threading.Thread(target=self._refill_pool, daemon=True).start()
+
+    def _refill_pool(self) -> None:
+        if not os.path.isfile(self.base_exe):
+            return  # base not installed yet; nothing to copy from
+        while len(self._pool_slots()) < self.warm_count:
+            slot = os.path.join(self.pool_dir, f"warm_{uuid.uuid4().hex[:8]}")
+            log.info("Pre-provisioning warm MT5 instance %s", slot)
+            self._copy_install(slot)
+
+    # ── provisioning ─────────────────────────────────────────────────────────
+    def ensure_installed(self, login: str) -> None:
+        """Ensure this account has its own MT5 folder: claim a warm slot if one
+        exists (instant), else copy the base install. Then refill the pool."""
+        if os.path.isfile(self.instance_exe(login)):
+            return
+        log.info("Provisioning MT5 instance folder for %s", login)
+        if not self._claim_warm(login):
+            self._copy_install(self.instance_dir(login))
+        self.refill_pool_async()
 
     def _write_login_ini(self, login: str, password: str, server: str) -> str:
         """Write the one-shot auto-login config MT5 reads at startup."""

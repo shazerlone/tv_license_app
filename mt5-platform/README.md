@@ -35,6 +35,10 @@ Operator UI ──HTTPS──▶ Laravel control plane (MySQL) ◀──HTTPS─
   reboot re-adopts running terminals; a dead agent is caught by heartbeat staleness.
 - **Resource-aware.** The scheduler won't over-pack a box, and the agent refuses to
   launch a terminal when CPU/RAM headroom is gone.
+- **Self-provisioning on bare VPS.** No MetaTrader pre-install needed — the agent
+  downloads + silent-installs MT5 on first boot and keeps one spare terminal *warm*
+  so the next account starts instantly. Add the meta details on the web; the terminal
+  appears automatically.
 
 ## Capacity note (read this)
 
@@ -53,9 +57,13 @@ with more VPS servers for the rest. Configurable per server via `max_terminals`,
 4. **Add an account:** `POST /api/accounts` with the MT5 meta details → the least-loaded
    VPS launches its terminal automatically.
 
-## Status
+## Status — tested
 
-Reference implementation. The Laravel PHP lints clean and the Python agent
-byte-compiles; wire it into a real Laravel app + a Windows VPS per
-`docs/DEPLOYMENT.md`. The `backend-laravel/` tree contains the app-specific files you
-drop into a stock `laravel new` project — not a full standalone Laravel install.
+The control plane was run for real (Laravel 13 + SQLite) and the full API flow
+verified end-to-end; the agent's watchdog and warm-pool logic pass deterministic
+tests. See `docs/TEST_RESULTS.md`. Only the Windows-only pieces (actual
+`terminal64.exe` launch, MT5 silent install, psutil on live terminals) must be
+exercised on a real Windows VPS — walkthrough in `docs/DEPLOYMENT.md §F`.
+
+The `backend-laravel/` tree contains the app-specific files you drop into a stock
+`laravel new` project — not a full standalone Laravel install.

@@ -26,6 +26,7 @@ import yaml
 
 import metrics
 from api_client import ApiClient
+from mt5_installer import Mt5Installer
 from mt5_manager import Instance, Mt5Manager
 from watchdog import Watchdog
 
@@ -46,9 +47,19 @@ class Agent:
             verify_tls=cfg["api"].get("ca_bundle") or cfg["api"].get("verify_tls", True),
             timeout=cfg["api"].get("timeout_seconds", 20),
         )
+        mt5c = cfg["mt5"]
         self.mt5 = Mt5Manager(
-            cfg["mt5"]["terminal_exe"], cfg["mt5"]["data_root"],
-            startup_grace=cfg["mt5"].get("startup_grace", 25),
+            mt5c["terminal_exe"], mt5c["data_root"],
+            startup_grace=mt5c.get("startup_grace", 25),
+            warm_count=mt5c.get("warm_count", 1),
+        )
+        self.auto_install = mt5c.get("auto_install", True)
+        self.installer = Mt5Installer(
+            mt5c["terminal_exe"],
+            download_dir=mt5c.get("download_dir", os.path.join(mt5c["data_root"], "_installer")),
+            installer_url=mt5c.get("installer_url"),
+            installer_urls=mt5c.get("installer_urls"),
+            install_timeout=mt5c.get("install_timeout", 300),
         )
         wd = cfg["watchdog"]
         self.watchdog = Watchdog(
@@ -245,11 +256,31 @@ class Agent:
         self.api.send_heartbeat(payload)
 
     # ── main loop ────────────────────────────────────────────────────────────
+    def bootstrap(self) -> None:
+        """Self-provision MT5 on a bare VPS, then warm the spare pool so the
+        first account launches instantly. Runs once at startup."""
+        if not self.auto_install:
+            return
+        try:
+            if not self.installer.base_installed():
+                self.emit("agent_started", "info", "No MT5 found — auto-installing")
+                resolved = self.installer.ensure_base_install()
+                self.mt5.set_base_exe(resolved)
+                self.emit("started", "info", f"MT5 installed at {resolved}")
+            else:
+                self.mt5.set_base_exe(self.installer.terminal_exe)
+            # Pre-provision the warm spare(s) in the background.
+            self.mt5.refill_pool_async()
+        except Exception as exc:
+            log.exception("MT5 bootstrap failed: %s", exc)
+            self.emit("agent_error", "error", f"MT5 auto-install failed: {exc}")
+
     def run(self) -> None:
         signal.signal(signal.SIGTERM, self._stop)
         signal.signal(signal.SIGINT, self._stop)
         log.info("Agent starting — %d instance(s) adopted on boot", len(self.instances))
         self.emit("agent_started", "info", "Agent process started")
+        self.bootstrap()
 
         while self.running:
             now = time.time()

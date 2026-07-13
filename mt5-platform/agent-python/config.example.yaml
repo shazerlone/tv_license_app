@@ -19,12 +19,30 @@ poll:
   heartbeat_interval: 20     # how often to push host+terminal metrics (seconds)
 
 mt5:
-  # Path to the MetaTrader 5 executable used to spawn terminals.
+  # Expected path to the MetaTrader 5 executable. On a BARE VPS this file won't
+  # exist yet — the agent auto-installs MT5 (see auto_install) and, if the real
+  # path differs, resolves it by searching Program Files.
   terminal_exe: "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
   # Root folder under which each account gets its own portable data dir.
   data_root: "C:\\mt5data"
   # Seconds to wait after launch before expecting a live process.
   startup_grace: 25
+
+  # ── Automatic provisioning (bare-VPS support) ──────────────────────────────
+  # If MT5 isn't installed, download + silent-install it on first boot.
+  auto_install: true
+  download_dir: "C:\\mt5data\\_installer"
+  install_timeout: 300
+  # Default installer (generic MetaQuotes build). Override per broker below if a
+  # broker requires its own branded terminal to reach its servers.
+  installer_url: "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe"
+  # Optional: broker_server -> installer URL (branded builds).
+  # installer_urls:
+  #   "ICMarketsSC-Demo": "https://download.mql5.com/.../icmarkets5setup.exe"
+
+  # Keep this many pre-installed spare terminals warm so the NEXT account starts
+  # instantly (no copy wait). 1 = the "always one extra download ready" you asked for.
+  warm_count: 1
 
 watchdog:
   # Restart backoff: delay = base * 2**(consecutive_failures-1), capped at max.
