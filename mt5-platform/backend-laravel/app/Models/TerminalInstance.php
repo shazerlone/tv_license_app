@@ -15,11 +15,17 @@ class TerminalInstance extends Model
         'trading_account_id', 'vps_server_id', 'os_pid', 'data_dir', 'instance_key',
         'status', 'cpu_pct', 'ram_mb', 'mt5_connected', 'restart_count',
         'last_restart_at', 'last_error', 'started_at', 'last_heartbeat_at',
+        'login_verified', 'balance', 'equity', 'profit', 'open_trades',
+        'account_currency', 'leverage',
     ];
 
     protected $casts = [
         'mt5_connected'    => 'boolean',
+        'login_verified'   => 'boolean',
         'cpu_pct'          => 'decimal:2',
+        'balance'          => 'decimal:2',
+        'equity'           => 'decimal:2',
+        'profit'           => 'decimal:2',
         'last_restart_at'  => 'datetime',
         'started_at'       => 'datetime',
         'last_heartbeat_at'=> 'datetime',

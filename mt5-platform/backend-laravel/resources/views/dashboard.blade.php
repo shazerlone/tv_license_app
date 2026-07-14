@@ -123,7 +123,7 @@
       <table>
         <thead><tr>
           <th>Login</th><th>Label</th><th>Server</th><th>Status</th>
-          <th>CPU</th><th>RAM</th><th>Restarts</th><th>Actions</th>
+          <th>Balance</th><th>Trades</th><th>CPU</th><th>RAM</th><th>Restarts</th><th>Actions</th>
         </tr></thead>
         <tbody id="accounts-body"></tbody>
       </table>
@@ -183,6 +183,8 @@
         <td><span class="pill" style="background:${statusColor(a.status)}22;color:${statusColor(a.status)}">
             <span class="dot" style="background:${statusColor(a.status)}"></span>${a.status}</span>
             ${a.desired==='stopped'?' <span class="muted" style="font-size:11px">(stopping)</span>':''}</td>
+        <td>${a.balance!=null?`<b>${a.balance}</b> <span class="muted" style="font-size:10px">${esc(a.currency||'')}</span>`:'—'}</td>
+        <td>${a.trades!=null?a.trades:'—'}</td>
         <td>${a.cpu!=null?a.cpu+'%':'—'}</td>
         <td>${a.ram!=null?a.ram+' MB':'—'}</td>
         <td>${a.restarts}</td>
@@ -197,7 +199,7 @@
             <input type="hidden" name="_token" value="${CSRF}"><input type="hidden" name="_method" value="DELETE">
             <button class="btn sm danger">✕</button></form>
         </td>
-      </tr>`).join('') : '<tr><td colspan="8" class="muted">No accounts yet — add one above.</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="10" class="muted">No accounts yet — add one above.</td></tr>';
   }
 
   function tick() {

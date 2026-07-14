@@ -209,6 +209,11 @@ class DashboardController extends Controller
                 'cpu'           => $a->terminal?->cpu_pct,
                 'ram'           => $a->terminal?->ram_mb,
                 'connected'     => (bool) $a->terminal?->mt5_connected,
+                'verified'      => (bool) $a->terminal?->login_verified,
+                'balance'       => $a->terminal?->balance,
+                'equity'        => $a->terminal?->equity,
+                'trades'        => $a->terminal?->open_trades,
+                'currency'      => $a->terminal?->account_currency,
                 'restarts'      => $a->terminal?->restart_count ?? 0,
             ]);
     }

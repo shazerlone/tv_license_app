@@ -39,6 +39,7 @@ class Instance:
     pid: int | None = None
     proc: subprocess.Popen | None = field(default=None, repr=False)
     started_at: float | None = None
+    password: str = field(default="", repr=False)   # kept in memory for balance queries
 
 
 class Mt5Manager:
@@ -145,10 +146,21 @@ class Mt5Manager:
         exe = self.instance_exe(login)
 
         log.info("Launching terminal for account=%s login=%s", account_id, login)
+        # Launch MINIMIZED (not hidden). MT5 is a GUI app and needs the desktop —
+        # it must run in an interactive session, so the agent runs in the user's
+        # session (see deployment), never as a Session-0 service.
+        startupinfo = None
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 7   # SW_SHOWMINNOACTIVE
+        except AttributeError:            # non-Windows (never launched there)
+            startupinfo = None
+
         proc = subprocess.Popen(
             [exe, "/portable", f"/config:{ini}"],
             cwd=self.instance_dir(login),
-            creationflags=CREATE_NO_WINDOW,
+            startupinfo=startupinfo,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -156,7 +168,7 @@ class Mt5Manager:
         inst = Instance(
             account_id=account_id, login=str(login), server=server,
             data_dir=self.instance_dir(login), pid=proc.pid, proc=proc,
-            started_at=time.time(),
+            started_at=time.time(), password=password,
         )
 
         # Give MT5 a moment to read the ini, then scrub the plaintext password.

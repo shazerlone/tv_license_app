@@ -26,6 +26,7 @@ import yaml
 
 import discovery
 import metrics
+import mt5_query
 from api_client import ApiClient
 from mt5_installer import Mt5Installer
 from mt5_manager import Instance, Mt5Manager
@@ -75,6 +76,10 @@ class Agent:
         self.instances: dict[int, Instance] = {}
         # account_id -> restart_count (reported to control plane)
         self.restart_counts: dict[int, int] = {}
+        # balance-query throttle + last result cache
+        self.balance_interval = mt5c.get("balance_query_interval", 60)
+        self._last_balance_query: dict[int, float] = {}
+        self._account_cache: dict[int, dict] = {}
         # durable event buffer
         self.event_file = os.path.join(os.path.dirname(cfg["logging"]["file"]), "events.buffer.json")
         self.events: list[dict] = self._load_events()
@@ -152,7 +157,8 @@ class Agent:
                 inst = Instance(account_id=account_id, login=str(a["login"]),
                                 server=a["broker_server"],
                                 data_dir=self.mt5.instance_dir(str(a["login"])),
-                                pid=pid, started_at=time.time())
+                                pid=pid, started_at=time.time(),
+                                password=a.get("password", ""))
                 self.instances[account_id] = inst
                 metrics.prime_cpu(pid)
                 return
@@ -211,6 +217,25 @@ class Agent:
         self.watchdog.forget(account_id)
         self.restart_counts.pop(account_id, None)
 
+    def _maybe_query_account(self, account_id: int, inst: Instance) -> dict | None:
+        """Query real MT5 account data, throttled to balance_interval seconds.
+        Returns the last cached result between queries so balances stay visible."""
+        now = time.time()
+        due = now - self._last_balance_query.get(account_id, 0) >= self.balance_interval
+        if not due:
+            return self._account_cache.get(account_id)
+        self._last_balance_query[account_id] = now
+        try:
+            result = mt5_query.query(
+                self.mt5.instance_exe(inst.login), inst.login, inst.password, inst.server,
+            )
+        except Exception as exc:                       # never break heartbeat
+            log.warning("account query error acct=%s: %s", account_id, exc)
+            result = self._account_cache.get(account_id)
+        if result is not None:
+            self._account_cache[account_id] = result
+        return result
+
     # ── resource-aware guard (Phase 6) ───────────────────────────────────────
     def _host_snapshot(self) -> dict:
         return metrics.host_metrics()
@@ -234,20 +259,41 @@ class Agent:
             pm = metrics.process_metrics(inst.pid) if alive else None
             if alive and pm:
                 self.watchdog.record_healthy(account_id)  # reset backoff when up
-                status = "running"      # 'connected' is inferred server-side once broker link confirmed
+                status = "running"
             else:
                 status = "crashed"
-            terminals.append({
+
+            entry = {
                 "account_id": account_id,
                 "status": status,
                 "os_pid": inst.pid,
                 "cpu_pct": pm["cpu_pct"] if pm else None,
                 "ram_mb": pm["ram_mb"] if pm else None,
-                "mt5_connected": alive,   # refine with MetaTrader5 pkg if you attach it
+                "mt5_connected": alive,
+                "login_verified": False,
                 "restart_count": self.restart_counts.get(account_id, 0),
                 "instance_key": inst.login,
                 "data_dir": inst.data_dir,
-            })
+            }
+
+            # Pull REAL account data (throttled) to prove the login is genuine.
+            if alive:
+                acct = self._maybe_query_account(account_id, inst)
+                if acct is not None:
+                    entry["login_verified"] = bool(acct.get("logged_in"))
+                    if acct.get("logged_in"):
+                        entry.update({
+                            "balance": acct.get("balance"),
+                            "equity": acct.get("equity"),
+                            "profit": acct.get("profit"),
+                            "open_trades": acct.get("open_trades"),
+                            "account_currency": acct.get("currency"),
+                            "leverage": acct.get("leverage"),
+                        })
+                    elif acct.get("error"):
+                        entry["last_error"] = str(acct["error"])[:250]
+
+            terminals.append(entry)
 
         # Discover MT5 terminals running on this box that we didn't launch.
         managed_pids = {i.pid for i in self.instances.values() if i.pid}

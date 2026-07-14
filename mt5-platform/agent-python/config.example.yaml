@@ -44,6 +44,10 @@ mt5:
   # instantly (no copy wait). 1 = the "always one extra download ready" you asked for.
   warm_count: 1
 
+  # How often (seconds) to pull real balance/equity/open-trades from each terminal
+  # via the MetaTrader5 API. This is what makes "connected" trustworthy.
+  balance_query_interval: 60
+
 watchdog:
   # Restart backoff: delay = base * 2**(consecutive_failures-1), capped at max.
   restart_base_seconds: 5

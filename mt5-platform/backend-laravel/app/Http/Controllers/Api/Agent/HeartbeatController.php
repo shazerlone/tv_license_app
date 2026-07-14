@@ -44,6 +44,14 @@ class HeartbeatController extends Controller
             'terminals.*.instance_key'    => ['nullable', 'string'],
             'terminals.*.data_dir'        => ['nullable', 'string'],
             'terminals.*.last_error'      => ['nullable', 'string'],
+            // Real account data pulled from MT5 (present once truly logged in).
+            'terminals.*.login_verified'  => ['nullable', 'boolean'],
+            'terminals.*.balance'         => ['nullable', 'numeric'],
+            'terminals.*.equity'          => ['nullable', 'numeric'],
+            'terminals.*.profit'          => ['nullable', 'numeric'],
+            'terminals.*.open_trades'     => ['nullable', 'integer'],
+            'terminals.*.account_currency'=> ['nullable', 'string', 'max:8'],
+            'terminals.*.leverage'        => ['nullable', 'integer'],
 
             // Terminals discovered already running (started outside the platform).
             'discovered'                  => ['sometimes', 'array'],
@@ -79,7 +87,14 @@ class HeartbeatController extends Controller
                     'cpu_pct'           => $t['cpu_pct'] ?? null,
                     'ram_mb'            => $t['ram_mb'] ?? null,
                     'mt5_connected'     => $t['mt5_connected'] ?? false,
-                    'restart_count'     => $t['restart_count'] ?? $instance->restart_count,
+                    'login_verified'    => $t['login_verified'] ?? false,
+                    'balance'           => $t['balance'] ?? $instance->balance,
+                    'equity'            => $t['equity'] ?? $instance->equity,
+                    'profit'            => $t['profit'] ?? $instance->profit,
+                    'open_trades'       => $t['open_trades'] ?? $instance->open_trades,
+                    'account_currency'  => $t['account_currency'] ?? $instance->account_currency,
+                    'leverage'          => $t['leverage'] ?? $instance->leverage,
+                    'restart_count'     => $t['restart_count'] ?? $instance->restart_count ?? 0,
                     'last_error'        => $t['last_error'] ?? $instance->last_error,
                     'last_heartbeat_at' => now(),
                 ]);
@@ -95,7 +110,7 @@ class HeartbeatController extends Controller
                 // Reflect terminal state onto the account for the dashboard.
                 $account->update([
                     'status'            => $this->accountStatusFrom($t),
-                    'last_connected_at' => ($t['mt5_connected'] ?? false) ? now() : $account->last_connected_at,
+                    'last_connected_at' => ($t['login_verified'] ?? false) ? now() : $account->last_connected_at,
                 ]);
 
                 // Record transitions only (keeps the log table lean).
@@ -197,16 +212,17 @@ class HeartbeatController extends Controller
 
     private function accountStatusFrom(array $t): string
     {
-        if ($t['mt5_connected'] ?? false) {
+        // "connected" now means the account genuinely logged in (account_info
+        // returned), not merely that a process is alive.
+        if ($t['login_verified'] ?? false) {
             return 'connected';
         }
 
         return match ($t['status']) {
-            'connected'            => 'connected',
-            'running', 'starting'  => 'connecting',
-            'crashed', 'errored'   => 'errored',
-            'stopped'              => 'stopped',
-            default                => 'disconnected',
+            'running', 'starting', 'connected' => 'connecting',   // process up, login not yet confirmed
+            'crashed', 'errored'               => 'errored',
+            'stopped'                          => 'stopped',
+            default                            => 'disconnected',
         };
     }
 }

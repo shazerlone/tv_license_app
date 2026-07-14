@@ -1,3 +1,4 @@
 psutil==5.9.8
 requests==2.32.3
 PyYAML==6.0.2
+MetaTrader5==5.0.4682  ; sys_platform == "win32"
