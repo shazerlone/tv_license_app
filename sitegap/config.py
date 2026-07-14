@@ -13,6 +13,30 @@ from dataclasses import dataclass, field
 # Paths
 # --------------------------------------------------------------------------- #
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_dotenv() -> None:
+    """Load KEY=VALUE lines from a local .env file into os.environ.
+
+    Zero dependencies. Keeps your Google API key in a gitignored file instead
+    of a shell command, a commit, or (never) a chat message. Existing
+    environment variables always win, so an exported key overrides the file.
+    """
+    path = os.path.join(BASE_DIR, ".env")
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+
+_load_dotenv()
+
 DB_PATH = os.environ.get("SITEGAP_DB", os.path.join(BASE_DIR, "leads.db"))
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 PITCH_DIR = os.path.join(OUTPUT_DIR, "pitch")

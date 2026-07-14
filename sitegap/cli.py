@@ -106,6 +106,52 @@ def cmd_seed(args: argparse.Namespace) -> None:
     print(f"  Buckets {res['buckets']}\n  Tiers {res['tiers']}")
 
 
+def cmd_pipeline(args: argparse.Namespace) -> None:
+    """One command: search → audit → score → pitch. The everyday driver."""
+    if not config.PLACES_API_KEY:
+        sys.exit(
+            "No API key found. Create a .env file (copy .env.example) and paste "
+            "your key there, or export GOOGLE_PLACES_API_KEY."
+        )
+    niches = _resolve_niches(args.niches)
+    areas = _resolve_areas(args.areas)
+    grid = places.build_grid(niches, areas)
+    n = len(grid) if args.max_queries is None else min(args.max_queries, len(grid))
+    print(f"① Search — {len(niches)} niches × {len(areas)} areas = {len(grid)} cells "
+          f"(running {n}, est. ≤ ${places.estimate_spend(n):.2f})")
+    res = places.run_search(niches, areas, args.max_queries,
+                            on_progress=lambda i, t, c, f: print(f"  [{i}/{t}] {c.niche}@{c.area}: {f}", flush=True))
+    print(f"   → {res['new_places']} new places · spend ≈ ${res['estimated_spend_usd']}")
+
+    print("② Audit — grading websites…")
+    ares = site_audit.run_audit(args.limit)
+    print(f"   → {ares['audited']} audited · {ares['buckets']}")
+
+    print("③ Score…")
+    sres = scoring.run_scoring()
+    print(f"   → tiers {sres['tiers']}")
+
+    print("④ Pitch packs (Tier A)…")
+    pres = pitch.run_pitch(tier="A")
+    print(f"   → {pres['written']} packs in {pres['dir']}")
+    print("\nDone. Open the dashboard:  python -m sitegap.web.app")
+
+
+def cmd_clear(args: argparse.Namespace) -> None:
+    import os as _os
+
+    if _os.path.exists(config.DB_PATH):
+        if not args.yes:
+            ans = input(f"Delete {config.DB_PATH} (all leads + cache)? [y/N] ").strip().lower()
+            if ans != "y":
+                print("Cancelled.")
+                return
+        _os.remove(config.DB_PATH)
+        print(f"Removed {config.DB_PATH}. Next run starts clean.")
+    else:
+        print("No database to clear.")
+
+
 def cmd_stats(args: argparse.Namespace) -> None:
     db.init_db()
     with db.connect() as conn:
@@ -151,6 +197,17 @@ def build_parser() -> argparse.ArgumentParser:
     sd = sub.add_parser("seed", help="Populate demo leads (no API key needed)")
     sd.add_argument("--per-area", type=int, default=6)
     sd.set_defaults(func=cmd_seed)
+
+    pl = sub.add_parser("pipeline", help="Run search → audit → score → pitch in one go")
+    pl.add_argument("--niches", nargs="+", default=["all"])
+    pl.add_argument("--areas", nargs="+", default=["dubai"])
+    pl.add_argument("--max-queries", type=int, default=None)
+    pl.add_argument("--limit", type=int, default=None, help="Cap sites audited")
+    pl.set_defaults(func=cmd_pipeline)
+
+    cl = sub.add_parser("clear", help="Delete leads.db (demo or real) and start clean")
+    cl.add_argument("--yes", action="store_true", help="Skip confirmation")
+    cl.set_defaults(func=cmd_clear)
 
     st = sub.add_parser("stats", help="Show funnel counts")
     st.set_defaults(func=cmd_stats)
