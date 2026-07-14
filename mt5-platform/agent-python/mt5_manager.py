@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -51,6 +52,8 @@ class Mt5Manager:
         self.startup_grace = startup_grace
         self.warm_count = warm_count
         self.login_ini_ttl = login_ini_ttl   # seconds to keep the login ini (slow first run)
+        self.broker_terminals: dict = {}      # optional {keyword: install path} from config
+        self._term_cache: list | None = None  # scanned installed terminals
         self.pool_dir = os.path.join(data_root, "_pool")
         self._pool_lock = threading.Lock()
         os.makedirs(data_root, exist_ok=True)
@@ -68,17 +71,57 @@ class Mt5Manager:
     def instance_exe(self, login: str) -> str:
         return os.path.join(self.instance_dir(login), "terminal64.exe")
 
+    # ── broker terminal selection ────────────────────────────────────────────
+    def _installed_terminals(self) -> list[str]:
+        """Scan Program Files for every MT5 install (folder holding terminal64.exe)."""
+        if self._term_cache is not None:
+            return self._term_cache
+        hits: list[str] = []
+        roots = [os.environ.get("ProgramFiles", r"C:\Program Files"),
+                 os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")]
+        for root in roots:
+            if not root or not os.path.isdir(root):
+                continue
+            for dp, dns, fns in os.walk(root):
+                if "terminal64.exe" in fns:
+                    hits.append(dp)
+                    dns[:] = []           # don't descend into a terminal's own subfolders
+        self._term_cache = hits
+        return hits
+
+    def resolve_base(self, broker_server: str | None) -> str:
+        """Pick the right MT5 install for this broker. The generic MetaQuotes
+        build can't reach most brokers' servers, so we prefer the broker's own
+        installed terminal (matched by keyword), falling back to the base install."""
+        srv = broker_server or ""
+        # 1) explicit config map wins
+        for key, path in (self.broker_terminals or {}).items():
+            if key and key.lower() in srv.lower():
+                d = path if os.path.isdir(path) else os.path.dirname(path)
+                if os.path.isfile(os.path.join(d, "terminal64.exe")):
+                    return d
+        # 2) auto-match an installed broker terminal by the leading keyword
+        kw = re.split(r"[-\s.]", srv)[0].lower() if srv else ""
+        if len(kw) >= 3:
+            for d in self._installed_terminals():
+                nd = d.lower()
+                if kw in nd and "mt5data" not in nd:   # skip our own per-account copies
+                    return d
+        # 3) fallback: the base (generic) install
+        return self.base_dir
+
     # ── warm pool ────────────────────────────────────────────────────────────
-    def _copy_install(self, target: str) -> None:
-        """Copy the base MT5 install into `target` (robocopy on Windows)."""
+    def _copy_install(self, target: str, src: str | None = None) -> None:
+        """Copy an MT5 install (`src`, default = base) into `target`."""
+        src = src or self.base_dir
         os.makedirs(target, exist_ok=True)
         try:
             subprocess.run(
-                ["robocopy", self.base_dir, target, "/E", "/NFL", "/NDL", "/NJH", "/NJS", "/NP"],
+                ["robocopy", src, target, "/E", "/NFL", "/NDL", "/NJH", "/NJS", "/NP"],
                 check=False, capture_output=True,
             )
         except FileNotFoundError:
-            shutil.copytree(self.base_dir, target, dirs_exist_ok=True)
+            shutil.copytree(src, target, dirs_exist_ok=True)
 
     def _pool_slots(self) -> list[str]:
         return [os.path.join(self.pool_dir, d) for d in os.listdir(self.pool_dir)
@@ -111,15 +154,18 @@ class Mt5Manager:
             self._copy_install(slot)
 
     # ── provisioning ─────────────────────────────────────────────────────────
-    def ensure_installed(self, login: str) -> None:
-        """Ensure this account has its own MT5 folder: claim a warm slot if one
-        exists (instant), else copy the base install. Then refill the pool."""
+    def ensure_installed(self, login: str, broker_server: str | None = None) -> None:
+        """Ensure this account has its own MT5 folder, copied from the terminal
+        that matches its broker (so it can actually reach the broker's servers)."""
         if os.path.isfile(self.instance_exe(login)):
             return
-        log.info("Provisioning MT5 instance folder for %s", login)
-        if not self._claim_warm(login):
-            self._copy_install(self.instance_dir(login))
-        self.refill_pool_async()
+        base = self.resolve_base(broker_server)
+        if base == self.base_dir:
+            log.warning("No broker-specific terminal found for '%s'; using generic "
+                        "install (may fail to connect). Install the broker's MT5 or "
+                        "set mt5.broker_terminals in config.", broker_server)
+        log.info("Provisioning MT5 for %s from %s", login, base)
+        self._copy_install(self.instance_dir(login), src=base)
 
     def _write_login_ini(self, login: str, password: str, server: str) -> str:
         """Write the one-shot auto-login config MT5 reads at startup."""
@@ -142,7 +188,7 @@ class Mt5Manager:
 
     # ── lifecycle ────────────────────────────────────────────────────────────
     def launch(self, account_id: int, login: str, password: str, server: str) -> Instance:
-        self.ensure_installed(login)
+        self.ensure_installed(login, server)
         ini = self._write_login_ini(login, password, server)
         exe = self.instance_exe(login)
 

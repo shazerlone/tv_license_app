@@ -58,6 +58,7 @@ class Agent:
             warm_count=mt5c.get("warm_count", 1),
             login_ini_ttl=mt5c.get("login_ini_ttl_s", 120),
         )
+        self.mt5.broker_terminals = mt5c.get("broker_terminals", {}) or {}
         self.auto_install = mt5c.get("auto_install", True)
         self.installer = Mt5Installer(
             mt5c["terminal_exe"],

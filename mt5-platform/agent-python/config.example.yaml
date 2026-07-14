@@ -40,6 +40,13 @@ mt5:
   # installer_urls:
   #   "ICMarketsSC-Demo": "https://download.mql5.com/.../icmarkets5setup.exe"
 
+  # The generic MetaQuotes terminal can't reach most brokers' servers. The agent
+  # auto-detects each broker's OWN installed terminal (matched by keyword) and
+  # copies that for the account. If auto-match fails, pin it explicitly here:
+  # broker_terminals:
+  #   "Exness":  "C:\\Program Files\\Exness Technologies Ltd\\MetaTrader 5"
+  #   "Century": "C:\\Program Files\\Century Financial\\MetaTrader 5"
+
   # Keep this many pre-installed spare terminals warm so the NEXT account starts
   # instantly (no copy wait). 1 = the "always one extra download ready" you asked for.
   warm_count: 1
