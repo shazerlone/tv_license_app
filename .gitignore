@@ -1,0 +1,16 @@
+# Sitegap runtime artifacts
+leads.db
+leads.db-journal
+outputs/pitch/*.md
+outputs/mockups/*.html
+outputs/mockups/*.png
+outputs/*.csv
+signal.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% set nav = 'leads' %}
+{% block title %}Lead Queue{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div class="eyebrow">Ranked queue · {{ rows|length }} leads</div>
+  <h1>Lead Queue</h1>
+  <p>Ranked by opportunity score (web weakness 0–60 + business quality 0–40). Filter to the segment you want to work.</p>
+</div>
+
+<form class="panel filters" method="get">
+  <label class="fld">Tier
+    <select name="tier" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for t in ['A','B','C'] %}<option value="{{ t }}" {{ 'selected' if active.tier==t }}>Tier {{ t }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="fld">Website
+    <select name="bucket" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for key, meta in buckets.items() %}<option value="{{ key }}" {{ 'selected' if active.bucket==key }}>{{ meta[0] }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="fld">Niche
+    <select name="niche" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for key, label in niches.items() %}<option value="{{ key }}" {{ 'selected' if active.niche==key }}>{{ key.replace('_',' ')|title }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="fld">Area
+    <select name="area" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for key, a in areas.items() %}<option value="{{ key }}" {{ 'selected' if active.area==key }}>{{ a.label }}</option>{% endfor %}
+    </select>
+  </label>
+  <a class="btn ghost sm" href="{{ url_for('leads') }}">Reset</a>
+</form>
+
+{% if rows %}
+<div class="panel table-wrap" style="margin-top:18px">
+  <table class="leads">
+    <thead><tr><th>Score</th><th>Tier</th><th>Business</th><th>Location</th><th>Website</th><th>Rating</th><th>Package</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><span class="score sm" style="background:conic-gradient({{ r.tier_meta[0] }} {{ r.opportunity_score }}%, #1c2949 0);"><span style="position:absolute;inset:4px;background:var(--panel);border-radius:50%;display:flex;align-items:center;justify-content:center">{{ r.opportunity_score }}</span></span></td>
+        <td><span class="tier" style="background:{{ r.tier_meta[0] }}">{{ r.tier }}</span></td>
+        <td><div class="name">{{ r.name }}</div><div class="muted">{{ r.niche_label }}</div></td>
+        <td class="muted">{{ r.area_label }}</td>
+        <td><span class="chip"><span class="dot" style="background:{{ r.bucket_meta[1] }}"></span>{{ r.bucket_meta[0] }}</span></td>
+        <td>{{ '%.1f'|format(r.rating) }}★ <span class="muted">· {{ r.review_count }}</span></td>
+        <td><b>{{ r.package|capitalize }}</b><div class="muted">{{ r.price_low|aed }}–{{ r.price_high|aed }}</div></td>
+        <td><a class="btn sm" href="{{ url_for('lead_detail', place_id=r.place_id) }}">Open →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel empty" style="margin-top:18px">No leads match these filters. <a href="{{ url_for('dashboard') }}" style="color:var(--brand)">Run the pipeline →</a></div>
+{% endif %}
+{% endblock %}

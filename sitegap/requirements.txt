@@ -1,0 +1,6 @@
+# Sitegap — Lead Finder → Quotation → Pitch Pack
+httpx>=0.27
+beautifulsoup4>=4.12
+Flask>=3.0
+# Optional — only needed for `mockup` PNG screenshots:
+# playwright>=1.44   (then: playwright install chromium)

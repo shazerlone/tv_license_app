@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}{{ d.name }}{% endblock %}
+{% block body %}
+
+<div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
+  <div>
+    <div class="eyebrow" style="display:flex;gap:10px;align-items:center">
+      <span class="tier" style="background:{{ d.tier_meta[0] }}">{{ d.tier }}</span>
+      Tier {{ d.tier }} · {{ d.tier_meta[1] }}
+    </div>
+    <h1>{{ d.name }}</h1>
+    <p>{{ d.niche_label }} · {{ d.area_label }}</p>
+  </div>
+  <div style="text-align:center">
+    <span class="score" style="background:conic-gradient({{ d.tier_meta[0] }} {{ d.opportunity_score }}%, #1c2949 0);width:74px;height:74px;font-size:22px">
+      <span style="position:absolute;inset:6px;background:var(--panel);border-radius:50%;display:flex;align-items:center;justify-content:center">{{ d.opportunity_score }}</span>
+    </span>
+    <div class="note" style="margin-top:6px">opportunity</div>
+  </div>
+</div>
+
+<!-- The hook -->
+<div class="hook" style="margin-bottom:20px">{{ d.roi_hook }}</div>
+
+<div class="detail-grid">
+  <!-- Left column -->
+  <div class="grid" style="gap:20px">
+    <!-- Diagnosis -->
+    <div class="panel section">
+      <h2>Diagnosis</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+        <span class="chip"><span class="dot" style="background:{{ d.bucket_meta[1] }}"></span>{{ d.bucket_meta[0] }}</span>
+        <span class="note">{{ d.bucket_meta[2] }}</span>
+      </div>
+      {% for reason in d.reasons %}
+      <div class="reason"><span class="x">✕</span><span>{{ reason }}</span></div>
+      {% endfor %}
+      {% if not d.reasons %}<p class="note">No signals recorded.</p>{% endif %}
+    </div>
+
+    <!-- Mockup preview -->
+    <div class="panel section">
+      <h2>Site mock-up <span class="note" style="text-transform:none;letter-spacing:0">— the differentiator</span></h2>
+      <p class="note" style="margin-bottom:12px">Don't pitch a service — send a screenshot of the site you already built for them.</p>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff">
+        <iframe src="{{ url_for('lead_mockup', place_id=d.place_id) }}" style="width:100%;height:420px;border:0" loading="lazy"></iframe>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <a class="btn sm" href="{{ url_for('lead_mockup', place_id=d.place_id) }}" target="_blank">Open full mock ↗</a>
+        <a class="btn sm ghost" href="{{ url_for('pitch_raw', place_id=d.place_id) }}" target="_blank">Download pitch .md ↓</a>
+      </div>
+    </div>
+
+    <!-- Outreach -->
+    <div class="panel section outreach">
+      <h2>Draft outreach</h2>
+      <div class="tabs">
+        <div class="tab active" data-t="wa">WhatsApp</div>
+        <div class="tab" data-t="email">Email</div>
+        <div class="tab" data-t="walk">Walk-in</div>
+      </div>
+      <div class="tabpane active" id="p-wa"><pre>{{ wa_text }}</pre></div>
+      <div class="tabpane" id="p-email"><pre>{{ email_text }}</pre></div>
+      <div class="tabpane" id="p-walk"><pre>{{ walk_text }}</pre></div>
+      <p class="note" style="margin-top:10px">Every template carries an opt-out line — unsolicited marketing is regulated (TDRA). Log consent before sending.</p>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="grid" style="gap:20px">
+    <!-- Contact -->
+    <div class="panel">
+      <dl class="kv">
+        <dt>Category</dt><dd>{{ d.niche_label }}</dd>
+        <dt>Area</dt><dd>{{ d.area_label }}</dd>
+        <dt>Address</dt><dd>{{ d.address or '—' }}</dd>
+        <dt>Phone</dt><dd>{{ d.phone_national or '—' }}{% if d.phone_intl %}<br><span class="note">{{ d.phone_intl }}</span>{% endif %}</dd>
+        <dt>Current site</dt><dd>{% if d.website_uri %}<a href="{{ d.website_uri }}" target="_blank" style="color:var(--brand)">{{ d.website_uri }}</a>{% else %}<span class="note">none</span>{% endif %}</dd>
+        <dt>Maps</dt><dd>{% if d.maps_uri %}<a href="{{ d.maps_uri }}" target="_blank" style="color:var(--brand)">Open in Maps ↗</a>{% else %}—{% endif %}</dd>
+        <dt>Rating</dt><dd>{{ '%.1f'|format(d.rating) }}★ · {{ d.review_count }} reviews</dd>
+        <dt>Status</dt><dd>{{ d.business_status }}</dd>
+      </dl>
+    </div>
+
+    <!-- Quotation -->
+    <div class="panel section">
+      <h2>Quotation</h2>
+      <div style="font-weight:800;font-size:18px;margin-bottom:2px">{{ quote.name }}</div>
+      <div class="quote-price" style="color:var(--accent)">{{ quote.price_low|aed }}–{{ quote.price_high|aed }} <span style="font-size:15px;color:var(--ink-dim)">AED</span></div>
+      <ul class="scope" style="list-style:none;margin-top:14px">
+        {% for s in quote.scope %}<li style="margin-left:0;display:flex;gap:8px"><span style="color:var(--green)">✓</span>{{ s }}</li>{% endfor %}
+      </ul>
+      <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px" class="note">
+        + Care plan {{ quote.care_low }}–{{ quote.care_high }} AED/mo — hosting, updates, backups, monthly report.
+      </div>
+    </div>
+
+    <!-- Audit facts -->
+    <div class="panel section">
+      <h2>Audit signals</h2>
+      <dl class="kv" style="padding:0;grid-template-columns:1fr auto;gap:8px">
+        <dt>HTTP status</dt><dd>{{ d.http_status or '—' }}</dd>
+        <dt>Mobile-responsive</dt><dd>{{ '✓' if d.has_viewport==1 else ('✕' if d.has_viewport==0 else '—') }}</dd>
+        <dt>HTTPS</dt><dd>{{ '✓' if d.is_https==1 else ('✕' if d.is_https==0 else '—') }}</dd>
+        <dt>Conversion path</dt><dd>{{ '✓' if d.has_cta==1 else ('✕' if d.has_cta==0 else '—') }}</dd>
+        <dt>TTFB</dt><dd>{{ (d.ttfb_ms ~ ' ms') if d.ttfb_ms else '—' }}</dd>
+        <dt>Platform</dt><dd>{{ d.platform or '—' }}</dd>
+        <dt>Word count</dt><dd>{{ d.word_count if d.word_count is not none else '—' }}</dd>
+        <dt>Weakness</dt><dd>{{ d.weakness_score }}/60</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tabpane').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('p-' + t.dataset.t).classList.add('active');
+}));
+</script>
+{% endblock %}

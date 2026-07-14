@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% set nav = 'dashboard' %}
+{% block title %}Dashboard{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div class="eyebrow">Lead Finder → Quotation → Pitch Pack</div>
+  <h1>A ranked queue of businesses with money, customers &amp; a bad website.</h1>
+  <p>Buy signal = high rating + high review count + weak or absent website. Reviews prove revenue;
+     a missing site proves the gap. Both must be true.</p>
+</div>
+
+{% if stats.total == 0 %}
+<div class="hint" style="margin-bottom:22px">
+  No leads yet. Set <code>GOOGLE_PLACES_API_KEY</code> and run a search, or click
+  <b>Seed demo data</b> below to explore the full pipeline with realistic sample leads.
+</div>
+{% endif %}
+
+<!-- Stat tiles -->
+<div class="grid cols-4">
+  <div class="panel stat"><div class="k">Places fetched</div><div class="v">{{ stats.total }}</div><div class="sub">across the grid</div></div>
+  <div class="panel stat"><div class="k">Qualified</div><div class="v">{{ stats.qualified }}</div><div class="sub">≥4.0★ · ≥20 reviews · has phone</div></div>
+  <div class="panel stat"><div class="k">Audited</div><div class="v">{{ stats.audited }}</div><div class="sub">websites graded</div></div>
+  <div class="panel stat"><div class="k" style="color:#22c55e">Tier A leads</div><div class="v" style="color:#22c55e">{{ stats.tiers.get('A', 0) }}</div><div class="sub">call today</div></div>
+</div>
+
+<div class="grid cols-2" style="margin-top:18px">
+  <!-- Funnel + buckets -->
+  <div class="panel funnel">
+    <h2 style="font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin-bottom:14px">The funnel</h2>
+    {% set steps = [('Fetched', stats.total), ('Qualified', stats.qualified), ('Audited', stats.audited), ('Scored', stats.scored)] %}
+    {% set maxn = [stats.total, 1]|max %}
+    {% for lbl, n in steps %}
+    <div class="funnel-row">
+      <div class="lbl">{{ lbl }}</div>
+      <div class="funnel-bar"><span style="width: {{ (100 * n / maxn)|round(1) }}%"></span></div>
+      <div class="n">{{ n }}</div>
+    </div>
+    {% endfor %}
+
+    <h2 style="font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin:22px 0 12px">Website buckets</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      {% for key, meta in bucket_meta.items() %}
+      <a href="{{ url_for('leads', bucket=key) }}" class="chip" title="{{ meta[2] }}">
+        <span class="dot" style="background:{{ meta[1] }}"></span>{{ meta[0] }}
+        <b>{{ stats.buckets.get(key, 0) }}</b>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Run pipeline -->
+  <div class="panel section">
+    <h2>Run the pipeline</h2>
+    <p class="note" style="margin-bottom:14px">
+      {% if has_key %}API key detected — searches hit Google Places live.
+      {% else %}No API key set — use demo data, or export <code>GOOGLE_PLACES_API_KEY</code>.{% endif %}
+    </p>
+
+    <form method="post" action="{{ url_for('run_stage', stage='search') }}" style="display:grid;gap:10px;margin-bottom:14px">
+      <div style="display:flex;gap:10px">
+        <label class="fld" style="flex:1">Areas
+          <select name="areas"><option value="dubai">Dubai (all)</option><option value="uae">UAE</option>
+          <option value="us">US</option><option value="uk">UK</option><option value="au">Australia</option><option value="all">Everywhere</option></select>
+        </label>
+        <label class="fld" style="width:120px">Max queries
+          <input type="number" name="max_queries" placeholder="budget" min="1">
+        </label>
+      </div>
+      <input type="hidden" name="niches" value="all">
+      <button class="btn primary" {{ 'disabled' if job.running }}>① Search grid</button>
+    </form>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <form method="post" action="{{ url_for('run_stage', stage='audit') }}"><button class="btn sm" {{ 'disabled' if job.running }}>② Audit</button></form>
+      <form method="post" action="{{ url_for('run_stage', stage='score') }}"><button class="btn sm" {{ 'disabled' if job.running }}>③ Score</button></form>
+      <form method="post" action="{{ url_for('run_stage', stage='pitch') }}"><button class="btn sm" {{ 'disabled' if job.running }}>④ Pitch packs</button></form>
+      <form method="post" action="{{ url_for('run_stage', stage='export') }}"><button class="btn sm" {{ 'disabled' if job.running }}>⑤ Export CSV</button></form>
+      <form method="post" action="{{ url_for('run_stage', stage='seed') }}" style="margin-left:auto"><button class="btn sm ghost" {{ 'disabled' if job.running }}>Seed demo data</button></form>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+      {% if job.running %}<span class="pulse"></span> <b id="jobstage">{{ job.stage }}</b> running…{% else %}<span style="color:var(--ink-faint)">Idle</span>{% endif %}
+    </div>
+    <div class="console" id="console">{{ job.line or 'Ready.' }}</div>
+    <p class="note" style="margin-top:10px">Est. spend ≈ ${{ cost_per_query }}/query × up to 3 pages. Every stage is idempotent — safe to re-run.</p>
+  </div>
+</div>
+
+<!-- Top Tier A -->
+<div class="page-head" style="padding-bottom:12px;display:flex;align-items:end;justify-content:space-between">
+  <div><div class="eyebrow">Sharpest opportunities</div><h1 style="font-size:22px">Top Tier A leads</h1></div>
+  <a class="btn sm" href="{{ url_for('leads', tier='A') }}">View all →</a>
+</div>
+
+{% if top %}
+<div class="panel table-wrap">
+  <table class="leads">
+    <thead><tr><th>Score</th><th>Business</th><th>Web</th><th>Reviews</th><th>Package</th><th></th></tr></thead>
+    <tbody>
+      {% for r in top %}
+      <tr>
+        <td><span class="score sm" style="background:conic-gradient({{ r.tier_meta[0] }} {{ r.opportunity_score }}%, #1c2949 0);"><span style="position:absolute;inset:4px;background:var(--panel);border-radius:50%;display:flex;align-items:center;justify-content:center">{{ r.opportunity_score }}</span></span></td>
+        <td><div class="name">{{ r.name }}</div><div class="muted">{{ r.niche_label }} · {{ r.area_label }}</div></td>
+        <td><span class="chip"><span class="dot" style="background:{{ r.bucket_meta[1] }}"></span>{{ r.bucket_meta[0] }}</span></td>
+        <td>{{ r.review_count }} <span class="muted">@ {{ '%.1f'|format(r.rating) }}★</span></td>
+        <td><b>{{ r.package|capitalize }}</b><div class="muted">{{ r.price_low|aed }}–{{ r.price_high|aed }} AED</div></td>
+        <td><a class="btn sm" href="{{ url_for('lead_detail', place_id=r.place_id) }}">Open →</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="panel empty">No scored leads yet — run the pipeline or seed demo data above.</div>
+{% endif %}
+
+<script>
+// Poll job status so the console updates live during a run.
+async function poll(){
+  try {
+    const r = await fetch("{{ url_for('job_status') }}");
+    const j = await r.json();
+    document.getElementById('console').textContent = j.line || 'Ready.';
+    if (j.done && document.querySelector('.pulse')) location.reload();
+  } catch(e){}
+}
+{% if job.running %}setInterval(poll, 1500);{% endif %}
+</script>
+{% endblock %}
