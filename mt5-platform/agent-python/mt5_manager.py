@@ -112,16 +112,23 @@ class Mt5Manager:
 
     # ── warm pool ────────────────────────────────────────────────────────────
     def _copy_install(self, target: str, src: str | None = None) -> None:
-        """Copy an MT5 install (`src`, default = base) into `target`."""
+        """Copy an MT5 install (`src`, default = base) into `target`.
+
+        We copy the broker's server knowledge but EXCLUDE its saved-login file
+        (accounts.dat) so the copy can only log into the account our start.ini
+        specifies — never a pre-existing account on the source terminal.
+        """
         src = src or self.base_dir
         os.makedirs(target, exist_ok=True)
         try:
             subprocess.run(
-                ["robocopy", src, target, "/E", "/NFL", "/NDL", "/NJH", "/NJS", "/NP"],
+                ["robocopy", src, target, "/E", "/XF", "accounts.dat",
+                 "/NFL", "/NDL", "/NJH", "/NJS", "/NP"],
                 check=False, capture_output=True,
             )
         except FileNotFoundError:
-            shutil.copytree(src, target, dirs_exist_ok=True)
+            shutil.copytree(src, target, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns("accounts.dat"))
 
     def _pool_slots(self) -> list[str]:
         return [os.path.join(self.pool_dir, d) for d in os.listdir(self.pool_dir)
