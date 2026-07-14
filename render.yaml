@@ -1,0 +1,17 @@
+# Render blueprint for the Sitegap dashboard.
+# In Render: New + → Blueprint → connect this repo → Apply.
+# Then open the service → Environment → add GOOGLE_PLACES_API_KEY as a secret.
+services:
+  - type: web
+    name: sitegap
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r sitegap/requirements.txt"
+    startCommand: "gunicorn sitegap.web.app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1"
+    envVars:
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false          # you paste the value in the Render dashboard, not here
+      - key: SITEGAP_AUTOSEED
+        value: "1"           # show demo leads on first boot so the page isn't empty
+      - key: PYTHON_VERSION
+        value: "3.11.9"

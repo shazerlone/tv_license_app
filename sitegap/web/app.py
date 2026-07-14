@@ -25,6 +25,28 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 _JOB: dict = {"running": False, "stage": "", "line": "", "done": True, "log": []}
 
 
+def _bootstrap() -> None:
+    """Runs at import so the app works under gunicorn (no main() call).
+
+    Ensures tables exist, and — when SITEGAP_AUTOSEED=1 and the DB is empty —
+    seeds demo leads so a freshly deployed dashboard isn't a blank page.
+    """
+    db.init_db()
+    if os.environ.get("SITEGAP_AUTOSEED") == "1":
+        try:
+            with db.connect() as conn:
+                empty = db.funnel_stats(conn)["total"] == 0
+            if empty:
+                from .. import seed as seed_mod
+
+                seed_mod.seed()
+        except Exception:  # noqa: BLE001 — never let seeding block startup
+            pass
+
+
+_bootstrap()
+
+
 BUCKET_META = {
     "NO_SITE": ("No site", "#ef4444", "Best lead — nowhere for customers to book."),
     "SOCIAL_ONLY": ("Social only", "#f97316", "Instagram-only — they already know they need a site."),
