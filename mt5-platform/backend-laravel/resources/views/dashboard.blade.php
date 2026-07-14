@@ -81,8 +81,8 @@
       <h3>➕ Add MT5 account</h3>
       <form method="POST" action="/dashboard/accounts">@csrf
         <div class="row2">
-          <div class="field"><label>MT5 login</label><input name="login" required></div>
-          <div class="field"><label>Broker server</label><input name="broker_server" placeholder="ICMarketsSC-Demo" required></div>
+          <div class="field"><label>MT5 login (account number)</label><input name="login" placeholder="e.g. 416010247 — numbers only" pattern="[0-9]+" title="Your MT5 account number (digits only), not the server name" required></div>
+          <div class="field"><label>Broker server</label><input name="broker_server" placeholder="e.g. Exness-MT5Trial14" required></div>
         </div>
         <div class="row2">
           <div class="field"><label>Password</label><input name="password" type="password" required></div>
