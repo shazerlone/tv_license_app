@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import signal
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -28,6 +29,7 @@ import discovery
 import metrics
 import mt5_query
 from api_client import ApiClient
+from copier_engine import CopierEngine
 from mt5_installer import Mt5Installer
 from mt5_manager import Instance, Mt5Manager
 from watchdog import Watchdog
@@ -86,6 +88,17 @@ class Agent:
 
         self._last_reconcile = 0.0
         self._last_heartbeat = 0.0
+
+        # ── trade copier ────────────────────────────────────────────────────
+        cop_cfg = cfg.get("copier", {})
+        self.copier_enabled = cop_cfg.get("enabled", True)
+        self.copier_poll_s = cop_cfg.get("poll_ms", 50) / 1000.0
+        self.copier_refresh_s = cop_cfg.get("config_refresh_s", 5)
+        self._last_copier_cfg = 0.0
+        self.copier = None
+        if self.copier_enabled:
+            script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mt5_connector.py")
+            self.copier = CopierEngine(self.api, script, self._resolve_creds)
 
     # ── event buffer (at-least-once) ─────────────────────────────────────────
     def _load_events(self) -> list[dict]:
@@ -217,6 +230,35 @@ class Agent:
         self.watchdog.forget(account_id)
         self.restart_counts.pop(account_id, None)
 
+    def _resolve_creds(self, account_id: int):
+        """(exe, login, password, server) for a running account, for the copier."""
+        inst = self.instances.get(account_id)
+        if not inst or not inst.pid:
+            return None
+        try:
+            return (self.mt5.instance_exe(inst.login), int(inst.login), inst.password, inst.server)
+        except (ValueError, TypeError):
+            return None
+
+    def _refresh_copier_config(self) -> None:
+        if not self.copier:
+            return
+        try:
+            data = self.api.get_copiers()
+            self.copier.update_config(data.get("copiers", []))
+        except Exception as exc:
+            log.debug("copier config refresh failed: %s", exc)
+
+    def _copier_loop(self) -> None:
+        """Tight loop driving the copier (its own thread for low latency)."""
+        while self.running:
+            try:
+                if self.copier:
+                    self.copier.tick()
+            except Exception as exc:
+                log.warning("copier tick error: %s", exc)
+            time.sleep(self.copier_poll_s)
+
     def _maybe_query_account(self, account_id: int, inst: Instance) -> dict | None:
         """Query real MT5 account data, throttled to balance_interval seconds.
         Returns the last cached result between queries so balances stay visible."""
@@ -336,6 +378,10 @@ class Agent:
         self.emit("agent_started", "info", "Agent process started")
         self.bootstrap()
 
+        if self.copier:
+            threading.Thread(target=self._copier_loop, daemon=True).start()
+            log.info("Copier engine thread started (poll %.0fms)", self.copier_poll_s * 1000)
+
         while self.running:
             now = time.time()
             try:
@@ -345,6 +391,9 @@ class Agent:
                 if now - self._last_heartbeat >= self.heartbeat_interval:
                     self.heartbeat()
                     self._last_heartbeat = now
+                if now - self._last_copier_cfg >= self.copier_refresh_s:
+                    self._refresh_copier_config()
+                    self._last_copier_cfg = now
                 self.flush_events()
             except PermissionError as exc:
                 log.error("Fatal auth error: %s", exc)

@@ -55,6 +55,7 @@
     <div class="logo">▲ MT5 MANAGER</div>
     <div>
       <span class="muted" id="clock"></span>
+      <a href="/copier" class="btn sm" style="text-decoration:none">⇄ Copier</a>
       <form class="inline" method="POST" action="/logout">@csrf
         <button class="btn sm">Sign out</button>
       </form>

@@ -64,6 +64,12 @@ limits:
   # Minimum free RAM that must remain AFTER launching one more terminal.
   ram_headroom_mb: 400
 
+# ── Trade copier ─────────────────────────────────────────────────────────────
+copier:
+  enabled: true
+  poll_ms: 50            # how fast the master's positions are polled (latency floor)
+  config_refresh_s: 5    # how often copier config is pulled from the control plane
+
 logging:
   file: "C:\\mt5agent\\logs\\agent.log"
   level: "INFO"          # DEBUG for troubleshooting (never logs passwords)

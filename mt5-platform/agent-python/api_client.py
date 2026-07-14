@@ -43,6 +43,14 @@ class ApiClient:
         resp = self._request("POST", "/agent/events", json={"events": events})
         return resp.get("accepted", [])
 
+    def get_copiers(self) -> dict[str, Any]:
+        """Copier config for masters running on this VPS."""
+        return self._request("GET", "/agent/copiers")
+
+    def send_copy_events(self, events: list[dict[str, Any]]) -> dict[str, Any]:
+        """Report copy opens/closes (master_ticket <-> slave_ticket)."""
+        return self._request("POST", "/agent/copy-events", json={"events": events})
+
     # ── internals ───────────────────────────────────────────────────────────
     def _request(self, method: str, path: str, **kwargs) -> dict[str, Any]:
         url = f"{self.base_url}{path}"

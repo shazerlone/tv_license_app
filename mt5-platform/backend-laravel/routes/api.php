@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\Agent\AssignmentController;
+use App\Http\Controllers\Api\Agent\CopierController as AgentCopierController;
 use App\Http\Controllers\Api\Agent\EventController;
 use App\Http\Controllers\Api\Agent\HeartbeatController;
 use App\Http\Controllers\Api\ServerController;
@@ -44,4 +45,6 @@ Route::prefix('agent')
         Route::get ('assignments', [AssignmentController::class, 'index']);
         Route::post('heartbeat',   [HeartbeatController::class, 'store']);
         Route::post('events',      [EventController::class, 'store']);
+        Route::get ('copiers',     [AgentCopierController::class, 'index']);
+        Route::post('copy-events', [AgentCopierController::class, 'events']);
     });
