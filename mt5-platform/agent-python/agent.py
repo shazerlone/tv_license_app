@@ -56,6 +56,7 @@ class Agent:
             mt5c["terminal_exe"], mt5c["data_root"],
             startup_grace=mt5c.get("startup_grace", 25),
             warm_count=mt5c.get("warm_count", 1),
+            login_ini_ttl=mt5c.get("login_ini_ttl_s", 120),
         )
         self.auto_install = mt5c.get("auto_install", True)
         self.installer = Mt5Installer(

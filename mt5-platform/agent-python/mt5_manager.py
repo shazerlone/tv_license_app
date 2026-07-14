@@ -44,12 +44,13 @@ class Instance:
 
 class Mt5Manager:
     def __init__(self, terminal_exe: str, data_root: str, startup_grace: int = 25,
-                 warm_count: int = 1):
+                 warm_count: int = 1, login_ini_ttl: int = 120):
         self.base_exe = terminal_exe
         self.base_dir = os.path.dirname(terminal_exe)
         self.data_root = data_root
         self.startup_grace = startup_grace
         self.warm_count = warm_count
+        self.login_ini_ttl = login_ini_ttl   # seconds to keep the login ini (slow first run)
         self.pool_dir = os.path.join(data_root, "_pool")
         self._pool_lock = threading.Lock()
         os.makedirs(data_root, exist_ok=True)
@@ -171,18 +172,19 @@ class Mt5Manager:
             started_at=time.time(), password=password,
         )
 
-        # Give MT5 a moment to read the ini, then scrub the plaintext password.
-        self._delayed_scrub(ini)
+        # Scrub the plaintext login ini AFTER the terminal has had time to log in.
+        # First run can take ~60-90s (MQL5 update + recompile), so delete it in the
+        # background well after that — deleting too early was breaking auto-login.
+        threading.Thread(target=self._delayed_scrub, args=(ini,), daemon=True).start()
         return inst
 
     def _delayed_scrub(self, ini_path: str) -> None:
-        # MT5 consumes the ini within a couple of seconds. Remove it best-effort.
         try:
-            time.sleep(3)
+            time.sleep(self.login_ini_ttl)
             if os.path.exists(ini_path):
                 os.remove(ini_path)
         except OSError:
-            log.warning("Could not remove login ini %s (will retry next cycle)", ini_path)
+            log.warning("Could not remove login ini %s", ini_path)
 
     def is_alive(self, inst: Instance) -> bool:
         if inst.pid is None:
