@@ -247,7 +247,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
               TextField(
                 controller: keyController,
                 style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
-                decoration: const InputDecoration(hintText: 'Paste your $name stream key'),
+                decoration: InputDecoration(hintText: 'Paste your $name stream key'),
               ),
               const SizedBox(height: 12),
               SizedBox(
