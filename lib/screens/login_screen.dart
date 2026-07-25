@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../state/session.dart';
 import '../widgets/millimore_logo.dart';
 import 'account_type_screen.dart';
 import 'home_screen.dart';
@@ -72,6 +73,26 @@ class _LoginScreenState extends State<LoginScreen>
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _isLoading = false);
+
+    final session = SessionScope.of(context);
+    final email = _emailController.text.trim().toLowerCase();
+    final nameFromEmail = email.contains('@') ? email.split('@').first : 'Trader';
+
+    // Demo verified-trader login (until backend auth exists).
+    // Sign in with trader@millimore.app to enter as an APPROVED creator.
+    if (email == 'trader@millimore.app') {
+      session.signInAsCreator(
+        name: 'Demo Trader',
+        market: 'Forex',
+        platform: 'MetaTrader 5',
+        residenceIso: 'IN',
+        residenceCountry: 'India',
+        status: CreatorStatus.approved,
+      );
+    } else {
+      session.signInAsFollower(name: nameFromEmail);
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
     );

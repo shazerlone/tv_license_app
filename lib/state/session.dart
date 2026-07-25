@@ -93,6 +93,15 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Flip the current creator to approved (demo/dev until backend verification).
+  void approveCreator() {
+    final u = _user;
+    if (u != null && u.isCreator) {
+      _user = u.copyWith(creatorStatus: CreatorStatus.approved);
+      notifyListeners();
+    }
+  }
+
   void signOut() {
     _user = null;
     notifyListeners();

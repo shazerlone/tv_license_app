@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../state/session.dart';
 import 'go_live_screen.dart';
 
@@ -25,6 +26,23 @@ class StudioScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             if (pending) _LockedBanner(),
+            if (pending && kDevMode) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    session.approveCreator();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Verified (demo) — you can now go live')),
+                    );
+                  },
+                  icon: const Icon(Icons.verified_rounded, size: 18, color: AppColors.green),
+                  label: Text('Mark as verified (demo)', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.green)),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.green.withOpacity(0.4))),
+                ),
+              ),
+            ],
             if (pending) const SizedBox(height: 20),
 
             // Primary actions
