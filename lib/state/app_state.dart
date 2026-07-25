@@ -246,7 +246,60 @@ class AppState extends ChangeNotifier {
   void endBroadcast() {
     _isBroadcasting = false;
     _viewers = 0;
+    _liveTrades.clear();
     notifyListeners();
+  }
+
+  // Live trades the broadcaster places on-stream (the overlay source).
+  final List<LiveTrade> _liveTrades = [];
+  List<LiveTrade> get liveTrades => List.unmodifiable(_liveTrades);
+
+  void placeLiveTrade(String symbol, bool isBuy) {
+    final rng = math.Random();
+    _liveTrades.insert(
+      0,
+      LiveTrade(
+        id: 'lt_${DateTime.now().microsecondsSinceEpoch}',
+        symbol: symbol,
+        isBuy: isBuy,
+        entryPrice: 1900 + rng.nextDouble() * 100, // e.g. gold
+        pnlPercent: (rng.nextDouble() * 1.2 - 0.4),
+        openedAt: DateTime.now(),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void closeLiveTrade(String id) {
+    _liveTrades.removeWhere((t) => t.id == id);
+    notifyListeners();
+  }
+
+  /// A viewer copies a trade directly from a live stream. Returns false if the
+  /// viewer has no connected account (caller should prompt to add one).
+  bool copyFromLive(Trader trader, {required String pair, required bool isBuy, double amount = 500}) {
+    if (!hasAccount) return false;
+    final rng = math.Random();
+    final pct = rng.nextDouble() * 1.5 - 0.3;
+    _positions.insert(
+      0,
+      CopyPosition(
+        id: 'pos_live_${DateTime.now().microsecondsSinceEpoch}',
+        traderId: trader.id,
+        traderName: trader.name,
+        pair: pair,
+        isBuy: isBuy,
+        status: PositionStatus.active,
+        entryPrice: 1 + rng.nextDouble(),
+        pnlAmount: amount * pct / 100,
+        pnlPercent: pct,
+        lots: 0.1 + rng.nextDouble() * 0.3,
+        openedAt: DateTime.now(),
+        accountId: _accounts.first.id,
+      ),
+    );
+    notifyListeners();
+    return true;
   }
 
   List<Comment> _seedComments(Post post) {

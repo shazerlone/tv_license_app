@@ -45,6 +45,28 @@ class CopyConfig {
   });
 }
 
+/// A trade the broadcasting trader places live on-stream (mirrors to their
+/// connected MT account via backend later). Shown as the live overlay.
+class LiveTrade {
+  final String id;
+  final String symbol;
+  final bool isBuy;
+  final double entryPrice;
+  final double pnlPercent;
+  final DateTime openedAt;
+
+  const LiveTrade({
+    required this.id,
+    required this.symbol,
+    required this.isBuy,
+    required this.entryPrice,
+    this.pnlPercent = 0,
+    required this.openedAt,
+  });
+
+  String get directionLabel => isBuy ? 'BUY' : 'SELL';
+}
+
 enum PositionStatus { active, closed }
 
 /// A single copied position (one trade mirrored from a trader).

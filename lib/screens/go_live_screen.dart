@@ -112,6 +112,74 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
             _CopyField(label: 'Ingest URL', value: store.ingestUrl),
             const SizedBox(height: 10),
             _CopyField(label: 'Stream key', value: store.streamKey, secret: true),
+            const SizedBox(height: 24),
+
+            // Trade on stream
+            Text('Trade on stream', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            const SizedBox(height: 4),
+            Text('Place a trade on your connected account. It appears as a live overlay so viewers can copy it instantly.',
+                style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted, height: 1.4)),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFF59E0B).withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.circle, size: 16, color: Color(0xFFF59E0B)),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Gold · XAU/USD', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () { store.placeLiveTrade('XAU/USD', true); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bought Gold — live on overlay'))); },
+                          child: Container(height: 46, alignment: Alignment.center, decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(12)), child: Text('Buy', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white))),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () { store.placeLiveTrade('XAU/USD', false); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sold Gold — live on overlay'))); },
+                          child: Container(height: 46, alignment: Alignment.center, decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(12)), child: Text('Sell', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white))),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (store.liveTrades.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    const Divider(height: 1),
+                    const SizedBox(height: 6),
+                    ...store.liveTrades.map((t) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(color: (t.isBuy ? AppColors.green : AppColors.red).withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
+                            child: Text(t.directionLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.isBuy ? AppColors.green : AppColors.red)),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(t.symbol, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                          const Spacer(),
+                          Text('${t.pnlPercent >= 0 ? '+' : ''}${t.pnlPercent.toStringAsFixed(2)}%', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: t.pnlPercent >= 0 ? AppColors.green : AppColors.red)),
+                          const SizedBox(width: 10),
+                          GestureDetector(onTap: () => store.closeLiveTrade(t.id), child: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    )),
+                  ],
+                ],
+              ),
+            ),
             const SizedBox(height: 28),
 
             if (live)

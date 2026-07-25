@@ -6,6 +6,7 @@ import '../models/trader.dart';
 import '../models/trade.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
+import '../widgets/add_account_sheet.dart';
 import 'copy_trading_screen.dart';
 
 class LiveStreamScreen extends StatefulWidget {
@@ -59,10 +60,15 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     final trader = _trader;
     final store = AppStateScope.of(context);
     final subscribed = store.isSubscribed(trader.id);
-    final liveTrade = mockTrades.firstWhere(
-      (t) => t.traderId == trader.id && t.status == TradeStatus.open,
-      orElse: () => mockTrades.first,
-    );
+    // Prefer the broadcaster's live-placed trades; fall back to an open mock trade.
+    final overlay = store.liveTrades.isNotEmpty
+        ? store.liveTrades.map((t) => (t.symbol, t.isBuy, t.pnlPercent)).toList()
+        : [
+            () {
+              final m = mockTrades.firstWhere((t) => t.traderId == trader.id && t.status == TradeStatus.open, orElse: () => mockTrades.first);
+              return (m.pair, m.direction == TradeDirection.buy, m.pnlPercent);
+            }()
+          ];
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B1120),
@@ -155,11 +161,16 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                   ),
                 ),
                 const Spacer(),
-                // Live trade overlay
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _LiveTradeCard(trade: liveTrade),
-                ),
+                // Live trade overlay(s)
+                ...overlay.map((o) => Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: _LiveTradeCard(
+                        pair: o.$1,
+                        isBuy: o.$2,
+                        pnlPercent: o.$3,
+                        onCopy: () => _copyFromLive(context, store, trader, o.$1, o.$2),
+                      ),
+                    )),
                 const SizedBox(height: 12),
                 // Chat
                 SizedBox(
@@ -216,17 +227,33 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   }
 
   String _fmt(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}K' : '$n';
+
+  Future<void> _copyFromLive(BuildContext context, AppState store, Trader trader, String pair, bool isBuy) async {
+    var ok = store.copyFromLive(trader, pair: pair, isBuy: isBuy);
+    if (!ok) {
+      // No account — prompt to connect, then retry.
+      final acc = await AddAccountSheet.open(context);
+      if (acc == null) return;
+      ok = store.copyFromLive(trader, pair: pair, isBuy: isBuy);
+    }
+    if (ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied ${trader.name}\'s $pair ${isBuy ? 'BUY' : 'SELL'}')));
+    }
+  }
 }
 
 class _LiveTradeCard extends StatelessWidget {
-  final Trade trade;
-  const _LiveTradeCard({required this.trade});
+  final String pair;
+  final bool isBuy;
+  final double pnlPercent;
+  final VoidCallback onCopy;
+  const _LiveTradeCard({required this.pair, required this.isBuy, required this.pnlPercent, required this.onCopy});
 
   @override
   Widget build(BuildContext context) {
-    final profit = trade.isProfit;
+    final profit = pnlPercent >= 0;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(14),
@@ -237,18 +264,27 @@ class _LiveTradeCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(6)),
-            child: Text('LIVE TRADE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+            child: Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
           ),
-          const SizedBox(width: 12),
-          Text(trade.pair, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+          const SizedBox(width: 10),
+          Text(pair, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(color: (trade.direction == TradeDirection.buy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
-            child: Text(trade.directionLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: trade.direction == TradeDirection.buy ? AppColors.green : AppColors.red)),
+            decoration: BoxDecoration(color: (isBuy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
+            child: Text(isBuy ? 'BUY' : 'SELL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: isBuy ? AppColors.green : AppColors.red)),
           ),
+          const SizedBox(width: 8),
+          Text('${profit ? '+' : ''}${pnlPercent.toStringAsFixed(2)}%', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
           const Spacer(),
-          Text(trade.formattedPnl, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
+          GestureDetector(
+            onTap: onCopy,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+              child: Text('Copy', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF0B1120))),
+            ),
+          ),
         ],
       ),
     );
