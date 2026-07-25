@@ -88,6 +88,59 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     _startController((_camIndex + 1) % _cameras.length);
   }
 
+  /// Confirm, capture stats, end the broadcast, then show a recap.
+  /// Returns true if the live actually ended.
+  Future<bool> _endLive() async {
+    final store = _store;
+    if (store == null || !store.isBroadcasting) return false;
+    final ok = await _confirmEnd(context);
+    if (ok != true) return false;
+    final peak = store.peakViewers;
+    final dur = store.liveDurationLabel;
+    final trades = store.closedLiveTrades.length + store.liveTrades.length;
+    final booked = store.closedLiveTrades.fold<double>(0, (s, c) => s + c.pnl) +
+        store.liveTrades.fold<double>(0, (s, t) => s + store.livePnl(t));
+    store.endBroadcast();
+    if (mounted) await _showRecap(peak, dur, trades, booked);
+    return true;
+  }
+
+  Future<void> _showRecap(int peak, String duration, int trades, double booked) {
+    final positive = booked >= 0;
+    return showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 18),
+            Text('Live ended', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
+            const SizedBox(height: 4),
+            Text('Nice session. Here\'s how it went.', style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textMuted)),
+            const SizedBox(height: 18),
+            Row(children: [
+              _RecapStat(label: 'Duration', value: duration),
+              _RecapStat(label: 'Peak viewers', value: '$peak'),
+            ]),
+            const SizedBox(height: 14),
+            Row(children: [
+              _RecapStat(label: 'Trades', value: '$trades'),
+              _RecapStat(label: 'Session P&L', value: '${positive ? '+' : '-'}\$${booked.abs().toStringAsFixed(2)}', color: positive ? AppColors.green : AppColors.red),
+            ]),
+            const SizedBox(height: 22),
+            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -139,11 +192,11 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                     children: [
                       _RoundBtn(icon: Icons.close_rounded, onTap: () async {
                         if (store.isBroadcasting) {
-                          final ok = await _confirmEnd(context);
-                          if (ok != true) return;
-                          store.endBroadcast();
+                          final ended = await _endLive();
+                          if (ended && context.mounted) Navigator.pop(context);
+                        } else {
+                          Navigator.pop(context);
                         }
-                        if (context.mounted) Navigator.pop(context);
                       }),
                       const Spacer(),
                       if (live) _LivePill(viewers: store.viewers, duration: store.liveDurationLabel)
@@ -281,10 +334,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                     child: connecting
                         ? _ConnectingBtn()
                         : live
-                            ? _EndBtn(onTap: () async {
-                                final ok = await _confirmEnd(context);
-                                if (ok == true) store.endBroadcast();
-                              })
+                            ? _EndBtn(onTap: _endLive)
                             : _GoLiveBtn(onTap: () => store.startBroadcast()),
                   ),
                 ),
@@ -521,6 +571,31 @@ class _ConnectingBtn extends StatelessWidget {
         const SizedBox(width: 10),
         Text('Connecting…', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
       ]),
+    );
+  }
+}
+
+class _RecapStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+  const _RecapStat({required this.label, required this.value, this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: color ?? AppColors.textPrimary)),
+            const SizedBox(height: 2),
+            Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+          ],
+        ),
+      ),
     );
   }
 }
