@@ -14,8 +14,8 @@ workflows:
           flutter create --platforms=android,ios --org com.millimore --project-name millimore .
       - name: Flutter packages get
         script: flutter pub get
-      - name: Build APK (debug-signed, installable for testing)
-        script: flutter build apk --release
+      - name: Build debug APK (installable, no signing needed)
+        script: flutter build apk --debug
     artifacts:
       - build/**/outputs/**/*.apk
     publishing:
