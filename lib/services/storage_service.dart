@@ -1,18 +1,8 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+// Cross-platform facade. Uses browser localStorage on web; a no-op on native.
+import 'storage_impl_stub.dart'
+    if (dart.library.html) 'storage_impl_web.dart' as impl;
 
 class StorageService {
-  static bool hasSeenOnboarding() {
-    try {
-      return html.window.localStorage['has_seen_onboarding'] == 'true';
-    } catch (_) {
-      return false;
-    }
-  }
-
-  static void markOnboardingSeen() {
-    try {
-      html.window.localStorage['has_seen_onboarding'] = 'true';
-    } catch (_) {}
-  }
+  static bool hasSeenOnboarding() => impl.hasSeenOnboarding();
+  static void markOnboardingSeen() => impl.markOnboardingSeen();
 }
