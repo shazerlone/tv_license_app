@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +7,7 @@ import 'package:camera/camera.dart';
 import '../theme/app_theme.dart';
 import '../state/app_state.dart';
 import '../widgets/order_ticket.dart';
+import '../widgets/live_reactions.dart';
 
 /// In-app Instagram / TikTok / YouTube-style go-live composer.
 /// Camera fills the screen. Millimore is always on; connect YouTube to
@@ -25,11 +28,16 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   String? _camError;
   bool _showHistory = false;
   AppState? _store;
+  final _reactions = LiveReactionsController();
+  Timer? _heartTimer;
 
   @override
   void initState() {
     super.initState();
     _initCamera();
+    _heartTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      if (mounted && (_store?.isLive ?? false)) _reactions.burst(1 + math.Random().nextInt(2));
+    });
   }
 
   @override
@@ -84,6 +92,8 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   void dispose() {
     _titleController.dispose();
     _camera?.dispose();
+    _heartTimer?.cancel();
+    _reactions.dispose();
     _store?.stopPriceFeed();
     super.dispose();
   }
@@ -115,6 +125,9 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
 
           // Scrims for readability
           const _Scrim(),
+
+          // Floating heart reactions from viewers (over camera, under controls)
+          Positioned.fill(child: IgnorePointer(child: LiveReactions(controller: _reactions))),
 
           SafeArea(
             child: Column(
