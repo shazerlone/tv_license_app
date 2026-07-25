@@ -6,6 +6,8 @@ import '../models/comment.dart';
 import '../models/trader.dart';
 import '../models/copy_models.dart';
 
+enum BroadcastPhase { idle, connecting, live }
+
 /// The app's reactive data store: subscriptions, saved posts, likes and
 /// comments. Swap the in-memory maps for a backend later — the UI only talks
 /// to this controller, so nothing else changes.
@@ -224,11 +226,26 @@ class AppState extends ChangeNotifier {
   final String streamKey = 'mlm_${(math.Random().nextInt(900000) + 100000)}_live';
   String get ingestUrl => 'rtmps://live.millimore.app:443/live';
 
-  bool _isBroadcasting = false;
-  bool get isBroadcasting => _isBroadcasting;
+  BroadcastPhase _phase = BroadcastPhase.idle;
+  BroadcastPhase get phase => _phase;
+  bool get isBroadcasting => _phase != BroadcastPhase.idle;
+  bool get isLive => _phase == BroadcastPhase.live;
 
   int _viewers = 0;
   int get viewers => _viewers;
+  int _peakViewers = 0;
+  int get peakViewers => _peakViewers;
+
+  DateTime? _liveStart;
+  Duration get liveDuration => _liveStart == null ? Duration.zero : DateTime.now().difference(_liveStart!);
+  String get liveDurationLabel {
+    final d = liveDuration;
+    final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
+    final two = (int n) => n.toString().padLeft(2, '0');
+    return h > 0 ? '${two(h)}:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
+  }
+
+  Timer? _viewerTimer;
 
   // Connected simulcast destinations (besides Millimore, which is always on).
   final Set<String> _destinations = {};
@@ -238,16 +255,36 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Begins the connecting → live handshake (mirrors a real RTMP connect).
   void startBroadcast() {
-    _isBroadcasting = true;
-    _viewers = 1 + math.Random().nextInt(40);
+    if (_phase != BroadcastPhase.idle) return;
+    _phase = BroadcastPhase.connecting;
     notifyListeners();
+    Timer(const Duration(milliseconds: 1600), () {
+      if (_phase != BroadcastPhase.connecting) return;
+      _phase = BroadcastPhase.live;
+      _liveStart = DateTime.now();
+      _viewers = 1 + math.Random().nextInt(20);
+      _peakViewers = _viewers;
+      startPriceFeed(); // keep duration/P&L ticking each second
+      _viewerTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+        _viewers = (_viewers + math.Random().nextInt(5) - 1).clamp(0, 1 << 30);
+        if (_viewers > _peakViewers) _peakViewers = _viewers;
+        notifyListeners();
+      });
+      notifyListeners();
+    });
   }
 
   void endBroadcast() {
-    _isBroadcasting = false;
+    final wasLive = _phase != BroadcastPhase.idle;
+    _phase = BroadcastPhase.idle;
     _viewers = 0;
+    _liveStart = null;
+    _viewerTimer?.cancel();
+    _viewerTimer = null;
     _liveTrades.clear();
+    if (wasLive) stopPriceFeed();
     notifyListeners();
   }
 

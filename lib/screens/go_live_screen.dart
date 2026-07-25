@@ -91,7 +91,9 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final live = store.isBroadcasting;
+    final phase = store.phase;
+    final live = phase == BroadcastPhase.live;
+    final connecting = phase == BroadcastPhase.connecting;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -122,12 +124,17 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                   child: Row(
                     children: [
-                      _RoundBtn(icon: Icons.close_rounded, onTap: () {
-                        if (live) store.endBroadcast();
-                        Navigator.pop(context);
+                      _RoundBtn(icon: Icons.close_rounded, onTap: () async {
+                        if (store.isBroadcasting) {
+                          final ok = await _confirmEnd(context);
+                          if (ok != true) return;
+                          store.endBroadcast();
+                        }
+                        if (context.mounted) Navigator.pop(context);
                       }),
                       const Spacer(),
-                      if (live) _LivePill(viewers: store.viewers),
+                      if (live) _LivePill(viewers: store.viewers, duration: store.liveDurationLabel)
+                      else if (connecting) _ConnectingPill(),
                       const Spacer(),
                       _RoundBtn(icon: Icons.cameraswitch_rounded, onTap: _flip),
                     ],
@@ -253,17 +260,19 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                   ),
                 ),
 
-                // Go live / End
+                // Go live / Connecting / End
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: SizedBox(
                     width: double.infinity,
-                    child: live
-                        ? _EndBtn(onTap: () => store.endBroadcast())
-                        : _GoLiveBtn(onTap: () {
-                            store.startBroadcast();
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are live')));
-                          }),
+                    child: connecting
+                        ? _ConnectingBtn()
+                        : live
+                            ? _EndBtn(onTap: () async {
+                                final ok = await _confirmEnd(context);
+                                if (ok == true) store.endBroadcast();
+                              })
+                            : _GoLiveBtn(onTap: () => store.startBroadcast()),
                   ),
                 ),
               ],
@@ -400,7 +409,8 @@ class _RoundBtn extends StatelessWidget {
 
 class _LivePill extends StatelessWidget {
   final int viewers;
-  const _LivePill({required this.viewers});
+  final String duration;
+  const _LivePill({required this.viewers, required this.duration});
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -412,6 +422,25 @@ class _LivePill extends StatelessWidget {
         const Icon(Icons.remove_red_eye_rounded, size: 13, color: Colors.white),
         const SizedBox(width: 4),
         Text('$viewers', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+        const SizedBox(width: 8),
+        Container(width: 1, height: 12, color: Colors.white24),
+        const SizedBox(width: 8),
+        Text(duration, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+      ]),
+    );
+  }
+}
+
+class _ConnectingPill extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+        const SizedBox(width: 8),
+        Text('Connecting…', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
       ]),
     );
   }
@@ -466,6 +495,37 @@ class _GoLiveBtn extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ConnectingBtn extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 54, alignment: Alignment.center,
+      decoration: BoxDecoration(color: AppColors.red.withOpacity(0.6), borderRadius: BorderRadius.circular(28)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+        const SizedBox(width: 10),
+        Text('Connecting…', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+      ]),
+    );
+  }
+}
+
+Future<bool?> _confirmEnd(BuildContext context) {
+  return showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      backgroundColor: AppColors.background,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text('End your live?', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+      content: Text('Your stream will stop on Millimore and any connected platforms.', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.5)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Keep live', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.textMuted))),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: Text('End live', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.red))),
+      ],
+    ),
+  );
 }
 
 class _EndBtn extends StatelessWidget {
