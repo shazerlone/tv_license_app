@@ -12,6 +12,17 @@ workflows:
           # incomplete. Regenerate them cleanly without touching lib/ or web/.
           rm -rf android ios
           flutter create --platforms=android,ios --org com.millimore --project-name millimore .
+      - name: Inject camera & mic permissions
+        script: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            /usr/bin/sed -i '' 's#<manifest\(.*\)>#<manifest\1>\
+    <uses-permission android:name="android.permission.CAMERA"/>\
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\
+    <uses-permission android:name="android.permission.INTERNET"/>#' "$MANIFEST"
+          fi
+          plutil -insert NSCameraUsageDescription -string "Camera is used to go live." ios/Runner/Info.plist || true
+          plutil -insert NSMicrophoneUsageDescription -string "Microphone is used to go live." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
       - name: Build debug APK (installable, no signing needed)
@@ -32,26 +43,21 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       flutter: stable
-      # Fill these in Codemagic UI once you have an Apple Developer account:
-      # ios_signing:
-      #   distribution_type: app_store
-      #   bundle_identifier: com.millimore.app
-      # groups:
-      #   - app_store_credentials   # App Store Connect API key
     scripts:
       - name: Regenerate native platform folders
         script: |
           rm -rf android ios
           flutter create --platforms=android,ios --org com.millimore --project-name millimore .
+      - name: Inject camera & mic permissions
+        script: |
+          plutil -insert NSCameraUsageDescription -string "Camera is used to go live." ios/Runner/Info.plist || true
+          plutil -insert NSMicrophoneUsageDescription -string "Microphone is used to go live." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
       - name: Build iOS (unsigned until signing is configured)
-        script: |
-          flutter build ios --release --no-codesign
+        script: flutter build ios --release --no-codesign
     artifacts:
       - build/ios/iphoneos/*.app
-    # Once signing is set up in the Codemagic UI, switch the build step to
-    # `flutter build ipa` and add publishing -> app_store_connect (TestFlight).
     publishing:
       email:
         recipients:
