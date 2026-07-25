@@ -45,26 +45,59 @@ class CopyConfig {
   });
 }
 
+enum LiveOrderType { market, limit }
+
 /// A trade the broadcasting trader places live on-stream (mirrors to their
 /// connected MT account via backend later). Shown as the live overlay.
 class LiveTrade {
   final String id;
   final String symbol;
   final bool isBuy;
+  final LiveOrderType orderType;
   final double entryPrice;
-  final double pnlPercent;
+  final double lots;
+  final double? sl;
+  final double? tp;
+  final double? limitPrice;
   final DateTime openedAt;
 
   const LiveTrade({
     required this.id,
     required this.symbol,
     required this.isBuy,
+    required this.orderType,
     required this.entryPrice,
-    this.pnlPercent = 0,
+    this.lots = 0.10,
+    this.sl,
+    this.tp,
+    this.limitPrice,
     required this.openedAt,
   });
 
   String get directionLabel => isBuy ? 'BUY' : 'SELL';
+  bool get isPending => orderType == LiveOrderType.limit && limitPrice != null;
+}
+
+/// A closed live trade for the history log.
+class ClosedTrade {
+  final String symbol;
+  final bool isBuy;
+  final double pnl;
+  final double lots;
+  final DateTime openedAt;
+  final DateTime closedAt;
+
+  const ClosedTrade({
+    required this.symbol,
+    required this.isBuy,
+    required this.pnl,
+    required this.lots,
+    required this.openedAt,
+    required this.closedAt,
+  });
+
+  String get directionLabel => isBuy ? 'BUY' : 'SELL';
+  bool get isProfit => pnl >= 0;
 }
 
 enum PositionStatus { active, closed }

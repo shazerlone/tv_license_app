@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/post.dart';
@@ -250,20 +251,85 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Live price feed (simulated; becomes real MT prices via backend) ─────────
+  final Map<String, double> _prices = {
+    'XAU/USD': 2015.0,
+    'EUR/USD': 1.0850,
+    'GBP/USD': 1.2650,
+    'USD/JPY': 149.50,
+    'BTC/USD': 67500.0,
+    'US30': 38500.0,
+  };
+  List<String> get symbols => _prices.keys.toList();
+  double priceOf(String s) => _prices[s] ?? 1.0;
+
+  Timer? _priceTimer;
+  int _feedRefs = 0;
+
+  void startPriceFeed() {
+    _feedRefs++;
+    _priceTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      final r = math.Random();
+      _prices.updateAll((k, v) => v * (1 + (r.nextDouble() - 0.5) * 0.0009));
+      notifyListeners();
+    });
+  }
+
+  void stopPriceFeed() {
+    _feedRefs--;
+    if (_feedRefs <= 0) {
+      _feedRefs = 0;
+      _priceTimer?.cancel();
+      _priceTimer = null;
+    }
+  }
+
+  int _contract(String s) {
+    if (s == 'XAU/USD') return 100;
+    if (s == 'BTC/USD') return 1;
+    if (s == 'US30') return 1;
+    if (s == 'USD/JPY') return 1000;
+    return 100000;
+  }
+
+  /// Floating dollar P/L for an open live trade at the current price.
+  double livePnl(LiveTrade t) {
+    if (t.isPending) return 0;
+    final cur = priceOf(t.symbol);
+    final dir = t.isBuy ? 1 : -1;
+    return (cur - t.entryPrice) * dir * t.lots * _contract(t.symbol);
+  }
+
   // Live trades the broadcaster places on-stream (the overlay source).
   final List<LiveTrade> _liveTrades = [];
   List<LiveTrade> get liveTrades => List.unmodifiable(_liveTrades);
 
-  void placeLiveTrade(String symbol, bool isBuy) {
-    final rng = math.Random();
+  final List<ClosedTrade> _closedLiveTrades = [];
+  List<ClosedTrade> get closedLiveTrades => List.unmodifiable(_closedLiveTrades);
+
+  void placeLiveOrder({
+    required String symbol,
+    required bool isBuy,
+    required LiveOrderType orderType,
+    double lots = 0.10,
+    double? sl,
+    double? tp,
+    double? limitPrice,
+  }) {
+    startPriceFeed();
+    final entry = orderType == LiveOrderType.market ? priceOf(symbol) : (limitPrice ?? priceOf(symbol));
     _liveTrades.insert(
       0,
       LiveTrade(
         id: 'lt_${DateTime.now().microsecondsSinceEpoch}',
         symbol: symbol,
         isBuy: isBuy,
-        entryPrice: 1900 + rng.nextDouble() * 100, // e.g. gold
-        pnlPercent: (rng.nextDouble() * 1.2 - 0.4),
+        orderType: orderType,
+        entryPrice: entry,
+        lots: lots,
+        sl: sl,
+        tp: tp,
+        limitPrice: limitPrice,
         openedAt: DateTime.now(),
       ),
     );
@@ -271,7 +337,21 @@ class AppState extends ChangeNotifier {
   }
 
   void closeLiveTrade(String id) {
-    _liveTrades.removeWhere((t) => t.id == id);
+    final idx = _liveTrades.indexWhere((t) => t.id == id);
+    if (idx == -1) return;
+    final t = _liveTrades[idx];
+    _closedLiveTrades.insert(
+      0,
+      ClosedTrade(
+        symbol: t.symbol,
+        isBuy: t.isBuy,
+        pnl: livePnl(t),
+        lots: t.lots,
+        openedAt: t.openedAt,
+        closedAt: DateTime.now(),
+      ),
+    );
+    _liveTrades.removeAt(idx);
     notifyListeners();
   }
 

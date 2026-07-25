@@ -32,6 +32,8 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
 
   Trader get _trader => widget.trader ?? mockTraders[0];
 
+  AppState? _store;
+
   @override
   void initState() {
     super.initState();
@@ -40,9 +42,19 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_store == null) {
+      _store = AppStateScope.of(context);
+      _store!.startPriceFeed();
+    }
+  }
+
+  @override
   void dispose() {
     _chatController.dispose();
     _anim.dispose();
+    _store?.stopPriceFeed();
     super.dispose();
   }
 
@@ -62,11 +74,11 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     final subscribed = store.isSubscribed(trader.id);
     // Prefer the broadcaster's live-placed trades; fall back to an open mock trade.
     final overlay = store.liveTrades.isNotEmpty
-        ? store.liveTrades.map((t) => (t.symbol, t.isBuy, t.pnlPercent)).toList()
+        ? store.liveTrades.map((t) => (t.symbol, t.isBuy, store.livePnl(t))).toList()
         : [
             () {
               final m = mockTrades.firstWhere((t) => t.traderId == trader.id && t.status == TradeStatus.open, orElse: () => mockTrades.first);
-              return (m.pair, m.direction == TradeDirection.buy, m.pnlPercent);
+              return (m.pair, m.direction == TradeDirection.buy, m.pnlPercent * 10.0);
             }()
           ];
 
@@ -167,7 +179,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                       child: _LiveTradeCard(
                         pair: o.$1,
                         isBuy: o.$2,
-                        pnlPercent: o.$3,
+                        pnl: o.$3,
                         onCopy: () => _copyFromLive(context, store, trader, o.$1, o.$2),
                       ),
                     )),
@@ -245,13 +257,13 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
 class _LiveTradeCard extends StatelessWidget {
   final String pair;
   final bool isBuy;
-  final double pnlPercent;
+  final double pnl;
   final VoidCallback onCopy;
-  const _LiveTradeCard({required this.pair, required this.isBuy, required this.pnlPercent, required this.onCopy});
+  const _LiveTradeCard({required this.pair, required this.isBuy, required this.pnl, required this.onCopy});
 
   @override
   Widget build(BuildContext context) {
-    final profit = pnlPercent >= 0;
+    final profit = pnl >= 0;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -275,7 +287,7 @@ class _LiveTradeCard extends StatelessWidget {
             child: Text(isBuy ? 'BUY' : 'SELL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: isBuy ? AppColors.green : AppColors.red)),
           ),
           const SizedBox(width: 8),
-          Text('${profit ? '+' : ''}${pnlPercent.toStringAsFixed(2)}%', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
+          Text('${profit ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
           const Spacer(),
           GestureDetector(
             onTap: onCopy,

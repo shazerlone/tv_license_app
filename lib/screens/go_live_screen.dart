@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
 import '../theme/app_theme.dart';
 import '../state/app_state.dart';
+import '../widgets/order_ticket.dart';
 
 /// In-app Instagram / TikTok / YouTube-style go-live composer.
 /// Camera fills the screen. Millimore is always on; connect YouTube to
@@ -22,11 +23,22 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   int _camIndex = 0;
   bool _cameraReady = false;
   String? _camError;
+  bool _showHistory = false;
+  AppState? _store;
 
   @override
   void initState() {
     super.initState();
     _initCamera();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_store == null) {
+      _store = AppStateScope.of(context);
+      _store!.startPriceFeed();
+    }
   }
 
   Future<void> _initCamera() async {
@@ -72,6 +84,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   void dispose() {
     _titleController.dispose();
     _camera?.dispose();
+    _store?.stopPriceFeed();
     super.dispose();
   }
 
@@ -156,36 +169,86 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
 
                 const Spacer(),
 
-                // Live trade overlay preview (what viewers see)
+                // Live trade overlay preview (what viewers see) with floating P/L
                 if (store.liveTrades.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                     child: Column(
-                      children: store.liveTrades.take(2).map((t) => Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),
-                        child: Row(children: [
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(6)), child: Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white))),
-                          const SizedBox(width: 10),
-                          Text(t.symbol, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
-                          const SizedBox(width: 8),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: (t.isBuy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)), child: Text(t.directionLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.isBuy ? AppColors.green : AppColors.red))),
-                          const Spacer(),
-                          GestureDetector(onTap: () => store.closeLiveTrade(t.id), child: const Icon(Icons.close_rounded, size: 18, color: Colors.white70)),
-                        ]),
-                      )).toList(),
+                      children: store.liveTrades.take(3).map((t) {
+                        final pnl = store.livePnl(t);
+                        final positive = pnl >= 0;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),
+                          child: Row(children: [
+                            Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: t.isPending ? AppColors.primary : AppColors.red, borderRadius: BorderRadius.circular(6)), child: Text(t.isPending ? 'PENDING' : 'LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white))),
+                            const SizedBox(width: 10),
+                            Text(t.symbol, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                            const SizedBox(width: 8),
+                            Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: (t.isBuy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)), child: Text(t.directionLabel, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: t.isBuy ? AppColors.green : AppColors.red))),
+                            const Spacer(),
+                            if (!t.isPending)
+                              Text('${positive ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: positive ? AppColors.green : AppColors.red)),
+                            const SizedBox(width: 10),
+                            GestureDetector(onTap: () => store.closeLiveTrade(t.id), child: const Icon(Icons.close_rounded, size: 18, color: Colors.white70)),
+                          ]),
+                        );
+                      }).toList(),
                     ),
                   ),
 
-                // Trade-on-stream controls
+                // History (collapsible)
+                if (_showHistory && store.closedLiveTrades.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(maxHeight: 160),
+                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), borderRadius: BorderRadius.circular(12)),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: store.closedLiveTrades.map((c) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(children: [
+                            Text(c.symbol, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white)),
+                            const SizedBox(width: 6),
+                            Text(c.directionLabel, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: c.isBuy ? AppColors.green : AppColors.red)),
+                            const Spacer(),
+                            Text('${c.isProfit ? '+' : '-'}\$${c.pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.isProfit ? AppColors.green : AppColors.red)),
+                          ]),
+                        )).toList(),
+                      ),
+                    ),
+                  ),
+
+                // Place trade + history controls
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: Row(
                     children: [
-                      _TradeBtn(label: 'Buy Gold', color: AppColors.green, onTap: () { store.placeLiveTrade('XAU/USD', true); }),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => OrderTicket.open(context),
+                          child: Container(
+                            height: 46, alignment: Alignment.center,
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),
+                            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              const Icon(Icons.add_chart_rounded, size: 18, color: Colors.white),
+                              const SizedBox(width: 8),
+                              Text('Place trade', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                            ]),
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      _TradeBtn(label: 'Sell Gold', color: AppColors.red, onTap: () { store.placeLiveTrade('XAU/USD', false); }),
+                      GestureDetector(
+                        onTap: () => setState(() => _showHistory = !_showHistory),
+                        child: Container(
+                          height: 46, width: 46, alignment: Alignment.center,
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),
+                          child: Icon(_showHistory ? Icons.history_toggle_off_rounded : Icons.history_rounded, size: 22, color: Colors.white),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -384,25 +447,6 @@ class _DestChip extends StatelessWidget {
   }
 }
 
-class _TradeBtn extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _TradeBtn({required this.label, required this.color, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 46, alignment: Alignment.center,
-          decoration: BoxDecoration(color: color.withOpacity(0.9), borderRadius: BorderRadius.circular(12)),
-          child: Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-        ),
-      ),
-    );
-  }
-}
 
 class _GoLiveBtn extends StatelessWidget {
   final VoidCallback onTap;
