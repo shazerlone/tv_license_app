@@ -1,0 +1,687 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "HealthController_health",
+        "summary": "Liveness probe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/v1/auth/register/follower": {
+      "post": {
+        "operationId": "AuthController_registerFollower",
+        "summary": "Register a follower (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterFollowerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/register/creator": {
+      "post": {
+        "operationId": "AuthController_registerCreator",
+        "summary": "Register a creator; opens a pending verification application (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterCreatorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/otp/request": {
+      "post": {
+        "operationId": "AuthController_otpRequest",
+        "summary": "Request an OTP for a phone number (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpRequestResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/otp/verify": {
+      "post": {
+        "operationId": "AuthController_otpVerify",
+        "summary": "Verify an OTP and sign in (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "summary": "Email + password login (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/social/apple": {
+      "post": {
+        "operationId": "AuthController_apple",
+        "summary": "Sign in with Apple (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppleSocialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/social/google": {
+      "post": {
+        "operationId": "AuthController_google",
+        "summary": "Sign in with Google (contract §4.1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSocialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "summary": "Log out (contract §4.1). Stateless JWT — client discards the token.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "operationId": "UsersController_me",
+        "summary": "Get the authenticated user (contract §4.1 GET /me)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_updateMe",
+        "summary": "Update the authenticated user (contract §4.1 PATCH /me)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Millimore API",
+    "description": "Backend API for the Millimore platform (mobile app + admin dashboard). Single source of truth: docs/BACKEND_CONTRACT.md",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Auth & onboarding (contract §4.1)"
+    },
+    {
+      "name": "users",
+      "description": "Current user (contract §4.1)"
+    },
+    {
+      "name": "creator",
+      "description": "Creator verification (contract §4.2)"
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.millimore.app/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:3000/v1",
+      "description": "Local"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RegisterFollowerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Priya Sharma"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+91 90000 00000"
+          },
+          "residenceIso": {
+            "type": "string",
+            "example": "IN"
+          },
+          "experience": {
+            "type": "string",
+            "example": "beginner"
+          },
+          "interests": {
+            "example": [
+              "Forex",
+              "Crypto"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "photoUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "residenceIso"
+        ]
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "u_123"
+          },
+          "name": {
+            "type": "string",
+            "example": "Marcus Sterling"
+          },
+          "username": {
+            "type": "string",
+            "example": "marcussterling"
+          },
+          "email": {
+            "type": "object",
+            "example": "marcus@x.com",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "example": "+91 90000 00000",
+            "nullable": true
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "follower",
+              "creator",
+              "admin"
+            ]
+          },
+          "creatorStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "approved",
+              "rejected",
+              "suspended"
+            ]
+          },
+          "residenceIso": {
+            "type": "object",
+            "example": "IN",
+            "nullable": true
+          },
+          "residenceCountry": {
+            "type": "object",
+            "example": "India",
+            "nullable": true
+          },
+          "market": {
+            "type": "object",
+            "example": "Forex",
+            "nullable": true
+          },
+          "platform": {
+            "type": "object",
+            "example": "MetaTrader 5",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-01-01T00:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "username",
+          "role",
+          "creatorStatus",
+          "createdAt"
+        ]
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserDto"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "VerificationDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "example": "MetaTrader 5"
+          },
+          "server": {
+            "type": "string",
+            "example": "XM-Live3"
+          },
+          "account": {
+            "type": "string",
+            "example": "50231487"
+          },
+          "investorPassword": {
+            "type": "string",
+            "example": "investor-pw",
+            "writeOnly": true
+          },
+          "statementUrl": {
+            "type": "string",
+            "example": "https://storage/statement.pdf"
+          }
+        },
+        "required": [
+          "platform"
+        ]
+      },
+      "RegisterCreatorDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Marcus Sterling"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+91 90000 00000"
+          },
+          "residenceIso": {
+            "type": "string",
+            "example": "IN"
+          },
+          "market": {
+            "type": "string",
+            "example": "Forex"
+          },
+          "platform": {
+            "type": "string",
+            "example": "MetaTrader 5"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/VerificationDto"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "residenceIso",
+          "market",
+          "platform",
+          "verification"
+        ]
+      },
+      "OtpRequestDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+91 90000 00000"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "OtpRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "example": "otp_9f8a..."
+          },
+          "devCode": {
+            "type": "string",
+            "description": "Present only in dev/console OTP mode to ease app integration.",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "requestId"
+        ]
+      },
+      "OtpVerifyDto": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "example": "otp_9f8a..."
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "requestId",
+          "code"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "trader@millimore.app"
+          },
+          "password": {
+            "type": "string",
+            "example": "password",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "AppleSocialDto": {
+        "type": "object",
+        "properties": {
+          "identityToken": {
+            "type": "string",
+            "description": "Apple identity token (JWT)."
+          }
+        },
+        "required": [
+          "identityToken"
+        ]
+      },
+      "GoogleSocialDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "description": "Google ID token (JWT)."
+          }
+        },
+        "required": [
+          "idToken"
+        ]
+      },
+      "UserEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserDto"
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "UpdateMeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "photoUrl": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "market": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,104 @@
+// Millimore backend — Prisma schema
+// Source of truth for entity shapes: docs/BACKEND_CONTRACT.md
+// Milestone 1 covers: User, OtpRequest, CreatorApplication.
+// Later milestones extend this file (brokers, accounts, traders, copy, broadcasts…).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  follower
+  creator
+  admin
+}
+
+enum CreatorStatus {
+  none
+  pending
+  approved
+  rejected
+  suspended
+}
+
+/// A platform user. Serialized to the contract `User` shape (see UsersService.toDto).
+model User {
+  id             String        @id // prefixed id, e.g. "u_abc123"
+  name           String
+  username       String        @unique
+  email          String?       @unique
+  phone          String?       @unique
+  photoUrl       String?
+  role           Role          @default(follower)
+  creatorStatus  CreatorStatus @default(none)
+
+  residenceIso     String? // ISO-3166 alpha-2, e.g. "IN"
+  residenceCountry String? // display name, e.g. "India"
+  market           String? // e.g. "Forex"
+  platform         String? // e.g. "MetaTrader 5"
+
+  // Onboarding extras (follower)
+  experience String?
+  interests  String[] @default([])
+
+  // Auth (write-only; never serialized)
+  passwordHash  String?
+  appleSubject  String? @unique
+  googleSubject String? @unique
+
+  banned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creatorApplications CreatorApplication[]
+
+  @@index([role])
+  @@index([creatorStatus])
+}
+
+/// One-time-passcode request used by /auth/otp/request + /auth/otp/verify.
+model OtpRequest {
+  id          String   @id // the opaque requestId returned to the client
+  phone       String
+  codeHash    String // never store the raw code
+  attempts    Int      @default(0)
+  consumedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([phone])
+}
+
+/// Creator verification application (from /auth/register/creator or /creator/apply).
+/// The admin approval queue (milestone 2) reads pending rows here.
+model CreatorApplication {
+  id       String        @id
+  userId   String
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status   CreatorStatus @default(pending)
+
+  market   String
+  platform String
+
+  // verification { platform, server?, account?, investorPassword?, statementUrl? }
+  verificationPlatform String
+  server               String?
+  account              String?
+  statementUrl         String?
+  // Write-only credential — AES-256-GCM encrypted, never returned in responses.
+  investorPasswordEnc  String?
+
+  reviewerNote String?
+  rejectReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([userId])
+}
