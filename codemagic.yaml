@@ -1,0 +1,58 @@
+workflows:
+  android-test:
+    name: Millimore Android (test)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+    scripts:
+      - name: Regenerate native platform folders
+        script: |
+          # The app was hand-authored (no flutter create), so android/ios are
+          # incomplete. Regenerate them cleanly without touching lib/ or web/.
+          rm -rf android ios
+          flutter create --platforms=android,ios --org com.millimore --project-name millimore .
+      - name: Flutter packages get
+        script: flutter pub get
+      - name: Build APK (debug-signed, installable for testing)
+        script: flutter build apk --release
+    artifacts:
+      - build/**/outputs/**/*.apk
+    publishing:
+      email:
+        recipients:
+          - asrariamobicity35@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  ios-testflight:
+    name: Millimore iOS (TestFlight)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      # Fill these in Codemagic UI once you have an Apple Developer account:
+      # ios_signing:
+      #   distribution_type: app_store
+      #   bundle_identifier: com.millimore.app
+      # groups:
+      #   - app_store_credentials   # App Store Connect API key
+    scripts:
+      - name: Regenerate native platform folders
+        script: |
+          rm -rf android ios
+          flutter create --platforms=android,ios --org com.millimore --project-name millimore .
+      - name: Flutter packages get
+        script: flutter pub get
+      - name: Build iOS (unsigned until signing is configured)
+        script: |
+          flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/iphoneos/*.app
+    # Once signing is set up in the Codemagic UI, switch the build step to
+    # `flutter build ipa` and add publishing -> app_store_connect (TestFlight).
+    publishing:
+      email:
+        recipients:
+          - asrariamobicity35@gmail.com
