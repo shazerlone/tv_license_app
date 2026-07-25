@@ -8,24 +8,16 @@ workflows:
     scripts:
       - name: Regenerate native platform folders
         script: |
-          # The app was hand-authored (no flutter create), so android/ios are
-          # incomplete. Regenerate them cleanly without touching lib/ or web/.
           rm -rf android ios
           flutter create --platforms=android,ios --org com.millimore --project-name millimore .
       - name: Inject camera & mic permissions
         script: |
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
-            /usr/bin/sed -i '' 's#<manifest\(.*\)>#<manifest\1>\
-    <uses-permission android:name="android.permission.CAMERA"/>\
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\
-    <uses-permission android:name="android.permission.INTERNET"/>#' "$MANIFEST"
-          fi
+          python3 -c 'import re,pathlib; p=pathlib.Path("android/app/src/main/AndroidManifest.xml"); t=p.read_text(); perm="<uses-permission android:name=\"android.permission.CAMERA\"/><uses-permission android:name=\"android.permission.RECORD_AUDIO\"/><uses-permission android:name=\"android.permission.INTERNET\"/>"; p.write_text(t if "permission.CAMERA" in t else re.sub(r"(<manifest[^>]*>)", lambda m: m.group(1)+perm, t, count=1))'
           plutil -insert NSCameraUsageDescription -string "Camera is used to go live." ios/Runner/Info.plist || true
           plutil -insert NSMicrophoneUsageDescription -string "Microphone is used to go live." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
-      - name: Build debug APK (installable, no signing needed)
+      - name: Build debug APK
         script: flutter build apk --debug
     artifacts:
       - build/**/outputs/**/*.apk
@@ -54,7 +46,7 @@ workflows:
           plutil -insert NSMicrophoneUsageDescription -string "Microphone is used to go live." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
-      - name: Build iOS (unsigned until signing is configured)
+      - name: Build iOS (unsigned)
         script: flutter build ios --release --no-codesign
     artifacts:
       - build/ios/iphoneos/*.app
