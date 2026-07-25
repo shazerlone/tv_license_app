@@ -6,8 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
 import '../theme/app_theme.dart';
 import '../state/app_state.dart';
+import '../models/copy_models.dart';
 import '../widgets/order_ticket.dart';
 import '../widgets/live_reactions.dart';
+import '../widgets/live_chat_feed.dart';
 
 /// In-app Instagram / TikTok / YouTube-style go-live composer.
 /// Camera fills the screen. Millimore is always on; connect YouTube to
@@ -30,6 +32,10 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   AppState? _store;
   final _reactions = LiveReactionsController();
   Timer? _heartTimer;
+  Timer? _chatTimer;
+
+  static const _chatUsers = ['alex_t', 'jade_fx', 'crypto_k', 'mark99', 'luna_t', 'trader_z', 'pip_hunter', 'gold_bug'];
+  static const _chatLines = ['nice entry 🔥', 'what\'s your SL?', 'copied!', 'gold looking bullish', 'ty for the breakdown', 'following live', 'buy or wait?', 'this is clean', 'from YouTube 👋', 'love the setups'];
 
   @override
   void initState() {
@@ -37,6 +43,17 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     _initCamera();
     _heartTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
       if (mounted && (_store?.isLive ?? false)) _reactions.burst(1 + math.Random().nextInt(2));
+    });
+    // Simulated incoming chat (Millimore + YouTube) while live.
+    _chatTimer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
+      if (!mounted || !(_store?.isLive ?? false)) return;
+      final r = math.Random();
+      final src = r.nextBool() ? ChatSource.youtube : ChatSource.millimore;
+      _store!.addChat(LiveChatMessage(
+        author: _chatUsers[r.nextInt(_chatUsers.length)],
+        text: _chatLines[r.nextInt(_chatLines.length)],
+        source: src,
+      ));
     });
   }
 
@@ -146,6 +163,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     _titleController.dispose();
     _camera?.dispose();
     _heartTimer?.cancel();
+    _chatTimer?.cancel();
     _reactions.dispose();
     _store?.stopPriceFeed();
     super.dispose();
@@ -240,7 +258,16 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                   ),
                 ),
 
-                const Spacer(),
+                // Live chat (Millimore + YouTube) fills the middle while live
+                if (live)
+                  Expanded(
+                    child: LiveChatFeed(
+                      messages: store.liveChat,
+                      onSend: (t) => store.sendHostChat(t, 'You'),
+                    ),
+                  )
+                else
+                  const Spacer(),
 
                 // Live trade overlay preview (what viewers see) with floating P/L
                 if (store.liveTrades.isNotEmpty)

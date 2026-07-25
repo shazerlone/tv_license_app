@@ -284,8 +284,24 @@ class AppState extends ChangeNotifier {
     _viewerTimer?.cancel();
     _viewerTimer = null;
     _liveTrades.clear();
+    _liveChat.clear();
     if (wasLive) stopPriceFeed();
     notifyListeners();
+  }
+
+  // ── Live chat (Millimore + YouTube/Facebook aggregated) ─────────────────────
+  final List<LiveChatMessage> _liveChat = [];
+  List<LiveChatMessage> get liveChat => List.unmodifiable(_liveChat);
+
+  void addChat(LiveChatMessage m) {
+    _liveChat.add(m);
+    if (_liveChat.length > 100) _liveChat.removeAt(0);
+    notifyListeners();
+  }
+
+  void sendHostChat(String text, String hostName) {
+    if (text.trim().isEmpty) return;
+    addChat(LiveChatMessage(author: hostName, text: text.trim(), byHost: true));
   }
 
   // ── Live price feed (simulated; becomes real MT prices via backend) ─────────

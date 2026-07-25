@@ -45,6 +45,24 @@ class CopyConfig {
   });
 }
 
+enum ChatSource { millimore, youtube, facebook }
+
+/// A live-chat message, aggregated from Millimore + connected platforms
+/// (YouTube/Facebook chat via their APIs on the backend later).
+class LiveChatMessage {
+  final String author;
+  final String text;
+  final ChatSource source;
+  final bool byHost;
+
+  const LiveChatMessage({
+    required this.author,
+    required this.text,
+    this.source = ChatSource.millimore,
+    this.byHost = false,
+  });
+}
+
 enum LiveOrderType { market, limit }
 
 /// A trade the broadcasting trader places live on-stream (mirrors to their
