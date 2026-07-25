@@ -1,0 +1,354 @@
+# Millimore — Backend & Admin API Contract (v1)
+
+This is the **single source of truth** shared by two Claude Code sessions:
+
+- **App session** (`millimore-app`, Flutter) — builds the mobile app *to* this contract.
+- **Backend session** (`millimore-backend`, new) — builds the API + admin *to* this contract.
+
+The AIs do not share memory. **This document is how they stay in sync.** When
+something changes, update this file first, then both sides follow it.
+
+The app is currently wired to a local demo store (`AppState` / `SessionController`).
+Goal: swap the demo data source for these live endpoints **without changing the UI**.
+
+---
+
+## 0. Principles
+
+- **One backend, two clients:** the mobile app and the admin dashboard call the
+  same API. Admin = elevated role, extra endpoints.
+- **REST for actions/queries, WebSocket for realtime** (prices, live trades,
+  chat, viewers, reactions).
+- Everything the app reads today from `AppState` maps to an endpoint below.
+
+## 1. Conventions
+
+- **Base URL:** `https://api.millimore.app/v1`
+- **Auth:** `Authorization: Bearer <JWT>` on all authenticated calls.
+- **Content-Type:** `application/json`
+- **IDs:** string (UUID).
+- **Money:** numbers in account currency (USD default); send as decimals.
+- **Timestamps:** ISO-8601 UTC (`2026-07-25T10:00:00Z`).
+- **Errors:** `{ "error": { "code": "string", "message": "human text" } }` with
+  proper HTTP status (400/401/403/404/409/422/429/500).
+- **Pagination:** `?limit=20&cursor=<opaque>` → `{ "items": [...], "nextCursor": "..." }`.
+
+## 2. Roles
+
+- `follower` — copies traders, watches lives.
+- `creator` — streams, posts, shares verified trades. Has `creatorStatus`.
+- `admin` — platform management (admin dashboard only).
+
+`creatorStatus`: `none | pending | approved | rejected | suspended`.
+
+---
+
+## 3. Data models (entities)
+
+### User
+```json
+{
+  "id": "u_123",
+  "name": "Marcus Sterling",
+  "username": "marcussterling",
+  "email": "marcus@x.com",
+  "phone": "+91 90000 00000",
+  "photoUrl": "https://...",
+  "role": "creator",
+  "creatorStatus": "approved",
+  "residenceIso": "IN",
+  "residenceCountry": "India",
+  "market": "Forex",
+  "platform": "MetaTrader 5",
+  "createdAt": "2026-01-01T00:00:00Z"
+}
+```
+
+### Trader (public profile card)
+```json
+{
+  "id": "t_1", "name": "Marcus Sterling", "username": "marcussterling",
+  "photoUrl": null, "isVerified": true, "isLive": true,
+  "returnPercent": 18.45, "returnDays": 30,
+  "followers": 12400, "copiers": 1840, "aum": 2300000,
+  "winRate": 72, "maxDrawdown": 9.2, "totalTrades": 612,
+  "category": "Forex", "tags": ["Price Action","EUR/USD"], "bio": "..."
+}
+```
+
+### Broker
+```json
+{ "id": "century", "name": "Century", "domain": "centuryfinancial.ae",
+  "logoUrl": "https://...", "recommended": true }
+```
+
+### TradingAccount
+```json
+{ "id": "acc_1", "brokerId": "xm", "brokerName": "XM",
+  "accountNumber": "50231487", "masked": "••••1487",
+  "server": "XM-Live3", "currency": "USD", "balance": 5000,
+  "status": "connected", "connectedAt": "2026-07-01T00:00:00Z" }
+```
+> Credentials (investor/trading password) are **write-only**: sent on connect,
+> never returned. Store encrypted.
+
+### CopyConfig
+```json
+{ "traderId": "t_1", "accountId": "acc_1", "amount": 500, "risk": 1.0,
+  "autoCopy": true, "startedAt": "..." }
+```
+
+### CopyPosition
+```json
+{ "id": "pos_1", "traderId": "t_1", "traderName": "Marcus", "pair": "EUR/USD",
+  "isBuy": true, "status": "active|closed", "entryPrice": 1.0876,
+  "exitPrice": null, "pnlAmount": 12.4, "pnlPercent": 0.47, "lots": 0.1,
+  "openedAt": "...", "closedAt": null, "accountId": "acc_1" }
+```
+
+### LiveTrade (broadcaster on-stream order)
+```json
+{ "id": "lt_1", "symbol": "XAU/USD", "isBuy": true,
+  "orderType": "market|limit", "entryPrice": 2015.3, "lots": 0.1,
+  "sl": 2008.0, "tp": 2030.0, "limitPrice": null,
+  "status": "open|pending|closed", "openedAt": "...", "closedAt": null }
+```
+
+### Post
+```json
+{ "id": "p_1", "trader": { Trader }, "type": "analysis|trade|lesson|update",
+  "content": "text", "pair": "EUR/USD", "title": null, "points": [],
+  "likes": 284, "comments": 47, "createdAt": "...", "isLiked": false, "saved": false }
+```
+
+### Comment
+```json
+{ "id": "c_1", "author": "Priya", "username": "priyatrades",
+  "text": "great!", "createdAt": "...", "byMe": false }
+```
+
+### LiveChatMessage
+```json
+{ "author": "alex_t", "text": "nice entry", "source": "millimore|youtube|facebook",
+  "byHost": false, "createdAt": "..." }
+```
+
+### Broadcast
+```json
+{ "id": "b_1", "creatorId": "u_1", "title": "Live trading",
+  "phase": "connecting|live|ended",
+  "ingestUrl": "rtmps://ingest.millimore.app/live",
+  "streamKey": "mlm_xxx",
+  "hlsUrl": "https://cdn.millimore.app/b_1/index.m3u8",
+  "viewers": 42, "peakViewers": 80, "startedAt": "...", "endedAt": null,
+  "destinations": [{ "id":"youtube","connected":true }] }
+```
+
+---
+
+## 4. REST endpoints
+
+### 4.1 Auth & onboarding
+```
+POST /auth/register/follower   { name, phone, residenceIso, experience?, interests?, photoUrl? }
+POST /auth/register/creator    { name, phone, residenceIso, market, platform,
+                                 verification: { platform, server?, account?, investorPassword?, statementUrl? } }
+POST /auth/otp/request         { phone } → { requestId }
+POST /auth/otp/verify          { requestId, code } → { token, user }
+POST /auth/login               { email, password } → { token, user }
+POST /auth/social/apple        { identityToken } → { token, user }
+POST /auth/social/google       { idToken } → { token, user }
+GET  /me                       → { user }
+PATCH /me                      { name?, photoUrl?, ... } → { user }
+POST /auth/logout
+```
+> App mapping: replaces `SessionController.signInAsFollower/Creator`, OTP screen,
+> login demo (`trader@millimore.app`).
+
+### 4.2 Creator verification
+```
+GET  /creator/status           → { creatorStatus, reason? }
+POST /creator/apply            { market, platform, verification{...} } → { creatorStatus:"pending" }
+```
+> Admin flips status; app polls or receives WS `creator.status` event.
+> This replaces the demo "Mark as verified" button.
+
+### 4.3 Brokers & accounts
+```
+GET  /brokers?country=IN               → [ Broker ]   // country-gated list
+GET  /accounts                         → [ TradingAccount ]
+POST /accounts                         { brokerId, accountNumber, server, password } → TradingAccount
+DELETE /accounts/{id}
+POST /accounts/{id}/password           { current, next }   // change password
+```
+
+### 4.4 Discover / traders
+```
+GET  /traders?category=&q=&sort=copiers|return&cursor=   → paginated [ Trader ]
+GET  /traders/{id}                     → Trader (full)
+GET  /traders/{id}/posts               → [ Post ]
+GET  /traders/{id}/trades?status=      → [ CopyPosition-like public trades ]
+GET  /traders/{id}/equity?range=30d    → [ { t, value } ]  // equity curve
+GET  /discover/reels                   → [ Reel ]  // mixed live/trade/lesson feed
+```
+`Reel`: `{ kind:"live|trade|lesson", trader, post, title?, points?, viewers? }`
+
+### 4.5 Social graph
+```
+POST   /subscriptions/{traderId}       // subscribe
+DELETE /subscriptions/{traderId}       // unsubscribe
+GET    /subscriptions                  → [ Trader ]
+POST   /subscriptions/{traderId}/notify  { on: true|false }  // bell
+GET    /feed                           → [ Post ]   // from subscriptions
+POST   /posts/{id}/like  / DELETE      → { likes }
+POST   /posts/{id}/save  / DELETE
+GET    /saved                          → [ Post ]
+GET    /posts/{id}/comments            → [ Comment ]
+POST   /posts/{id}/comments  { text }  → Comment
+```
+
+### 4.6 Creator content (compose)
+```
+POST /posts   { type:"trade|analysis|lesson", content, pair?, title?, points?[] } → Post
+```
+
+### 4.7 Copy trading
+```
+POST /copy/{traderId}/start   { accountId, amount, risk, autoCopy } → CopyConfig
+POST /copy/{traderId}/stop
+GET  /copy                    → [ CopyConfig ]
+GET  /positions?status=active|closed  → [ CopyPosition ]
+GET  /portfolio/summary       → { netPnl, openPnl, bookedProfit, bookedLoss,
+                                  copyingCount, activeCount, closedCount, invested }
+POST /copy/live/{broadcastId}/{tradeId}  { accountId }   // copy a trade from a live
+```
+
+### 4.8 Market data
+```
+GET  /symbols                 → ["XAU/USD","EUR/USD",...]
+GET  /prices?symbols=XAU/USD,EUR/USD  → { "XAU/USD": 2015.3, ... }   // snapshot
+```
+> Realtime prices come over WS (below). REST is the initial snapshot.
+
+### 4.9 Live streaming (creator)
+```
+POST /broadcasts                       { title } → Broadcast (ingestUrl, streamKey, hlsUrl)
+POST /broadcasts/{id}/start            → phase:"live"    // after RTMP connects
+POST /broadcasts/{id}/end              → summary { duration, peakViewers, trades, pnl }
+GET  /broadcasts/{id}                  → Broadcast
+GET  /broadcasts/live                  → [ Broadcast ]   // who's live now
+POST /broadcasts/{id}/destinations/youtube/connect   // OAuth handshake (returns auth URL)
+POST /broadcasts/{id}/destinations/{platform}/disconnect
+```
+> Backend uses **Cloudflare Stream Live** (or Ant Media): create a Live Input
+> (ingestUrl+key+hlsUrl), add Outputs for YouTube/Facebook simulcast.
+
+### 4.10 Live trades (on-stream orders → broker)
+```
+POST /broadcasts/{id}/orders   { symbol, isBuy, orderType, lots, sl?, tp?, limitPrice? } → LiveTrade
+POST /broadcasts/{id}/orders/{tradeId}/close → ClosedTrade
+GET  /broadcasts/{id}/orders   → [ LiveTrade ]     // open + pending
+GET  /broadcasts/{id}/history  → [ ClosedTrade ]
+```
+> These execute on the creator's connected MT account (investor pw = read-only
+> for verification; a trade-enabled connection is required to actually place).
+
+### 4.11 Live chat (aggregated)
+```
+GET  /broadcasts/{id}/chat            → [ LiveChatMessage ]   // recent
+POST /broadcasts/{id}/chat            { text } → LiveChatMessage  // host or viewer
+```
+> **YouTube chat ingestion (server-side):** backend uses YouTube Data API v3:
+> `liveBroadcasts.list` → `activeLiveChatId`, then poll `liveChatMessages.list`
+> respecting `pollingIntervalMillis`; push each into the broadcast chat with
+> `source:"youtube"`. Optional: `liveChatMessages.insert` to send host replies
+> back to YouTube. Requires YouTube OAuth (`youtube.readonly`, `youtube.force-ssl`)
+> and quota management.
+
+### 4.12 Notifications
+```
+GET  /notifications            → [ { id, type, title, body, createdAt, read } ]
+POST /notifications/read       { ids: [] }
+```
+
+---
+
+## 5. Realtime (WebSocket)
+
+Connect: `wss://api.millimore.app/v1/ws?token=<JWT>`
+Subscribe to channels; server pushes events:
+
+```jsonc
+// client → server
+{ "op": "subscribe", "channels": ["prices", "broadcast:b_1", "portfolio"] }
+
+// server → client events
+{ "ch": "prices",          "data": { "XAU/USD": 2015.4, "EUR/USD": 1.0851 } }        // ~1/sec
+{ "ch": "broadcast:b_1",   "type": "viewers",  "data": { "viewers": 43 } }
+{ "ch": "broadcast:b_1",   "type": "chat",     "data": LiveChatMessage }
+{ "ch": "broadcast:b_1",   "type": "reaction", "data": { "count": 3 } }
+{ "ch": "broadcast:b_1",   "type": "trade",    "data": LiveTrade }                    // overlay
+{ "ch": "portfolio",       "type": "position", "data": CopyPosition }                 // live P/L
+{ "ch": "user",            "type": "creator.status", "data": { "creatorStatus": "approved" } }
+```
+
+> App mapping: the 1-second price feed, floating P/L, live chat, viewers, hearts,
+> and creator-approval that are currently simulated in `AppState` all become
+> these WS events.
+
+---
+
+## 6. Admin API (admin dashboard)
+
+Base: `/v1/admin` — requires `role: admin`.
+
+```
+GET  /admin/metrics            → { dau, mau, liveNow, streamsToday, totalUsers,
+                                   creators, gmv, copyVolume, errors24h, uptime }
+GET  /admin/users?q=&role=&cursor=      → paginated [ User ]
+PATCH /admin/users/{id}        { role?, banned?, creatorStatus? }
+GET  /admin/creators/pending   → [ application ]      // verification queue
+POST /admin/creators/{id}/approve  { note? }
+POST /admin/creators/{id}/reject   { reason }
+GET  /admin/broadcasts/live    → [ Broadcast + health ]
+GET  /admin/trades?range=      → volumes, P/L aggregates
+GET  /admin/accounts           → broker connection statuses
+GET  /admin/payouts            → creator earnings / payout requests
+POST /admin/payouts/{id}/approve
+GET  /admin/reports            → moderation queue
+POST /admin/moderation/{postId}/remove
+GET  /admin/system             → server load, queue depth, API quota (YouTube), latency
+```
+
+---
+
+## 7. Secrets / env the backend needs
+```
+DATABASE_URL
+JWT_SECRET
+OTP_PROVIDER_KEY            # e.g. Twilio/MSG91
+CLOUDFLARE_STREAM_TOKEN     # live inputs + outputs (simulcast)
+YOUTUBE_OAUTH_CLIENT_ID / SECRET   # live chat + simulcast auth
+FACEBOOK_APP_ID / SECRET
+BROKER_BRIDGE_URL          # MT4/MT5 gateway / EA bridge for prices+orders
+STORAGE_BUCKET             # statements, photos (S3/GCS)
+```
+
+## 8. Suggested stack
+- **Backend:** NestJS (TS) or FastAPI (Py); Postgres; Redis (WS/pubsub); or **Supabase** for speed (auth + DB + realtime).
+- **Admin:** Next.js + Refine/React-Admin.
+- **Live:** Cloudflare Stream Live (managed simulcast + HLS) or Ant Media.
+- **MT bridge:** MetaAPI.cloud (hosted MT4/MT5 API) or a custom EA gateway for prices + order execution + investor-password verification.
+
+## 9. Build order (backend)
+1. Auth + users + JWT + OTP  → app login/register goes live.
+2. Brokers + accounts + creator verify + **admin approve queue**.
+3. Traders/discover/feed/social (subscribe, saved, comments, likes).
+4. Copy engine + positions + portfolio + WS `portfolio`/`prices`.
+5. Broadcasts (Cloudflare) + WS chat/viewers/reactions + YouTube chat ingest.
+6. Live orders → MT bridge; payouts; full admin metrics/monitoring.
+
+## 10. Integration note for the app session
+Each `AppState` / `SessionController` method has a matching endpoint above.
+Introduce a thin `ApiClient` + repository layer; flip a `useBackend` flag to
+swap the demo store for live calls, screen by screen — UI stays identical.
