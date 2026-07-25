@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import '../models/trade.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/add_account_sheet.dart';
+import '../widgets/live_reactions.dart';
 import 'copy_trading_screen.dart';
 
 class LiveStreamScreen extends StatefulWidget {
@@ -33,12 +35,18 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   Trader get _trader => widget.trader ?? mockTraders[0];
 
   AppState? _store;
+  final _reactions = LiveReactionsController();
+  Timer? _heartTimer;
 
   @override
   void initState() {
     super.initState();
     _anim = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
     _viewers = 800 + math.Random().nextInt(11000);
+    // Simulated audience love while watching.
+    _heartTimer = Timer.periodic(const Duration(milliseconds: 1400), (_) {
+      if (mounted) _reactions.burst(1 + math.Random().nextInt(2));
+    });
   }
 
   @override
@@ -54,6 +62,8 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   void dispose() {
     _chatController.dispose();
     _anim.dispose();
+    _heartTimer?.cancel();
+    _reactions.dispose();
     _store?.stopPriceFeed();
     super.dispose();
   }
@@ -99,6 +109,9 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
               ),
             ),
           ),
+
+          // Floating heart reactions (over the video, under the controls)
+          Positioned.fill(child: IgnorePointer(child: LiveReactions(controller: _reactions))),
 
           SafeArea(
             child: Column(
@@ -211,6 +224,16 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _reactions.burst(2),
+                        child: Container(
+                          width: 44, height: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+                          child: const Icon(Icons.favorite_rounded, size: 20, color: AppColors.red),
                         ),
                       ),
                       const SizedBox(width: 8),
