@@ -12,6 +12,7 @@ import 'trader_profile_screen.dart';
 import 'copy_trading_screen.dart';
 import 'login_screen.dart';
 import 'accounts_screen.dart';
+import 'support_chat_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -160,10 +161,22 @@ class ProfileScreen extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
             }),
-            _SettingsRow(icon: Icons.person_outline_rounded, label: 'Edit profile'),
-            _SettingsRow(icon: Icons.notifications_none_rounded, label: 'Notifications'),
-            _SettingsRow(icon: Icons.shield_outlined, label: 'Privacy & security'),
-            _SettingsRow(icon: Icons.help_outline_rounded, label: 'Help & support'),
+            _SettingsRow(icon: Icons.person_outline_rounded, label: 'Edit profile', onTap: () {
+              Navigator.pop(context);
+              _toast(context, 'Edit profile');
+            }),
+            _SettingsRow(icon: Icons.notifications_none_rounded, label: 'Notifications', onTap: () {
+              Navigator.pop(context);
+              _toast(context, 'Notification settings');
+            }),
+            _SettingsRow(icon: Icons.shield_outlined, label: 'Privacy & security', onTap: () {
+              Navigator.pop(context);
+              _toast(context, 'Privacy & security');
+            }),
+            _SettingsRow(icon: Icons.help_outline_rounded, label: 'Help & support', onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen()));
+            }),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -502,6 +515,8 @@ class _SettingsRow extends StatelessWidget {
             Icon(icon, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 14),
             Text(label, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+            const Spacer(),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
           ],
         ),
       ),
