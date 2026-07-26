@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
+import '../models/copy_models.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/add_account_sheet.dart';
@@ -83,12 +84,22 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     final store = AppStateScope.of(context);
     final subscribed = store.isSubscribed(trader.id);
     // Prefer the broadcaster's live-placed trades; fall back to an open mock trade.
-    final overlay = store.liveTrades.isNotEmpty
-        ? store.liveTrades.map((t) => (t.symbol, t.isBuy, store.livePnl(t))).toList()
+    final List<LiveTrade> overlay = store.liveTrades.isNotEmpty
+        ? store.liveTrades
         : [
             () {
               final m = mockTrades.firstWhere((t) => t.traderId == trader.id && t.status == TradeStatus.open, orElse: () => mockTrades.first);
-              return (m.pair, m.direction == TradeDirection.buy, m.pnlPercent * 10.0);
+              return LiveTrade(
+                id: 'mock_${m.id}',
+                symbol: m.pair,
+                isBuy: m.direction == TradeDirection.buy,
+                orderType: LiveOrderType.market,
+                entryPrice: m.entryPrice,
+                lots: 0.10,
+                sl: m.stopLoss,
+                tp: m.takeProfit,
+                openedAt: m.openedAt,
+              );
             }()
           ];
 
@@ -186,14 +197,13 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                   ),
                 ),
                 const Spacer(),
-                // Live trade overlay(s)
-                ...overlay.map((o) => Padding(
+                // Live trade overlay(s) — full detail: entry, SL, TP, floating P/L
+                ...overlay.map((t) => Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: _LiveTradeCard(
-                        pair: o.$1,
-                        isBuy: o.$2,
-                        pnl: o.$3,
-                        onCopy: () => _copyFromLive(context, store, trader, o.$1, o.$2),
+                        trade: t,
+                        pnl: store.livePnl(t),
+                        onCopy: () => _copyFromLive(context, store, trader, t.symbol, t.isBuy),
                       ),
                     )),
                 const SizedBox(height: 12),
@@ -278,14 +288,22 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
 }
 
 class _LiveTradeCard extends StatelessWidget {
-  final String pair;
-  final bool isBuy;
+  final LiveTrade trade;
   final double pnl;
   final VoidCallback onCopy;
-  const _LiveTradeCard({required this.pair, required this.isBuy, required this.pnl, required this.onCopy});
+  const _LiveTradeCard({required this.trade, required this.pnl, required this.onCopy});
+
+  String _p(double? v) {
+    if (v == null) return '—';
+    if (v >= 1000) return v.toStringAsFixed(2);
+    if (v >= 100) return v.toStringAsFixed(3);
+    return v.toStringAsFixed(4);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isBuy = trade.isBuy;
+    final pending = trade.isPending;
     final profit = pnl >= 0;
     return Container(
       padding: const EdgeInsets.all(12),
@@ -294,32 +312,64 @@ class _LiveTradeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withOpacity(0.18)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(6)),
-            child: Text('LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(color: pending ? AppColors.primary : AppColors.red, borderRadius: BorderRadius.circular(6)),
+                child: Text(pending ? 'PENDING' : 'LIVE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+              ),
+              const SizedBox(width: 10),
+              Text(trade.symbol, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(color: (isBuy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
+                child: Text(isBuy ? 'BUY' : 'SELL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: isBuy ? AppColors.green : AppColors.red)),
+              ),
+              const Spacer(),
+              if (!pending)
+                Text('${profit ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
+            ],
           ),
-          const SizedBox(width: 10),
-          Text(pair, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(color: (isBuy ? AppColors.green : AppColors.red).withOpacity(0.25), borderRadius: BorderRadius.circular(6)),
-            child: Text(isBuy ? 'BUY' : 'SELL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: isBuy ? AppColors.green : AppColors.red)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _leg('Entry', _p(trade.entryPrice), Colors.white),
+              _leg('SL', _p(trade.sl), AppColors.red),
+              _leg('TP', _p(trade.tp), AppColors.green),
+              _leg('Lots', trade.lots.toStringAsFixed(2), Colors.white),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text('${profit ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: profit ? AppColors.green : AppColors.red)),
-          const Spacer(),
-          GestureDetector(
-            onTap: onCopy,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-              child: Text('Copy', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF0B1120))),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: GestureDetector(
+              onTap: onCopy,
+              child: Container(
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                child: Text('Copy this trade', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: const Color(0xFF0B1120))),
+              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _leg(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 10.5, color: Colors.white54)),
+          const SizedBox(height: 1),
+          Text(value, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
         ],
       ),
     );

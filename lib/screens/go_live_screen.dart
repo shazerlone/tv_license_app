@@ -258,16 +258,17 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                   ),
                 ),
 
-                // Live chat (Millimore + YouTube) fills the middle while live
+                const Spacer(),
+                // Live chat (Millimore + YouTube) — bottom-anchored, capped height
+                // so it never covers the camera.
                 if (live)
-                  Expanded(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.26),
                     child: LiveChatFeed(
                       messages: store.liveChat,
                       onSend: (t) => store.sendHostChat(t, 'You'),
                     ),
-                  )
-                else
-                  const Spacer(),
+                  ),
 
                 // Live trade overlay preview (what viewers see) with floating P/L
                 if (store.liveTrades.isNotEmpty)

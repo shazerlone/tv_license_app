@@ -82,9 +82,7 @@ class FollowerHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = SessionScope.of(context);
     final store = AppStateScope.of(context);
-    final name = session.user?.name.split(' ').first ?? 'there';
     final subscribedIds = store.subscribedTraderIds;
     final posts = mockPosts(mockTraders).where((p) => subscribedIds.contains(p.trader.id)).toList();
     final liveTraders = mockTraders.where((t) => t.isLive && subscribedIds.contains(t.id)).toList();
@@ -103,32 +101,15 @@ class FollowerHome extends StatelessWidget {
           titleSpacing: 24,
           title: const MillimoreLogo(size: 24),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 8),
+            _AppBarIcon(icon: Icons.search_rounded, onTap: () {}),
+            _AppBarIcon(icon: Icons.notifications_none_rounded, onTap: () {}, dot: true),
+            const SizedBox(width: 16),
           ],
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Hi $name 👋',
-                    style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
-                const SizedBox(height: 2),
-                Text('Here\'s how your traders are doing today.',
-                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-              ],
-            ),
-          ),
         ),
         // Portfolio summary
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
             child: _PortfolioCard(totalPnl: totalPnl, openCount: openCopied.length, following: store.subscriptionCount),
           ),
         ),
@@ -168,6 +149,38 @@ class FollowerHome extends StatelessWidget {
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
+    );
+  }
+}
+
+class _AppBarIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool dot;
+  const _AppBarIcon({required this.icon, required this.onTap, this.dot = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(icon, color: AppColors.textPrimary, size: 24),
+            if (dot)
+              Positioned(
+                right: -1, top: -1,
+                child: Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle, border: Border.all(color: AppColors.background, width: 1.5)),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -268,7 +281,6 @@ class CreatorHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
-    final name = session.user?.name.split(' ').first ?? 'Creator';
     final pending = session.user?.creatorStatus == CreatorStatus.pending;
     final posts = mockPosts(mockTraders).take(2).toList();
 
@@ -284,27 +296,21 @@ class CreatorHome extends StatelessWidget {
           titleSpacing: 24,
           title: const MillimoreLogo(size: 24),
           actions: [
-            IconButton(icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary), onPressed: () {}),
-            const SizedBox(width: 8),
+            _AppBarIcon(icon: Icons.insights_rounded, onTap: () {}),
+            _AppBarIcon(icon: Icons.notifications_none_rounded, onTap: () {}, dot: true),
+            const SizedBox(width: 16),
           ],
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
-            child: Text('Welcome back, $name',
-                style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
-          ),
         ),
         if (pending)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
               child: _PendingBanner(),
             ),
           ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            padding: EdgeInsets.fromLTRB(24, pending ? 0 : 8, 24, 20),
             child: _CreatorStatsCard(),
           ),
         ),
