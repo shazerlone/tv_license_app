@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/trader.dart';
@@ -282,6 +283,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       ok = store.copyFromLive(trader, pair: pair, isBuy: isBuy);
     }
     if (ok && context.mounted) {
+      HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied ${trader.name}\'s $pair ${isBuy ? 'BUY' : 'SELL'}')));
     }
   }
