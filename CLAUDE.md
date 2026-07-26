@@ -26,6 +26,28 @@ or changing any web UI.** Summary:
 - Radii 14px cards / 10px controls / 999px pills. Subtle 1px borders + very soft
   shadows only.
 
+## This is a real product headed for AWS at scale — keep it portable
+
+The founder is non-technical and relies on Claude as developer/advisor. The app
+must later move to AWS (or similar) and serve millions. **Never** paint us into a
+corner. Non-negotiable guardrails (full detail: `millimore-backend/ARCHITECTURE.md`):
+
+- **Stateless API** — no in-memory sessions, no local-disk source of truth. State
+  lives in Postgres / Redis / object storage so we can run many copies behind a
+  load balancer (horizontal scale).
+- **12-factor config** — everything via environment variables; secrets never in
+  code (env now → AWS Secrets Manager later, same names).
+- **Swappable managed services** — Postgres via Prisma (→ Aurora/RDS by changing
+  `DATABASE_URL`), Redis (→ ElastiCache), storage via `STORAGE_*` env (→ S3+CloudFront).
+- **Isolate integrations behind small modules** (OTP, MT bridge, streaming,
+  storage) so each can be swapped without touching the app or the API contract.
+- **Heavy/slow work goes through queues/workers**, not the request path.
+- **Don't over-engineer early.** Build clean + portable on cheap infra; turn on
+  scale layers (replicas, cache, CDN, autoscaling) when real metrics demand it.
+  Each step must be an upgrade, not a rewrite.
+- A production `Dockerfile` exists — the API is a stateless container, ready for
+  ECS/Fargate/EKS.
+
 ## Backend / contract
 
 - Single source of truth for the API: `docs/BACKEND_CONTRACT.md`. Don't invent
