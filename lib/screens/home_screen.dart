@@ -18,6 +18,7 @@ import 'studio_screen.dart';
 import 'copied_trades_screen.dart';
 import 'profile_screen.dart';
 import 'discover_screen.dart';
+import 'leaderboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -203,7 +204,7 @@ class _FollowerHomeState extends State<FollowerHome> {
           SliverToBoxAdapter(
               child: _SectionHeader(
                   title: 'Top creators to copy',
-                  onSeeAll: () => context.findAncestorStateOfType<_HomeScreenState>()?.goToTab(1))),
+                  onSeeAll: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaderboardScreen())))),
           SliverToBoxAdapter(
             child: SizedBox(
               height: 176,

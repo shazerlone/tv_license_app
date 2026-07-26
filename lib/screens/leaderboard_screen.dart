@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/trader.dart';
+import '../services/backend_api.dart';
 import '../widgets/verified_badge.dart';
 import 'trader_profile_screen.dart';
 
+/// Rankings page. Backend-driven (GET /traders?sort=return|copiers).
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
 
@@ -13,104 +16,161 @@ class LeaderboardScreen extends StatefulWidget {
 }
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
-  int _selectedPeriod = 0;
-  static const List<String> _periods = ['7D', '30D', '90D', 'All Time'];
+  String _sort = 'return'; // 'return' | 'copiers'
+  List<Trader> _traders = const [];
+  bool _loading = false;
+  bool _failed = false;
 
-  List<Trader> get _sorted {
-    final list = List<Trader>.from(mockTraders);
-    list.sort((a, b) => b.returnPercent.compareTo(a.returnPercent));
-    return list;
+  @override
+  void initState() {
+    super.initState();
+    if (kUseBackend) {
+      _loading = true;
+      _load();
+    } else {
+      _traders = List<Trader>.from(mockTraders)..sort((a, b) => b.returnPercent.compareTo(a.returnPercent));
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final page = await BackendApi.traders(sort: _sort);
+      if (!mounted) return;
+      setState(() {
+        _traders = page.items.map(Trader.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _failed = true;
+      });
+    }
+  }
+
+  void _setSort(String s) {
+    if (_sort == s) return;
+    setState(() => _sort = s);
+    if (kUseBackend) {
+      _load();
+    } else {
+      setState(() {
+        _traders = List<Trader>.from(mockTraders)
+          ..sort((a, b) => s == 'return' ? b.returnPercent.compareTo(a.returnPercent) : b.copiers.compareTo(a.copiers));
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sorted = _sorted;
-
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          pinned: false,
-          floating: true,
-          snap: true,
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          titleSpacing: 24,
-          title: Text('Rankings', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(_periods.length, (i) {
-                  final active = i == _selectedPeriod;
-                  return Padding(
-                    padding: EdgeInsets.only(right: i < _periods.length - 1 ? 8 : 0),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedPeriod = i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: active ? AppColors.primary : AppColors.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: active ? AppColors.primary : AppColors.border),
-                        ),
-                        child: Text(
-                          _periods[i],
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: active ? Colors.white : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Rankings', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+      ),
+      body: Column(
+        children: [
+          // Sort toggle
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
             child: Row(
               children: [
-                const SizedBox(width: 32),
-                Expanded(
-                  child: Text('#  Trader', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
-                ),
-                SizedBox(
-                  width: 72,
-                  child: Text('Return', textAlign: TextAlign.right, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Text('Followers', textAlign: TextAlign.right, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
-                ),
+                _SortChip(label: 'Top return', active: _sort == 'return', onTap: () => _setSort('return')),
+                const SizedBox(width: 10),
+                _SortChip(label: 'Most copied', active: _sort == 'copiers', onTap: () => _setSort('copiers')),
               ],
             ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 12)),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (_, i) => GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: sorted[i])),
-              ),
-              child: _LeaderboardRow(trader: sorted[i], rank: i + 1),
+          // Header row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Row(
+              children: [
+                const SizedBox(width: 32),
+                Expanded(child: Text('#  Trader', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted))),
+                SizedBox(width: 72, child: Text('Return', textAlign: TextAlign.right, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted))),
+                SizedBox(width: 60, child: Text('Copiers', textAlign: TextAlign.right, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted))),
+              ],
             ),
-            childCount: sorted.length,
           ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _traders.isEmpty
+                    ? _RankEmpty(failed: _failed, onRetry: _load)
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 32),
+                          itemCount: _traders.length,
+                          itemBuilder: (_, i) => GestureDetector(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: _traders[i]))),
+                            child: _LeaderboardRow(trader: _traders[i], rank: i + 1),
+                          ),
+                        ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const _SortChip({required this.label, required this.active, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: active ? AppColors.primary : AppColors.border),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
-      ],
+        child: Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: active ? Colors.white : AppColors.textSecondary)),
+      ),
+    );
+  }
+}
+
+class _RankEmpty extends StatelessWidget {
+  final bool failed;
+  final VoidCallback onRetry;
+  const _RankEmpty({required this.failed, required this.onRetry});
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(failed ? Icons.wifi_off_rounded : Icons.leaderboard_outlined, size: 46, color: AppColors.textMuted.withOpacity(0.5)),
+            const SizedBox(height: 14),
+            Text(failed ? 'Couldn\'t load rankings' : 'No traders ranked yet',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            const SizedBox(height: 6),
+            Text(failed ? 'Check your connection and try again.' : 'Rankings appear as creators start trading.',
+                textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted, height: 1.5)),
+            if (failed) ...[
+              const SizedBox(height: 18),
+              OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('Retry')),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
