@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -666,13 +667,58 @@ class _SearchSheet extends StatefulWidget {
 
 class _SearchSheetState extends State<_SearchSheet> {
   String _q = '';
+  List<Trader> _results = const [];
+  bool _loading = false;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kUseBackend) {
+      _loading = true;
+      _search();
+    } else {
+      _results = mockTraders;
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onChanged(String v) {
+    setState(() => _q = v);
+    if (!kUseBackend) return;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _search);
+  }
+
+  Future<void> _search() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      final page = await BackendApi.traders(q: _q, sort: 'copiers');
+      if (!mounted) return;
+      setState(() {
+        _results = page.items.map(Trader.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final results = mockTraders.where((t) {
-      final q = _q.toLowerCase();
-      return q.isEmpty || t.name.toLowerCase().contains(q) || t.username.toLowerCase().contains(q) || t.tags.any((x) => x.toLowerCase().contains(q));
-    }).toList();
+    final results = kUseBackend
+        ? _results
+        : mockTraders.where((t) {
+            final q = _q.toLowerCase();
+            return q.isEmpty || t.name.toLowerCase().contains(q) || t.username.toLowerCase().contains(q) || t.tags.any((x) => x.toLowerCase().contains(q));
+          }).toList();
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -688,7 +734,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                 child: TextField(
                   autofocus: true,
-                  onChanged: (v) => setState(() => _q = v),
+                  onChanged: _onChanged,
                   style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Search traders, pairs, strategies',
@@ -700,7 +746,11 @@ class _SearchSheetState extends State<_SearchSheet> {
                 ),
               ),
               Expanded(
-                child: ListView.builder(
+                child: _loading && results.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : results.isEmpty
+                        ? Center(child: Text('No traders found', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)))
+                        : ListView.builder(
                   controller: scroll,
                   itemCount: results.length,
                   itemBuilder: (_, i) {
