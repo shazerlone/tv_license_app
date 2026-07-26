@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
 import '../models/trade.dart';
+import '../services/backend_api.dart';
 import '../state/session.dart';
 import '../state/app_state.dart';
 import '../widgets/bottom_nav_bar.dart';
@@ -80,22 +82,71 @@ class _HomeScreenState extends State<HomeScreen> {
 // FOLLOWER HOME
 // ════════════════════════════════════════════════════════════════════════════
 
-class FollowerHome extends StatelessWidget {
+class FollowerHome extends StatefulWidget {
   const FollowerHome();
+
+  @override
+  State<FollowerHome> createState() => _FollowerHomeState();
+}
+
+class _FollowerHomeState extends State<FollowerHome> {
+  List<Trader> _topCreators = const [];
+  List<Trader> _liveTraders = const [];
+  List<Post> _feed = const [];
+  bool _loading = false;
+  bool _seeded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kUseBackend) {
+      _loading = true;
+      _load();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!kUseBackend && !_seeded) {
+      _seeded = true;
+      final store = AppStateScope.of(context);
+      final subscribedIds = store.subscribedTraderIds;
+      _topCreators = ([...mockTraders]..sort((a, b) => b.copiers.compareTo(a.copiers))).take(8).toList();
+      _feed = mockPosts(mockTraders).where((p) => subscribedIds.contains(p.trader.id)).toList();
+      _liveTraders = mockTraders.where((t) => t.isLive && subscribedIds.contains(t.id)).toList();
+    }
+  }
+
+  /// Live data: top creators (GET /traders?sort=copiers) + subscription feed
+  /// (GET /feed). No demo content when useBackend.
+  Future<void> _load() async {
+    try {
+      final page = await BackendApi.traders(sort: 'copiers');
+      final feed = await BackendApi.feed();
+      if (!mounted) return;
+      final traders = page.items.map(Trader.fromApi).toList();
+      setState(() {
+        _topCreators = traders.take(8).toList();
+        _liveTraders = traders.where((t) => t.isLive).toList();
+        _feed = feed.map(Post.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final subscribedIds = store.subscribedTraderIds;
-    final _topCreators = ([...mockTraders]..sort((a, b) => b.copiers.compareTo(a.copiers))).take(8).toList();
-    final posts = mockPosts(mockTraders).where((p) => subscribedIds.contains(p.trader.id)).toList();
-    final liveTraders = mockTraders.where((t) => t.isLive && subscribedIds.contains(t.id)).toList();
     final openCopied = mockTrades.where((t) => t.status == TradeStatus.open).toList();
     final totalPnl = openCopied.fold<double>(0, (s, t) => s + t.pnlPercent);
 
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () => Future.delayed(const Duration(milliseconds: 700)),
+      onRefresh: () => kUseBackend ? _load() : Future.delayed(const Duration(milliseconds: 700)),
       child: CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -119,14 +170,14 @@ class FollowerHome extends StatelessWidget {
             const SizedBox(width: 16),
           ],
         ),
-        // Portfolio summary
+        // Portfolio summary (copy engine — demo until milestone 4)
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
             child: _PortfolioCard(totalPnl: totalPnl, openCount: openCopied.length, following: store.subscriptionCount),
           ),
         ),
-        if (liveTraders.isNotEmpty) ...[
+        if (_liveTraders.isNotEmpty) ...[
           SliverToBoxAdapter(child: _SectionHeader(dot: true, title: 'Live now')),
           SliverToBoxAdapter(
             child: SizedBox(
@@ -135,11 +186,11 @@ class FollowerHome extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemCount: liveTraders.length,
+                itemCount: _liveTraders.length,
                 itemBuilder: (_, i) => _LiveTraderAvatar(
-                  trader: liveTraders[i],
+                  trader: _liveTraders[i],
                   onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => LiveStreamScreen(trader: liveTraders[i]))),
+                      MaterialPageRoute(builder: (_) => LiveStreamScreen(trader: _liveTraders[i]))),
                 ),
               ),
             ),
@@ -147,35 +198,41 @@ class FollowerHome extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
         // Top creators to copy
-        SliverToBoxAdapter(
-            child: _SectionHeader(
-                title: 'Top creators to copy',
-                onSeeAll: () => context.findAncestorStateOfType<_HomeScreenState>()?.goToTab(1))),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 176,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemCount: _topCreators.length,
-              itemBuilder: (_, i) => _CreatorMiniCard(trader: _topCreators[i]),
+        if (_topCreators.isNotEmpty) ...[
+          SliverToBoxAdapter(
+              child: _SectionHeader(
+                  title: 'Top creators to copy',
+                  onSeeAll: () => context.findAncestorStateOfType<_HomeScreenState>()?.goToTab(1))),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 176,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemCount: _topCreators.length,
+                itemBuilder: (_, i) => _CreatorMiniCard(trader: _topCreators[i]),
+              ),
             ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 22)),
+          const SliverToBoxAdapter(child: SizedBox(height: 22)),
+        ],
         SliverToBoxAdapter(child: _SectionHeader(title: 'From your subscriptions')),
-        if (posts.isEmpty)
+        if (_loading)
+          const SliverToBoxAdapter(
+            child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator())),
+          )
+        else if (_feed.isEmpty)
           SliverToBoxAdapter(child: _EmptyFeed())
         else
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (_, i) => FeedPost(
-                post: posts[i],
+                post: _feed[i],
                 onOpenProfile: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+                    MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: _feed[i].trader))),
               ),
-              childCount: posts.length,
+              childCount: _feed.length,
             ),
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),

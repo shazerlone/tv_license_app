@@ -38,23 +38,41 @@ class DiscoverTab extends StatefulWidget {
 class _DiscoverTabState extends State<DiscoverTab> {
   final _controller = PageController();
   late List<ReelItem> _reels;
+  bool _loading = false;
+  bool _failed = false;
 
   @override
   void initState() {
     super.initState();
-    _reels = _buildReels(); // instant mock render; backend refines below
-    if (kUseBackend) _loadFromBackend();
+    if (kUseBackend) {
+      _reels = const [];
+      _loading = true;
+      _loadFromBackend();
+    } else {
+      _reels = _buildReels(); // demo only when backend is off
+    }
   }
 
-  /// GET /discover/reels (§4.4). Falls back silently to the mock feed on error
-  /// so Discover always has something to show. UI is unchanged.
+  /// GET /discover/reels (§4.4). Backend is the only source when useBackend —
+  /// no demo content is shown.
   Future<void> _loadFromBackend() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     try {
       final reels = await BackendApi.reels();
-      if (reels.isEmpty || !mounted) return;
-      setState(() => _reels = reels.map(_mapReel).toList());
+      if (!mounted) return;
+      setState(() {
+        _reels = reels.map(_mapReel).toList();
+        _loading = false;
+      });
     } catch (_) {
-      // keep the mock feed
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _failed = true;
+      });
     }
   }
 
@@ -146,12 +164,18 @@ class _DiscoverTabState extends State<DiscoverTab> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        PageView.builder(
-          controller: _controller,
-          scrollDirection: Axis.vertical,
-          itemCount: _reels.length,
-          itemBuilder: (_, i) => _ReelPage(reel: _reels[i]),
-        ),
+        const Positioned.fill(child: ColoredBox(color: Color(0xFF0B1120))),
+        if (_reels.isNotEmpty)
+          PageView.builder(
+            controller: _controller,
+            scrollDirection: Axis.vertical,
+            itemCount: _reels.length,
+            itemBuilder: (_, i) => _ReelPage(reel: _reels[i]),
+          )
+        else if (_loading)
+          const Center(child: CircularProgressIndicator(color: Colors.white))
+        else
+          _DiscoverEmpty(failed: _failed, onRetry: _loadFromBackend),
         Positioned(
           top: 0, left: 0, right: 0,
           child: SafeArea(
@@ -185,6 +209,40 @@ class _DiscoverTabState extends State<DiscoverTab> {
 }
 
 // ── Reel page ─────────────────────────────────────────────────────────────────
+
+class _DiscoverEmpty extends StatelessWidget {
+  final bool failed;
+  final VoidCallback onRetry;
+  const _DiscoverEmpty({required this.failed, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(failed ? Icons.wifi_off_rounded : Icons.explore_off_rounded, size: 48, color: Colors.white.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            Text(failed ? 'Couldn\'t load Discover' : 'Nothing to discover yet',
+                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white)),
+            const SizedBox(height: 6),
+            Text(failed ? 'Check your connection and try again.' : 'New live streams and lessons will appear here.',
+                textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13.5, color: Colors.white.withOpacity(0.6), height: 1.5)),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+              label: Text('Retry', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+              style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.white.withOpacity(0.4)), minimumSize: const Size(140, 46)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ReelPage extends StatefulWidget {
   final ReelItem reel;
