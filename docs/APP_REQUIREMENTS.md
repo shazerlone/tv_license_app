@@ -64,10 +64,10 @@ server, currency, balance, status (connected|pending|disconnected|error), connec
 | Method · Path | App sends | App expects | Status |
 | --- | --- | --- | --- |
 | GET `/traders?sort=copiers|return&q=&category=&cursor=` | — | `{ items: [Trader], nextCursor? }` | ✅ Home rail, Leaderboard, Search |
-| GET `/traders/{id}` | — | `Trader` (or `{ trader }`) | 🔴 (trader profile still demo) |
-| GET `/traders/{id}/posts` | — | `[Post]` | 🔴 |
-| GET `/traders/{id}/trades?status=active|closed` | — | `[PublicTrade]` | 🔴 |
-| GET `/traders/{id}/equity?range=30d` | — | `[ { t, value } ]` | 🔴 |
+| GET `/traders/{id}` | — | `Trader` (or `{ trader }`) | 🟡 (profile uses passed trader) |
+| GET `/traders/{id}/posts` | — | `[Post]` | ✅ trader profile |
+| GET `/traders/{id}/trades?status=active|closed` | — | `[PublicTrade]` | ✅ trader profile |
+| GET `/traders/{id}/equity?range=30d` | — | `[ { t, value } ]` | 🔴 (chart still synthetic) |
 | GET `/discover/reels` | — | `[Reel]` | ✅ Discover feed |
 
 **IMPORTANT for "Aisha not showing":** `GET /traders` (and search `?q=`) **must
@@ -95,9 +95,9 @@ title?, points[], viewers?`.
 | POST `/subscriptions/{traderId}/notify` | `{ on }` | 200 | 🟡 |
 | POST `/posts/{id}/like` · DELETE | — | `{ likes }` | ✅ (count optimistic) |
 | POST `/posts/{id}/save` · DELETE | — | 200 | ✅ |
-| GET `/saved` | — | `[Post]` | 🔴 (saved screen still filters demo) |
-| GET `/posts/{id}/comments` | — | `[Comment]` | 🔴 (comment sheet still demo) |
-| POST `/posts/{id}/comments` | `{ text }` | the created `Comment` | 🔴 |
+| GET `/saved` | — | `[Post]` | ✅ saved screen |
+| GET `/posts/{id}/comments` | — | `[Comment]` | ✅ comment sheet |
+| POST `/posts/{id}/comments` | `{ text }` | the created `Comment` | ✅ |
 | POST `/posts` | `{ type, content, pair?, title?, points? }` | `Post` | 🔴 (compose) |
 
 `Post` app reads: `id, trader (Trader), type (analysis|trade|lesson|update),
