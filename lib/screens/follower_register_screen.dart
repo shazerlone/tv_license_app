@@ -7,7 +7,9 @@ import '../widgets/phone_field.dart';
 import '../services/image_picker_service.dart';
 import '../services/auth_api.dart';
 import '../services/api_client.dart';
+import '../state/session.dart';
 import 'otp_screen.dart';
+import 'home_screen.dart';
 
 class FollowerRegisterScreen extends StatefulWidget {
   const FollowerRegisterScreen({super.key});
@@ -91,10 +93,10 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     final name = _nameController.text.trim();
     setState(() => _isLoading = true);
 
-    String? requestId;
+    // ── Live backend: register returns { token, user } — an immediate session.
     if (kUseBackend) {
       try {
-        requestId = await AuthApi.registerFollower(
+        final user = await AuthApi.registerFollower(
           name: name,
           phone: phone,
           residenceIso: _residence!.iso,
@@ -102,21 +104,27 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
           interests: _interests.toList(),
           photoUrl: _photoDataUrl,
         );
+        if (!mounted) return;
+        SessionScope.of(context).applyBackendSession(user);
+        setState(() => _isLoading = false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (r) => false,
+        );
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-        return;
       } catch (_) {
         if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
-        return;
       }
-    } else {
-      await Future.delayed(const Duration(milliseconds: 600));
+      return;
     }
 
+    // ── Demo: keep the OTP verification screen.
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     setState(() => _isLoading = false);
     Navigator.of(context).push(
@@ -126,7 +134,6 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
           name: name,
           residenceIso: _residence!.iso,
           residenceCountry: _residence!.name,
-          requestId: requestId,
         ),
       ),
     );

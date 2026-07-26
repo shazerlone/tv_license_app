@@ -1,7 +1,18 @@
 import 'api_client.dart';
 import '../state/session.dart';
 
-/// Auth endpoints (docs/BACKEND_CONTRACT.md §4.1). Milestone 1.
+/// Result of an OTP request. In dev/console OTP mode the backend also returns
+/// [devCode] so the app can be tested without a real SMS gateway.
+class OtpRequest {
+  final String requestId;
+  final String? devCode;
+  const OtpRequest(this.requestId, this.devCode);
+}
+
+/// Auth endpoints (docs/BACKEND_CONTRACT.md §4.1, backend openapi.json). Milestone 1.
+///
+/// Register/login/verify all return AuthResponseDto `{ token, user }` — an
+/// immediate authenticated session. Only the phone-login path uses OTP.
 class AuthApi {
   static final _api = ApiClient.instance;
 
@@ -18,8 +29,9 @@ class AuthApi {
     return _session(res as Map);
   }
 
-  /// Creates a follower account, then requests an OTP. Returns requestId.
-  static Future<String> registerFollower({
+  /// Creates a follower account and signs in immediately (backend returns
+  /// { token, user }). No OTP step.
+  static Future<UserProfile> registerFollower({
     required String name,
     required String phone,
     String? residenceIso,
@@ -27,27 +39,28 @@ class AuthApi {
     List<String>? interests,
     String? photoUrl,
   }) async {
-    await _api.post('/auth/register/follower', {
+    final res = await _api.post('/auth/register/follower', {
       'name': name,
       'phone': phone,
-      'residenceIso': residenceIso,
-      'experience': experience,
-      'interests': interests,
-      'photoUrl': photoUrl,
+      if (residenceIso != null) 'residenceIso': residenceIso,
+      if (experience != null) 'experience': experience,
+      if (interests != null) 'interests': interests,
+      if (photoUrl != null) 'photoUrl': photoUrl,
     });
-    return requestOtp(phone);
+    return _session(res as Map);
   }
 
-  /// Creates a creator application, then requests an OTP. Returns requestId.
-  static Future<String> registerCreator({
+  /// Creates a creator application and signs in immediately with a pending
+  /// creatorStatus (backend returns { token, user }).
+  static Future<UserProfile> registerCreator({
     required String name,
     required String phone,
-    String? residenceIso,
-    String? market,
-    String? platform,
-    Map<String, dynamic>? verification,
+    required String residenceIso,
+    required String market,
+    required String platform,
+    required Map<String, dynamic> verification,
   }) async {
-    await _api.post('/auth/register/creator', {
+    final res = await _api.post('/auth/register/creator', {
       'name': name,
       'phone': phone,
       'residenceIso': residenceIso,
@@ -55,12 +68,14 @@ class AuthApi {
       'platform': platform,
       'verification': verification,
     });
-    return requestOtp(phone);
+    return _session(res as Map);
   }
 
-  static Future<String> requestOtp(String phone) async {
-    final res = await _api.post('/auth/otp/request', {'phone': phone});
-    return (res as Map)['requestId'].toString();
+  /// Requests an OTP for a phone number. Returns the requestId (+ devCode in
+  /// console OTP mode).
+  static Future<OtpRequest> requestOtp(String phone) async {
+    final res = await _api.post('/auth/otp/request', {'phone': phone}) as Map;
+    return OtpRequest(res['requestId'].toString(), res['devCode']?.toString());
   }
 
   static Future<UserProfile> verifyOtp({required String requestId, required String code}) async {

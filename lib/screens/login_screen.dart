@@ -77,37 +77,32 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _isLoading = true);
 
-    // Safety bypass: demo verified-trader always works, even in backend mode,
-    // so you can always get in if the backend is cold-starting or unreachable.
-    if (email == 'trader@millimore.app') {
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      session.signInAsCreator(
-        name: 'Demo Trader', market: 'Forex', platform: 'MetaTrader 5',
-        residenceIso: 'IN', residenceCountry: 'India', status: CreatorStatus.approved,
-      );
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
-      return;
-    }
-
     // ── Live backend ──────────────────────────────────────────────────────────
+    // Seeded accounts (password: "password"): priya@millimore.app (follower),
+    // trader@millimore.app (creator), admin@millimore.app (admin).
     if (kUseBackend) {
       try {
         final user = await AuthApi.login(email: email, password: _passwordController.text);
         if (!mounted) return;
         session.applyBackendSession(user);
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+        return;
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
       } catch (_) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+        // Network error / cold start. Fall through to the demo safety net below
+        // for the demo trader so you can always get in to review the UI.
+        if (email != 'trader@millimore.app') {
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not reach the server — try again in a moment')));
+          return;
+        }
       }
-      return;
     }
 
     // ── Demo (no backend) ─────────────────────────────────────────────────────

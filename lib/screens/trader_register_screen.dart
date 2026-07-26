@@ -7,7 +7,10 @@ import '../data/countries.dart';
 import '../data/markets.dart';
 import '../widgets/phone_field.dart';
 import '../services/image_picker_service.dart';
+import '../services/auth_api.dart';
+import '../services/api_client.dart';
 import '../state/session.dart';
+import '../config.dart';
 import 'home_screen.dart';
 
 class TraderRegisterScreen extends StatefulWidget {
@@ -46,6 +49,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
   final _formKey2 = GlobalKey<FormState>();
 
   bool _isLoading = false;
+  bool _backendApplied = false;
 
   @override
   void initState() {
@@ -116,6 +120,43 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
 
   Future<void> _submit() async {
     setState(() => _isLoading = true);
+
+    if (kUseBackend) {
+      try {
+        final user = await AuthApi.registerCreator(
+          name: _nameController.text.trim().isEmpty ? 'Creator' : _nameController.text.trim(),
+          phone: '${_country.dialCode} ${_phoneController.text.trim()}',
+          residenceIso: _residence!.iso,
+          market: _market!.name,
+          platform: _platform!.name,
+          verification: {
+            'platform': _platform!.name,
+            if (_serverController.text.trim().isNotEmpty) 'server': _serverController.text.trim(),
+            if (_accountController.text.trim().isNotEmpty) 'account': _accountController.text.trim(),
+            if (_investorPwController.text.trim().isNotEmpty)
+              'investorPassword': _investorPwController.text.trim(),
+            if (_uploadedFileName != null) 'statementUrl': _uploadedFileName,
+          },
+        );
+        if (!mounted) return;
+        SessionScope.of(context).applyBackendSession(user);
+        _backendApplied = true;
+        setState(() => _isLoading = false);
+        _go(4);
+        return;
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        _toast(e.message);
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        _toast('Could not reach the server');
+        return;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 1300));
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -132,14 +173,17 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
   }
 
   void _finish() {
-    SessionScope.of(context).signInAsCreator(
-      name: _nameController.text.trim().isEmpty ? 'Creator' : _nameController.text.trim(),
-      market: _market?.name,
-      platform: _platform?.name,
-      residenceIso: _residence?.iso,
-      residenceCountry: _residence?.name,
-      status: CreatorStatus.pending,
-    );
+    // In backend mode the session was already applied in _submit().
+    if (!_backendApplied) {
+      SessionScope.of(context).signInAsCreator(
+        name: _nameController.text.trim().isEmpty ? 'Creator' : _nameController.text.trim(),
+        market: _market?.name,
+        platform: _platform?.name,
+        residenceIso: _residence?.iso,
+        residenceCountry: _residence?.name,
+        status: CreatorStatus.pending,
+      );
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,
