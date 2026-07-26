@@ -121,6 +121,7 @@ class _FollowerHomeState extends State<FollowerHome> {
   /// Live data: top creators (GET /traders?sort=copiers) + subscription feed
   /// (GET /feed). No demo content when useBackend.
   Future<void> _load() async {
+    AppStateScope.of(context).loadSocial(); // refresh real follow graph
     try {
       final page = await BackendApi.traders(sort: 'copiers');
       final feed = await BackendApi.feed();

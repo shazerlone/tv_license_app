@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../config.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
 import '../models/trader.dart';
 import '../models/copy_models.dart';
+import '../services/backend_api.dart';
 
 enum BroadcastPhase { idle, connecting, live }
 
@@ -12,10 +14,10 @@ enum BroadcastPhase { idle, connecting, live }
 /// comments. Swap the in-memory maps for a backend later — the UI only talks
 /// to this controller, so nothing else changes.
 class AppState extends ChangeNotifier {
-  // traderId -> subscribed
-  final Set<String> _subscribed = {'1', '2', '3'};
+  // traderId -> subscribed (loaded from backend; empty until loadSocial()).
+  final Set<String> _subscribed = kUseBackend ? {} : {'1', '2', '3'};
   // traderId -> notifications on
-  final Set<String> _notify = {'1'};
+  final Set<String> _notify = kUseBackend ? {} : {'1'};
   // postId -> saved
   final Set<String> _saved = {};
   // postId -> liked
@@ -23,6 +25,21 @@ class AppState extends ChangeNotifier {
   final Map<String, int> _likeCount = {};
   // postId -> comments
   final Map<String, List<Comment>> _comments = {};
+
+  /// Loads the real social graph (subscriptions) from the backend. Called once
+  /// after sign-in / at home load. No-op in demo mode.
+  Future<void> loadSocial() async {
+    if (!kUseBackend) return;
+    try {
+      final subs = await BackendApi.subscriptions();
+      _subscribed
+        ..clear()
+        ..addAll(subs.map((t) => t.id));
+      notifyListeners();
+    } catch (_) {
+      // keep whatever we have
+    }
+  }
 
   // ── Subscriptions ──────────────────────────────────────────────────────────
   bool isSubscribed(String traderId) => _subscribed.contains(traderId);
@@ -33,12 +50,14 @@ class AppState extends ChangeNotifier {
     _subscribed.add(traderId);
     _notify.add(traderId);
     notifyListeners();
+    if (kUseBackend) BackendApi.subscribe(traderId).catchError((_) {});
   }
 
   void unsubscribe(String traderId) {
     _subscribed.remove(traderId);
     _notify.remove(traderId);
     notifyListeners();
+    if (kUseBackend) BackendApi.unsubscribe(traderId).catchError((_) {});
   }
 
   void toggleSubscribe(String traderId) =>
@@ -46,8 +65,10 @@ class AppState extends ChangeNotifier {
 
   bool isNotifying(String traderId) => _notify.contains(traderId);
   void toggleNotify(String traderId) {
-    _notify.contains(traderId) ? _notify.remove(traderId) : _notify.add(traderId);
+    final on = !_notify.contains(traderId);
+    on ? _notify.add(traderId) : _notify.remove(traderId);
     notifyListeners();
+    if (kUseBackend) BackendApi.setNotify(traderId, on).catchError((_) {});
   }
 
   // ── Saved posts ────────────────────────────────────────────────────────────
@@ -56,8 +77,12 @@ class AppState extends ChangeNotifier {
   Set<String> get savedPostIds => _saved;
 
   void toggleSave(String postId) {
-    _saved.contains(postId) ? _saved.remove(postId) : _saved.add(postId);
+    final saved = _saved.contains(postId);
+    saved ? _saved.remove(postId) : _saved.add(postId);
     notifyListeners();
+    if (kUseBackend) {
+      (saved ? BackendApi.unsavePost(postId) : BackendApi.savePost(postId)).catchError((_) {});
+    }
   }
 
   // ── Likes ──────────────────────────────────────────────────────────────────
@@ -74,6 +99,9 @@ class AppState extends ChangeNotifier {
     _liked[post.id] = !liked;
     _likeCount[post.id] = likeCount(post) + (!liked ? 1 : -1);
     notifyListeners();
+    if (kUseBackend) {
+      (liked ? BackendApi.unlikePost(post.id) : BackendApi.likePost(post.id)).catchError((_) => 0);
+    }
   }
 
   // ── Comments ──────────────────────────────────────────────────────────────
