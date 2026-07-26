@@ -545,7 +545,7 @@ class _LoginPanel extends StatelessWidget {
                       label: 'Apple',
                       icon: _AppleIcon(),
                       dark: true,
-                      onTap: () {},
+                      onTap: () => _soon(context, 'Apple sign-in'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -554,7 +554,7 @@ class _LoginPanel extends StatelessWidget {
                       label: 'Google',
                       icon: _GoogleIcon(),
                       dark: false,
-                      onTap: () {},
+                      onTap: () => _soon(context, 'Google sign-in'),
                     ),
                   ),
                 ],
@@ -605,7 +605,7 @@ class _LoginPanel extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () => _soon(context, 'Password reset'),
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: Size.zero,
@@ -666,6 +666,12 @@ class _LoginPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+void _soon(BuildContext context, String feature) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('$feature is coming soon')),
+  );
 }
 
 class _SocialButton extends StatelessWidget {

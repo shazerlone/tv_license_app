@@ -27,6 +27,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _navIndex = 0;
 
+  void goToTab(int i) => setState(() => _navIndex = i);
+
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
@@ -103,8 +105,13 @@ class FollowerHome extends StatelessWidget {
           titleSpacing: 24,
           title: const MillimoreLogo(size: 24),
           actions: [
-            _AppBarIcon(icon: Icons.search_rounded, onTap: () {}),
-            _AppBarIcon(icon: Icons.notifications_none_rounded, onTap: () {}, dot: true),
+            _AppBarIcon(
+                icon: Icons.search_rounded,
+                onTap: () => context.findAncestorStateOfType<_HomeScreenState>()?.goToTab(1)),
+            _AppBarIcon(
+                icon: Icons.notifications_none_rounded,
+                onTap: () => showNotificationsSheet(context),
+                dot: true),
             const SizedBox(width: 16),
           ],
         ),
@@ -136,7 +143,10 @@ class FollowerHome extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
         // Top creators to copy
-        SliverToBoxAdapter(child: _SectionHeader(title: 'Top creators to copy', onSeeAll: () {})),
+        SliverToBoxAdapter(
+            child: _SectionHeader(
+                title: 'Top creators to copy',
+                onSeeAll: () => context.findAncestorStateOfType<_HomeScreenState>()?.goToTab(1))),
         SliverToBoxAdapter(
           child: SizedBox(
             height: 176,
@@ -313,8 +323,13 @@ class CreatorHome extends StatelessWidget {
           titleSpacing: 24,
           title: const MillimoreLogo(size: 24),
           actions: [
-            _AppBarIcon(icon: Icons.insights_rounded, onTap: () {}),
-            _AppBarIcon(icon: Icons.notifications_none_rounded, onTap: () {}, dot: true),
+            _AppBarIcon(
+                icon: Icons.insights_rounded,
+                onTap: () => context.findAncestorStateOfType<_HomeScreenState>()?.goToTab(3)),
+            _AppBarIcon(
+                icon: Icons.notifications_none_rounded,
+                onTap: () => showNotificationsSheet(context),
+                dot: true),
             const SizedBox(width: 16),
           ],
         ),
@@ -574,6 +589,118 @@ class _CreatorMiniCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+class _Notif {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+  final String time;
+  final bool unread;
+  const _Notif(this.icon, this.color, this.title, this.body, this.time, {this.unread = false});
+}
+
+void showNotificationsSheet(BuildContext context) {
+  final items = <_Notif>[
+    _Notif(Icons.podcasts_rounded, AppColors.red, 'Marcus Sterling is live',
+        'Trading gold — placing setups now.', '2m', unread: true),
+    _Notif(Icons.trending_up_rounded, AppColors.green, 'Copied trade closed +3.2%',
+        'EUR/USD long hit take-profit.', '18m', unread: true),
+    _Notif(Icons.person_add_rounded, AppColors.primary, 'New copier',
+        'Ava R. started copying your trades.', '1h'),
+    _Notif(Icons.verified_rounded, AppColors.primary, 'You\'re verified',
+        'Your creator account is approved.', '3h'),
+    _Notif(Icons.campaign_rounded, AppColors.purple, 'Weekly recap ready',
+        'See how your copied traders performed.', '1d'),
+  ];
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppColors.background,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (_) => DraggableScrollableSheet(
+      initialChildSize: 0.62,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, controller) => Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+            child: Row(
+              children: [
+                Text('Notifications', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
+                const Spacer(),
+                Text('Mark all read', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 4),
+              itemBuilder: (_, i) => _NotifRow(items[i]),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _NotifRow extends StatelessWidget {
+  final _Notif n;
+  const _NotifRow(this.n);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: n.unread ? AppColors.primary.withOpacity(0.04) : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(color: n.color.withOpacity(0.12), shape: BoxShape.circle),
+            child: Icon(n.icon, color: n.color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(n.title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(n.body, style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary, height: 1.35)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(n.time, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+              if (n.unread) ...[
+                const SizedBox(height: 6),
+                Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

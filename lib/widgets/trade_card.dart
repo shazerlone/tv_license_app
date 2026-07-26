@@ -69,31 +69,25 @@ class TradeCard extends StatelessWidget {
             ],
           ),
           if (showActions) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             const Divider(height: 1),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      backgroundColor: AppColors.primary,
-                    ),
-                    child: Text('Copy Trade', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
-                  ),
+                Icon(
+                  trade.status == TradeStatus.open ? Icons.circle : Icons.check_circle_rounded,
+                  size: 13,
+                  color: trade.status == TradeStatus.open ? AppColors.green : AppColors.textMuted,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      side: const BorderSide(color: AppColors.border),
-                    ),
-                    child: Text('Oppose', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                  ),
+                const SizedBox(width: 6),
+                Text(
+                  trade.status == TradeStatus.open ? 'Open' : 'Closed',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                ),
+                const Spacer(),
+                Text(
+                  _relativeTime(trade.closedAt ?? trade.openedAt),
+                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
                 ),
               ],
             ),
@@ -102,6 +96,14 @@ class TradeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _relativeTime(DateTime t) {
+  final d = DateTime.now().difference(t);
+  if (d.inMinutes < 1) return 'just now';
+  if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+  if (d.inHours < 24) return '${d.inHours}h ago';
+  return '${d.inDays}d ago';
 }
 
 class _DirectionChip extends StatelessWidget {
