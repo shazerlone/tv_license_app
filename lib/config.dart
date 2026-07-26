@@ -13,4 +13,7 @@ const bool kUseBackend = true;
 /// IMPORTANT: this must include the API path prefix the backend actually uses.
 /// If your backend serves endpoints at the root (e.g. /auth/login) instead of
 /// /v1/auth/login, remove the '/v1' below.
-const String kApiBaseUrl = 'https://millimore-backend.onrender.com/v1';
+const String kApiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'https://millimore-backend.onrender.com/v1',
+);

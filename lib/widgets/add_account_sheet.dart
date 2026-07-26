@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../data/brokers.dart';
 import '../models/copy_models.dart';
+import '../services/backend_api.dart';
+import '../services/api_client.dart';
 import '../state/session.dart';
 import '../state/app_state.dart';
 import 'broker_logo.dart';
@@ -34,6 +37,37 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
   Broker? _broker;
   bool _loading = false;
 
+  List<Broker>? _brokers; // null while loading (backend); local list otherwise
+  bool _brokersLoaded = false;
+
+  /// Maps a backend broker onto the UI's Broker model (keeps the widget UI
+  /// unchanged). `blurb` isn't in the API, so we synthesise a short line.
+  Broker _mapBroker(dynamic b) => Broker(
+        b.id as String,
+        b.name as String,
+        (b.recommended as bool) ? 'Recommended partner' : 'Available in your region',
+        domain: b.domain as String,
+        recommended: b.recommended as bool,
+      );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_brokersLoaded) return;
+    _brokersLoaded = true;
+    final iso = SessionScope.of(context).user?.residenceIso;
+    if (kUseBackend) {
+      BackendApi.brokers(country: iso).then((list) {
+        if (mounted) setState(() => _brokers = list.map(_mapBroker).toList());
+      }).catchError((_) {
+        // Fall back to the bundled list if the API is unreachable.
+        if (mounted) setState(() => _brokers = brokersForCountry(iso));
+      });
+    } else {
+      _brokers = brokersForCountry(iso);
+    }
+  }
+
   @override
   void dispose() {
     _accountController.dispose();
@@ -49,7 +83,32 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
     }
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 900));
+
+    // Live backend: create the real (encrypted) connection first (§4.3). The
+    // demo copy engine (milestone 4) still needs a local account, so we mirror.
+    if (kUseBackend) {
+      try {
+        await BackendApi.connectAccount(
+          brokerId: _broker!.id,
+          accountNumber: _accountController.text.trim(),
+          server: _serverController.text.trim(),
+          password: _passwordController.text,
+        );
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+        return;
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 900));
+    }
+
     if (!mounted) return;
     final acc = store.addAccount(
       brokerId: _broker!.id,
@@ -64,9 +123,8 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
     final store = AppStateScope.of(context);
-    final iso = session.user?.residenceIso;
     final country = session.user?.residenceCountry ?? 'your region';
-    final brokers = brokersForCountry(iso);
+    final brokers = _brokers;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -124,11 +182,17 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          ...brokers.map((b) => _BrokerTile(
-                                broker: b,
-                                selected: _broker?.id == b.id,
-                                onTap: () => setState(() => _broker = b),
-                              )),
+                          if (brokers == null)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            )
+                          else
+                            ...brokers.map((b) => _BrokerTile(
+                                  broker: b,
+                                  selected: _broker?.id == b.id,
+                                  onTap: () => setState(() => _broker = b),
+                                )),
                           if (_broker != null) ...[
                             const SizedBox(height: 20),
                             _Label('Account / Login number'),
