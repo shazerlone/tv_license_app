@@ -1,3 +1,5 @@
+import 'api_models.dart';
+
 enum TradeDirection { buy, sell }
 enum TradeStatus { open, closed, pending }
 
@@ -29,6 +31,20 @@ class Trade {
     required this.openedAt,
     this.closedAt,
   });
+
+  /// Maps a backend PublicTrade (openapi.json §4.4) onto the UI model.
+  factory Trade.fromApi(PublicTrade p) => Trade(
+        id: p.id,
+        traderId: p.traderId,
+        pair: p.pair,
+        direction: p.isBuy ? TradeDirection.buy : TradeDirection.sell,
+        status: p.status == 'closed' ? TradeStatus.closed : TradeStatus.open,
+        entryPrice: p.entryPrice,
+        currentPrice: p.exitPrice,
+        pnlPercent: p.pnlPercent,
+        openedAt: DateTime.tryParse(p.openedAt)?.toLocal() ?? DateTime.now(),
+        closedAt: p.closedAt != null ? DateTime.tryParse(p.closedAt!)?.toLocal() : null,
+      );
 
   bool get isProfit => pnlPercent >= 0;
 

@@ -2,9 +2,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
 import '../models/post.dart';
+import '../services/backend_api.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/trade_card.dart';
@@ -24,10 +26,40 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
+  List<Trade> _trades = const [];
+  List<Post> _posts = const [];
+  bool _loading = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    if (kUseBackend) {
+      _loading = true;
+      _load();
+    } else {
+      _trades = mockTrades.where((t) => t.traderId == widget.trader.id).toList();
+      _posts = mockPosts(mockTraders).where((p) => p.trader.id == widget.trader.id).toList();
+    }
+  }
+
+  /// GET /traders/{id}/posts + /trades (§4.4). Falls back to empty on error.
+  Future<void> _load() async {
+    try {
+      final id = widget.trader.id;
+      final posts = await BackendApi.traderPosts(id);
+      final active = await BackendApi.traderTrades(id, status: 'active');
+      final closed = await BackendApi.traderTrades(id, status: 'closed');
+      if (!mounted) return;
+      setState(() {
+        _posts = posts.map(Post.fromApi).toList();
+        _trades = [...active, ...closed].map(Trade.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -41,8 +73,8 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
     final trader = widget.trader;
     final store = AppStateScope.of(context);
     final subscribed = store.isSubscribed(trader.id);
-    final traderTrades = mockTrades.where((t) => t.traderId == trader.id).toList();
-    final traderPosts = mockPosts(mockTraders).where((p) => p.trader.id == trader.id).toList();
+    final traderTrades = _trades;
+    final traderPosts = _posts;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -173,8 +205,8 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _PostsList(posts: traderPosts),
-            _TradesList(trades: traderTrades),
+            _PostsList(posts: traderPosts, loading: _loading),
+            _TradesList(trades: traderTrades, loading: _loading),
           ],
         ),
       ),
@@ -325,10 +357,12 @@ class _EquityPainter extends CustomPainter {
 
 class _PostsList extends StatelessWidget {
   final List<Post> posts;
-  const _PostsList({required this.posts});
+  final bool loading;
+  const _PostsList({required this.posts, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
+    if (loading && posts.isEmpty) return const Center(child: CircularProgressIndicator());
     if (posts.isEmpty) {
       return _Empty(icon: Icons.dynamic_feed_rounded, text: 'No posts yet');
     }
@@ -342,10 +376,12 @@ class _PostsList extends StatelessWidget {
 
 class _TradesList extends StatelessWidget {
   final List<Trade> trades;
-  const _TradesList({required this.trades});
+  final bool loading;
+  const _TradesList({required this.trades, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
+    if (loading && trades.isEmpty) return const Center(child: CircularProgressIndicator());
     if (trades.isEmpty) {
       return _Empty(icon: Icons.candlestick_chart_rounded, text: 'No trades shared yet');
     }
