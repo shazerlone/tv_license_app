@@ -33,39 +33,42 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={onSubmit}>
-        <h1>
-          Milli<span style={{ color: 'var(--accent)' }}>more</span> Admin
-        </h1>
-        <p className="subtle" style={{ textAlign: 'center', marginTop: 0 }}>
-          Sign in with an administrator account
-        </p>
+        <div className="login-brand">
+          milli<b>more</b>
+        </div>
+        <p className="login-sub">Sign in to the admin console</p>
+
         {error && <div className="error">{error}</div>}
+
         <div className="field">
-          <label className="subtle">Email</label>
+          <label>Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
+            placeholder="you@millimore.app"
             required
           />
         </div>
         <div className="field">
-          <label className="subtle">Password</label>
+          <label>Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
+            placeholder="••••••••"
             required
           />
         </div>
         <button className="btn" type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="muted-note" style={{ textAlign: 'center', marginTop: 14 }}>
-          API: {API_BASE}
-        </p>
+
+        <div className="login-foot">
+          Administrator access only · <span className="mono">{API_BASE}</span>
+        </div>
       </form>
     </div>
   );

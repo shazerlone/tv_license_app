@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Shell from '../../components/Shell';
 import { apiFetch } from '../../lib/api';
+import { Avatar, Pill } from '../../components/ui';
 
 interface Application {
   id: string;
@@ -67,7 +68,7 @@ export default function CreatorQueuePage() {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      setApps((prev) => prev.filter((a) => a.id !== app.id)); // drop from queue
+      setApps((prev) => prev.filter((a) => a.id !== app.id));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -75,64 +76,83 @@ export default function CreatorQueuePage() {
     }
   }
 
+  const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
+    <div className="kv">
+      <div className="k">{k}</div>
+      <div className="v">{v}</div>
+    </div>
+  );
+
   return (
     <Shell>
-      <h1>Creator verification queue</h1>
-      <p className="subtle">
-        Approving flips the applicant to <code>creatorStatus: approved</code>; the app is
-        notified on its next <code>/creator/status</code> poll.
-      </p>
+      <div className="page-head">
+        <h1>Creator verification</h1>
+        <p className="lead">
+          Review verification applications. Approving flips the applicant to{' '}
+          <code>creatorStatus: approved</code>; the app picks it up on its next{' '}
+          <code>/creator/status</code> poll.
+        </p>
+      </div>
 
       {error && <div className="error">{error}</div>}
 
       {loading ? (
-        <div className="empty">Loading…</div>
+        <div className="panel empty">Loading applications…</div>
       ) : apps.length === 0 ? (
-        <div className="empty">🎉 Nothing pending. The queue is clear.</div>
+        <div className="panel empty">
+          <div className="big">✓</div>
+          The queue is clear — no applications waiting for review.
+        </div>
       ) : (
         apps.map((app) => (
           <div key={app.id} className="queue-item">
-            <div className="row">
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{app.user.name}</div>
-              <span className="pill role-creator">@{app.user.username}</span>
-              <span className="pill status-pending">pending</span>
-              <div className="spacer" />
-              <span className="subtle">{new Date(app.createdAt).toLocaleString()}</span>
+            <div className="queue-head">
+              <Avatar name={app.user.name} seed={app.userId} size={44} />
+              <div style={{ flex: 1 }}>
+                <div className="name">{app.user.name}</div>
+                <div className="cell-sub">@{app.user.username}</div>
+              </div>
+              <Pill tone="amber">pending</Pill>
+              <span className="muted" style={{ fontSize: 12.5 }}>
+                {new Date(app.createdAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </span>
             </div>
 
-            <div className="kv">
-              <div className="k">Contact</div>
-              <div>
-                {app.user.email || '—'} {app.user.phone ? `· ${app.user.phone}` : ''}
-              </div>
-              <div className="k">Residence</div>
-              <div>{app.user.residenceCountry || '—'}</div>
-              <div className="k">Market / Platform</div>
-              <div>
-                {app.market} · {app.platform}
-              </div>
-              <div className="k">MT server</div>
-              <div>{app.verification.server || '—'}</div>
-              <div className="k">MT account</div>
-              <div>{app.verification.account || '—'}</div>
-              <div className="k">Investor password</div>
-              <div>
-                {app.verification.hasInvestorPassword ? (
-                  <span className="subtle">provided (encrypted, not shown)</span>
-                ) : (
-                  <span className="subtle">not provided</span>
-                )}
-              </div>
-              <div className="k">Statement</div>
-              <div>
-                {app.verification.statementUrl ? (
-                  <a href={app.verification.statementUrl} target="_blank" rel="noreferrer">
-                    View statement
-                  </a>
-                ) : (
-                  '—'
-                )}
-              </div>
+            <div className="kv-grid">
+              <Row k="Email" v={app.user.email || <span className="muted">—</span>} />
+              <Row k="Phone" v={<span className="mono">{app.user.phone || '—'}</span>} />
+              <Row k="Residence" v={app.user.residenceCountry || '—'} />
+              <Row k="Market · Platform" v={`${app.market} · ${app.platform}`} />
+              <Row k="MT server" v={app.verification.server || '—'} />
+              <Row k="MT account" v={<span className="mono">{app.verification.account || '—'}</span>} />
+              <Row
+                k="Investor password"
+                v={
+                  app.verification.hasInvestorPassword ? (
+                    <Pill tone="green" plain>
+                      provided · encrypted
+                    </Pill>
+                  ) : (
+                    <span className="muted">not provided</span>
+                  )
+                }
+              />
+              <Row
+                k="Statement"
+                v={
+                  app.verification.statementUrl ? (
+                    <a href={app.verification.statementUrl} target="_blank" rel="noreferrer">
+                      View statement ↗
+                    </a>
+                  ) : (
+                    <span className="muted">—</span>
+                  )
+                }
+              />
             </div>
 
             <div className="row">
@@ -141,7 +161,7 @@ export default function CreatorQueuePage() {
                 disabled={workingId === app.id}
                 onClick={() => decide(app, 'approve')}
               >
-                Approve
+                Approve creator
               </button>
               <button
                 className="btn danger"
