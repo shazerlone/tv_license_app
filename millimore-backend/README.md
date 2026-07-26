@@ -50,6 +50,33 @@ Plus one pending creator application (Aisha Khan) for the admin approval queue.
 - **Credentials are write-only:** broker/investor passwords and tokens are sent
   on write, stored **AES-256-GCM encrypted**, and never returned in responses.
 
+## Deploy to Render (free)
+
+A Render **Blueprint** lives at the repo root ([`../render.yaml`](../render.yaml)):
+one free web service + one free Postgres. Redis is added later when the realtime
+milestones need it.
+
+1. Push this branch to GitHub (done).
+2. In Render: **New → Blueprint**, pick this repo, and confirm the branch
+   (`claude/millimore-backend-admin-yl2ffz`, or `main` after you merge).
+3. Render reads `render.yaml`, provisions the Postgres DB, injects `DATABASE_URL`,
+   generates `JWT_SECRET` + `CREDENTIAL_ENCRYPTION_KEY`, builds, migrates, seeds,
+   and starts the API. **Apply** and wait for the first deploy.
+4. Your API is at `https://<service>.onrender.com/v1` — point the app's base URL
+   there. Health check: `/v1/health`; Swagger: `/v1/docs`.
+
+Notes on the free tier:
+
+- The web service **sleeps after ~15 min idle** and cold-starts (~30–60s) on the
+  next request. Fine for integration/demo; upgrade the instance to keep it warm.
+- Free **Postgres expires ~30 days** after creation (Render policy) — upgrade the
+  DB plan before then to keep data.
+- OTP runs in `console` mode, so codes come back as `devCode` in the response —
+  the app can log in without an SMS gateway. Set `OTP_PROVIDER=twilio|msg91` +
+  `OTP_PROVIDER_KEY` in the Render dashboard to send real SMS.
+- Keep `CREDENTIAL_ENCRYPTION_KEY` stable; rotating it makes already-encrypted
+  credentials undecryptable.
+
 ## Milestone status
 
 ### ✅ Milestone 1 — Auth + users + JWT + OTP (LIVE)

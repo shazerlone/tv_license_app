@@ -18,8 +18,11 @@ async function bootstrap() {
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
+  // '*' (or empty) → reflect any origin. Reflecting is required alongside
+  // credentials:true, since browsers reject a literal '*' with credentials.
+  const allowAll = origins.length === 0 || origins.includes('*');
   app.enableCors({
-    origin: origins.length ? origins : true,
+    origin: allowAll ? true : origins,
     credentials: true,
   });
 
@@ -37,7 +40,8 @@ async function bootstrap() {
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
 
   const port = Number(config.get<string>('PORT', '3000'));
-  await app.listen(port);
+  // Bind to 0.0.0.0 so the container is reachable on hosts like Render.
+  await app.listen(port, '0.0.0.0');
   new Logger('Bootstrap').log(
     `Millimore API on http://localhost:${port}/${apiPrefix}  (docs: /${apiPrefix}/docs)`,
   );
