@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../services/api_client.dart';
+import '../services/backend_api.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
 import '../state/session.dart';
@@ -327,39 +328,105 @@ class _Empty extends StatelessWidget {
 
 // ── Sub-pages reached from the menu ───────────────────────────────────────────
 
-class SavedPostsScreen extends StatelessWidget {
+class SavedPostsScreen extends StatefulWidget {
   const SavedPostsScreen({super.key});
+  @override
+  State<SavedPostsScreen> createState() => _SavedPostsScreenState();
+}
+
+class _SavedPostsScreenState extends State<SavedPostsScreen> {
+  List<Post> _posts = const [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kUseBackend) {
+      _loading = true;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await BackendApi.saved();
+      if (!mounted) return;
+      setState(() {
+        _posts = list.map(Post.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final posts = mockPosts(mockTraders).where((p) => store.isSaved(p.id)).toList();
+    final posts = kUseBackend ? _posts : mockPosts(mockTraders).where((p) => store.isSaved(p.id)).toList();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Saved posts', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-      body: posts.isEmpty
-          ? _Empty(icon: Icons.bookmark_border_rounded, title: 'No saved posts yet', sub: 'Tap the bookmark on any post to save it here for later.')
-          : ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: posts.length,
-              itemBuilder: (_, i) => FeedPost(
-                post: posts[i],
-                onOpenProfile: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
-              ),
-            ),
+      body: _loading && posts.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : posts.isEmpty
+              ? _Empty(icon: Icons.bookmark_border_rounded, title: 'No saved posts yet', sub: 'Tap the bookmark on any post to save it here for later.')
+              : ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: posts.length,
+                  itemBuilder: (_, i) => FeedPost(
+                    post: posts[i],
+                    onOpenProfile: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+                  ),
+                ),
     );
   }
 }
 
-class SubscriptionsScreen extends StatelessWidget {
+class SubscriptionsScreen extends StatefulWidget {
   const SubscriptionsScreen({super.key});
+  @override
+  State<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
+}
+
+class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
+  List<Trader> _backendTraders = const [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kUseBackend) {
+      _loading = true;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await BackendApi.subscriptions();
+      if (!mounted) return;
+      setState(() {
+        _backendTraders = list.map(Trader.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final traders = mockTraders.where((t) => store.isSubscribed(t.id)).toList();
+    final traders = kUseBackend ? _backendTraders : mockTraders.where((t) => store.isSubscribed(t.id)).toList();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Subscriptions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-      body: traders.isEmpty
+      body: _loading && traders.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : traders.isEmpty
           ? _Empty(icon: Icons.group_outlined, title: 'No subscriptions yet', sub: 'Subscribe to traders to see their posts in your feed.')
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
+import '../services/backend_api.dart';
 import '../state/app_state.dart';
 
 /// A real, working comments thread. Reads & writes through [AppState].
@@ -27,6 +29,40 @@ class _CommentsSheetState extends State<CommentsSheet> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
+  List<Comment> _comments = const [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kUseBackend) {
+      _loading = true;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await BackendApi.comments(widget.post.id);
+      if (!mounted) return;
+      setState(() {
+        _comments = list
+            .map((c) => Comment(
+                  author: c.author,
+                  username: c.username,
+                  text: c.text,
+                  createdAt: DateTime.tryParse(c.createdAt)?.toLocal() ?? DateTime.now(),
+                  byMe: c.byMe,
+                ))
+            .toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -37,15 +73,24 @@ class _CommentsSheetState extends State<CommentsSheet> {
   void _send(AppState store) {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    store.addComment(widget.post, text);
     _controller.clear();
     _focus.unfocus();
+    if (kUseBackend) {
+      // optimistic
+      setState(() => _comments = [
+            Comment(author: 'You', username: 'you', text: text, createdAt: DateTime.now(), byMe: true),
+            ..._comments,
+          ]);
+      BackendApi.addComment(widget.post.id, text).then((_) {}, onError: (_) {});
+    } else {
+      store.addComment(widget.post, text);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final comments = store.commentsFor(widget.post);
+    final comments = kUseBackend ? _comments : store.commentsFor(widget.post);
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -80,7 +125,9 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 ),
                 const Divider(height: 1),
                 Expanded(
-                  child: comments.isEmpty
+                  child: _loading && comments.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : comments.isEmpty
                       ? Center(
                           child: Text('Be the first to comment',
                               style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
