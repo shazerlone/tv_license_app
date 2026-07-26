@@ -10,6 +10,8 @@ import '../widgets/millimore_logo.dart';
 import 'account_type_screen.dart';
 import 'home_screen.dart';
 
+/// Clean, modern sign-in. A soft brand header (no chart animation) over a
+/// scrollable form that adapts to any phone size.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,54 +19,15 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
-  late final AnimationController _heroController;
-  late final AnimationController _panelController;
-  late final Animation<double> _heroFade;
-  late final Animation<Offset> _panelSlide;
-  late final Animation<double> _panelFade;
-
-  @override
-  void initState() {
-    super.initState();
-    _heroController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _panelController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _heroFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _heroController, curve: Curves.easeOut),
-    );
-    _panelSlide = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _panelController, curve: Curves.easeOutCubic),
-    );
-    _panelFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _panelController, curve: Curves.easeOut),
-    );
-
-    _heroController.forward();
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (mounted) _panelController.forward();
-    });
-  }
-
   @override
   void dispose() {
-    _heroController.dispose();
-    _panelController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -139,530 +102,165 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  void _soon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$feature is coming soon')));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1120),
-      // The panel scrolls internally and pads for the keyboard, so we keep the
-      // scaffold from resizing (which would fight the Column layout).
-      resizeToAvoidBottomInset: false,
-      body: Column(
-        children: [
-          // Hero fills whatever space the panel leaves — candles never get
-          // covered, and it scales cleanly across phone sizes.
-          Expanded(
-            child: FadeTransition(
-              opacity: _heroFade,
-              child: const _LoginHero(),
-            ),
-          ),
-          SlideTransition(
-            position: _panelSlide,
-            child: FadeTransition(
-              opacity: _panelFade,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: size.height * 0.62),
-                child: _LoginPanel(
-                  formKey: _formKey,
-                  emailController: _emailController,
-                  passwordController: _passwordController,
-                  obscurePassword: _obscurePassword,
-                  isLoading: _isLoading,
-                  onTogglePassword: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  onSignIn: _signIn,
-                  onCreateAccount: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const AccountTypeScreen()),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+      backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 28),
+                    const MillimoreLogo(size: 26),
+                    const SizedBox(height: 40),
 
-class _LoginHero extends StatefulWidget {
-  const _LoginHero();
-
-  @override
-  State<_LoginHero> createState() => _LoginHeroState();
-}
-
-class _LoginHeroState extends State<_LoginHero>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ticker.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: AnimatedBuilder(
-            animation: _ticker,
-            builder: (_, __) => CustomPaint(
-              painter: _MarketPainter(progress: _ticker.value),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 120,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  AppColors.background,
-                ],
-              ),
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const MillimoreLogo(size: 26),
-                const SizedBox(height: 20),
-                Text(
-                  'Trade smarter.\nGrow together.',
-                  style: GoogleFonts.inter(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.8,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'The creator economy for traders.',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    color: Colors.white.withOpacity(0.55),
-                    letterSpacing: 0.1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          right: 24,
-          top: 28,
-          child: SafeArea(
-            child: _LiveBadge(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LiveBadge extends StatefulWidget {
-  @override
-  State<_LiveBadge> createState() => _LiveBadgeState();
-}
-
-class _LiveBadgeState extends State<_LiveBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scale,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: AppColors.red.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.red.withOpacity(0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(
-                color: AppColors.red,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              'LIVE',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.red,
-                letterSpacing: 1.0,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MarketPainter extends CustomPainter {
-  final double progress;
-  const _MarketPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFF0B1120),
-    );
-
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.04)
-      ..strokeWidth = 1;
-    for (int i = 1; i < 6; i++) {
-      final y = size.height * i / 6;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-    for (int i = 1; i < 8; i++) {
-      final x = size.width * i / 8;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-
-    final candles = _generateCandles(size);
-    for (final c in candles) {
-      _drawCandle(canvas, c);
-    }
-
-    final trendPaint = Paint()
-      ..color = AppColors.primary.withOpacity(0.6)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    final pts = candles.map((c) => Offset(c.x, c.close)).toList();
-    if (pts.isNotEmpty) {
-      path.moveTo(pts.first.dx, pts.first.dy);
-      for (int i = 1; i < pts.length; i++) {
-        final cx = (pts[i - 1].dx + pts[i].dx) / 2;
-        path.cubicTo(cx, pts[i - 1].dy, cx, pts[i].dy, pts[i].dx, pts[i].dy);
-      }
-    }
-
-    canvas.save();
-    canvas.clipRect(
-        Rect.fromLTWH(0, 0, size.width * (0.3 + 0.7 * progress), size.height));
-    canvas.drawPath(path, trendPaint);
-
-    final fillPath = Path.from(path)
-      ..lineTo(pts.last.dx, size.height)
-      ..lineTo(pts.first.dx, size.height)
-      ..close();
-    canvas.drawPath(
-      fillPath,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.primary.withOpacity(0.12),
-            Colors.transparent,
-          ],
-        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
-    );
-    canvas.restore();
-  }
-
-  List<_Candle> _generateCandles(Size size) {
-    final rng = math.Random(42);
-    final candles = <_Candle>[];
-    const count = 9;
-    final candleW = size.width / count;
-    double price = size.height * 0.55;
-
-    for (int i = 0; i < count; i++) {
-      final x = candleW * i + candleW / 2;
-      final move = (rng.nextDouble() - 0.44) * size.height * 0.09;
-      final open = price;
-      price = (price + move).clamp(size.height * 0.2, size.height * 0.8);
-      final close = price;
-      final high = math.min(open, close) - rng.nextDouble() * 8;
-      final low = math.max(open, close) + rng.nextDouble() * 8;
-      candles.add(_Candle(x: x, open: open, close: close, high: high, low: low, width: candleW * 0.42));
-    }
-    return candles;
-  }
-
-  void _drawCandle(Canvas canvas, _Candle c) {
-    final bull = c.close <= c.open;
-    final color = bull ? AppColors.green : AppColors.red;
-    final body = Rect.fromLTWH(
-      c.x - c.width / 2,
-      math.min(c.open, c.close),
-      c.width,
-      (c.open - c.close).abs().clamp(2.0, double.infinity),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(body, const Radius.circular(2)),
-      Paint()..color = color.withOpacity(0.85),
-    );
-    final wickPaint = Paint()
-      ..color = color.withOpacity(0.5)
-      ..strokeWidth = 1.2;
-    canvas.drawLine(Offset(c.x, c.high), Offset(c.x, math.min(c.open, c.close)), wickPaint);
-    canvas.drawLine(Offset(c.x, math.max(c.open, c.close)), Offset(c.x, c.low), wickPaint);
-  }
-
-  @override
-  bool shouldRepaint(_MarketPainter old) => old.progress != progress;
-}
-
-class _Candle {
-  final double x, open, close, high, low, width;
-  const _Candle({
-    required this.x,
-    required this.open,
-    required this.close,
-    required this.high,
-    required this.low,
-    required this.width,
-  });
-}
-
-class _LoginPanel extends StatelessWidget {
-  final GlobalKey<FormState> formKey;
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final bool obscurePassword;
-  final bool isLoading;
-  final VoidCallback onTogglePassword;
-  final VoidCallback onSignIn;
-  final VoidCallback onCreateAccount;
-
-  const _LoginPanel({
-    required this.formKey,
-    required this.emailController,
-    required this.passwordController,
-    required this.obscurePassword,
-    required this.isLoading,
-    required this.onTogglePassword,
-    required this.onSignIn,
-    required this.onCreateAccount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(maxHeight: 560),
-      decoration: const BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          24 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Text(
-                'Welcome back',
-                style: GoogleFonts.inter(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SocialButton(
-                      label: 'Apple',
-                      icon: _AppleIcon(),
-                      dark: true,
-                      onTap: () => _soon(context, 'Apple sign-in'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _SocialButton(
-                      label: 'Google',
-                      icon: _GoogleIcon(),
-                      dark: false,
-                      onTap: () => _soon(context, 'Google sign-in'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _OrDivider(),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                autocorrect: false,
-                textInputAction: TextInputAction.next,
-                style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                decoration: const InputDecoration(hintText: 'Email address'),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter your email';
-                  if (!v.contains('@')) return 'Enter a valid email';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: passwordController,
-                obscureText: obscurePassword,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => onSignIn(),
-                style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Password',
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: AppColors.textMuted,
-                      size: 20,
-                    ),
-                    onPressed: onTogglePassword,
-                  ),
-                ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter your password';
-                  if (v.length < 6) return 'Min 6 characters';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => _soon(context, 'Password reset'),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'Forgot password?',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: isLoading ? null : onSignIn,
-                child: isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Sign In'),
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: GestureDetector(
-                  onTap: onCreateAccount,
-                  child: RichText(
-                    text: TextSpan(
+                    // Headline
+                    Text(
+                      'Welcome back',
                       style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: AppColors.textMuted,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.9,
                       ),
-                      children: [
-                        const TextSpan(text: "Don't have an account? "),
-                        TextSpan(
-                          text: 'Join now',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sign in to follow top traders and copy their moves.',
+                      style: GoogleFonts.inter(fontSize: 15, color: AppColors.textSecondary, height: 1.4),
+                    ),
+                    const SizedBox(height: 32),
+
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _FieldLabel('Email'),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            textInputAction: TextInputAction.next,
+                            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                            decoration: const InputDecoration(
+                              hintText: 'you@example.com',
+                              prefixIcon: Icon(Icons.mail_outline_rounded, size: 20, color: AppColors.textMuted),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Enter your email';
+                              if (!v.contains('@')) return 'Enter a valid email';
+                              return null;
+                            },
                           ),
+                          const SizedBox(height: 18),
+                          _FieldLabel('Password'),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _signIn(),
+                            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: 'Your password',
+                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: AppColors.textMuted),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                  color: AppColors.textMuted,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Enter your password';
+                              if (v.length < 6) return 'Min 6 characters';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => _soon('Password reset'),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text('Forgot password?',
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : _signIn,
+                            child: _isLoading
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Text('Sign In'),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Text('or', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                         ),
+                        const Expanded(child: Divider()),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: _SocialButton(label: 'Apple', icon: const _AppleIcon(), dark: true, onTap: () => _soon('Apple sign-in'))),
+                        const SizedBox(width: 12),
+                        Expanded(child: _SocialButton(label: 'Google', icon: const _GoogleIcon(), dark: false, onTap: () => _soon('Google sign-in'))),
+                      ],
+                    ),
+
+                    const Spacer(),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountTypeScreen())),
+                        behavior: HitTestBehavior.opaque,
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted),
+                            children: [
+                              const TextSpan(text: "Don't have an account? "),
+                              TextSpan(
+                                text: 'Join now',
+                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -670,10 +268,14 @@ class _LoginPanel extends StatelessWidget {
   }
 }
 
-void _soon(BuildContext context, String feature) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('$feature is coming soon')),
-  );
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+      );
 }
 
 class _SocialButton extends StatelessWidget {
@@ -681,21 +283,14 @@ class _SocialButton extends StatelessWidget {
   final Widget icon;
   final bool dark;
   final VoidCallback onTap;
-
-  const _SocialButton({
-    required this.label,
-    required this.icon,
-    required this.dark,
-    required this.onTap,
-  });
+  const _SocialButton({required this.label, required this.icon, required this.dark, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 48,
+      child: Container(
+        height: 52,
         decoration: BoxDecoration(
           color: dark ? AppColors.textPrimary : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -706,14 +301,7 @@ class _SocialButton extends StatelessWidget {
           children: [
             icon,
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: dark ? Colors.white : AppColors.textPrimary,
-              ),
-            ),
+            Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: dark ? Colors.white : AppColors.textPrimary)),
           ],
         ),
       ),
@@ -722,24 +310,18 @@ class _SocialButton extends StatelessWidget {
 }
 
 class _AppleIcon extends StatelessWidget {
+  const _AppleIcon();
   @override
-  Widget build(BuildContext context) {
-    return const Icon(Icons.apple, size: 22, color: Colors.white);
-  }
+  Widget build(BuildContext context) => const Icon(Icons.apple, size: 22, color: Colors.white);
 }
 
 class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 18,
-      height: 18,
-      child: CustomPaint(painter: _GoogleGPainter()),
-    );
-  }
+  Widget build(BuildContext context) => SizedBox(width: 18, height: 18, child: CustomPaint(painter: _GoogleGPainter()));
 }
 
-/// Draws a recognisable multi-colour Google "G".
+/// Multi-colour Google "G".
 class _GoogleGPainter extends CustomPainter {
   static const _blue = Color(0xFF4285F4);
   static const _red = Color(0xFFEA4335);
@@ -755,20 +337,15 @@ class _GoogleGPainter extends CustomPainter {
       center: Offset(size.width / 2, size.height / 2),
       radius: size.width / 2 - stroke / 2,
     );
-
     Paint arc(Color c) => Paint()
       ..color = c
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.butt;
-
-    // Ring segments (gap at the upper-right where the bar sits).
-    canvas.drawArc(rect, _deg(-16), _deg(76), false, arc(_blue));   // right
-    canvas.drawArc(rect, _deg(64), _deg(88), false, arc(_green));   // bottom
-    canvas.drawArc(rect, _deg(156), _deg(76), false, arc(_yellow)); // left
-    canvas.drawArc(rect, _deg(236), _deg(84), false, arc(_red));    // top
-
-    // The blue horizontal bar from centre to the right edge.
+    canvas.drawArc(rect, _deg(-16), _deg(76), false, arc(_blue));
+    canvas.drawArc(rect, _deg(64), _deg(88), false, arc(_green));
+    canvas.drawArc(rect, _deg(156), _deg(76), false, arc(_yellow));
+    canvas.drawArc(rect, _deg(236), _deg(84), false, arc(_red));
     final cx = size.width / 2;
     final cy = size.height / 2;
     final barRect = Rect.fromLTRB(cx, cy - stroke / 2, rect.right + stroke / 2, cy + stroke / 2);
@@ -777,23 +354,4 @@ class _GoogleGPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GoogleGPainter old) => false;
-}
-
-class _OrDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: Divider()),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Text(
-            'or continue with email',
-            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
-          ),
-        ),
-        const Expanded(child: Divider()),
-      ],
-    );
-  }
 }
