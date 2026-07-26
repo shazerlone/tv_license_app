@@ -93,7 +93,11 @@ class FollowerHome extends StatelessWidget {
     final openCopied = mockTrades.where((t) => t.status == TradeStatus.open).toList();
     final totalPnl = openCopied.fold<double>(0, (s, t) => s + t.pnlPercent);
 
-    return CustomScrollView(
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => Future.delayed(const Duration(milliseconds: 700)),
+      child: CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverAppBar(
           floating: true,
@@ -176,6 +180,7 @@ class FollowerHome extends StatelessWidget {
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
+      ),
     );
   }
 }
