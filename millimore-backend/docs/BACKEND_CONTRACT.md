@@ -353,6 +353,10 @@ Each `AppState` / `SessionController` method has a matching endpoint above.
 Introduce a thin `ApiClient` + repository layer; flip a `useBackend` flag to
 swap the demo store for live calls, screen by screen — UI stays identical.
 
+**→ Step-by-step app-side instructions: [`APP_INTEGRATION.md`](./APP_INTEGRATION.md)**
+(base URL, which screens are live, demo-method → endpoint map, and a skip rule so
+already-integrated screens are left alone).
+
 ---
 
 ## 11. Implementation notes (backend — kept in sync as milestones land)
