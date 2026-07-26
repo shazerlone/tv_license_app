@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../state/session.dart';
+import '../services/backend_api.dart';
+import '../services/api_client.dart';
 import 'go_live_screen.dart';
 
 class StudioScreen extends StatelessWidget {
@@ -26,7 +28,18 @@ class StudioScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             if (pending) _LockedBanner(),
-            if (pending && kDevMode) ...[
+            if (pending && kUseBackend) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _checkStatus(context, session),
+                  icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+                  label: Text('Check verification status', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.primary.withOpacity(0.4))),
+                ),
+              ),
+            ] else if (pending && kDevMode) ...[
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
@@ -68,6 +81,32 @@ class StudioScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _checkStatus(BuildContext context, SessionController session) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Checking your verification status…')));
+    try {
+      final r = await BackendApi.creatorStatus();
+      messenger.hideCurrentSnackBar();
+      switch (r.creatorStatus) {
+        case 'approved':
+          session.approveCreator();
+          messenger.showSnackBar(const SnackBar(content: Text('Approved 🎉 You can now go live and post.')));
+          break;
+        case 'rejected':
+          messenger.showSnackBar(SnackBar(content: Text('Application rejected${r.reason != null ? ': ${r.reason}' : ''}')));
+          break;
+        default:
+          messenger.showSnackBar(const SnackBar(content: Text('Still in review — we\'ll notify you once approved.')));
+      }
+    } on ApiException catch (e) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
   }
 
   void _action(BuildContext context, String name) {
