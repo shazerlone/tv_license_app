@@ -70,7 +70,33 @@ code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; f
   position: sticky;
   top: 0;
   height: 100vh;
+  z-index: 60;
+  transition: transform 0.22s ease;
 }
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 55;
+  backdrop-filter: blur(1px);
+}
+/* Hamburger + mobile brand live in the topbar; hidden on desktop. */
+.hamburger {
+  display: none;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.hamburger svg { width: 20px; height: 20px; }
+.topbar-brand { display: none; font-weight: 800; font-size: 18px; letter-spacing: -0.03em; }
+.topbar-brand b { color: var(--primary); }
 .brand {
   font-weight: 800;
   font-size: 21px;
@@ -122,7 +148,8 @@ code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; f
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 14px;
   padding: 0 28px;
   position: sticky;
   top: 0;
@@ -306,7 +333,74 @@ select { cursor: pointer; appearance: none;
 
 .pagination { display: flex; justify-content: center; margin-top: 20px; }
 
-@media (max-width: 720px) {
-  .sidebar { display: none; }
-  .kv-grid { grid-template-columns: 1fr; }
+/* ─── Mobile / tablet ───────────────────────────────────────── */
+@media (max-width: 860px) {
+  /* Sidebar becomes a slide-in drawer toggled by the hamburger. */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .hamburger {
+    display: inline-flex;
+  }
+  .topbar-brand {
+    display: block;
+  }
+  .topbar .title {
+    display: none;
+  }
+  /* Keep the avatar + logout in the bar; drop the name/email text. */
+  .topbar-user {
+    display: none;
+  }
+  .topbar {
+    padding: 0 14px;
+    gap: 10px;
+  }
+  .content {
+    padding: 20px 14px;
+  }
+  h1 {
+    font-size: 22px;
+  }
+  /* Filters stack; search takes the full row. */
+  .search-wrap.search {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  /* Wide data tables scroll horizontally instead of breaking the layout. */
+  .panel {
+    overflow-x: auto;
+  }
+  .panel table {
+    min-width: 620px;
+  }
+  .kv-grid {
+    grid-template-columns: 1fr;
+  }
+  .cards {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .login-card {
+    width: 100%;
+    padding: 26px 22px;
+  }
+}
+
+@media (max-width: 460px) {
+  .cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  .topbar-brand {
+    font-size: 16px;
+  }
+  .topbar .avatar {
+    display: none;
+  } /* free up room; keep the Log out button reachable */
 }
