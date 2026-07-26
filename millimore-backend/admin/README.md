@@ -33,26 +33,28 @@ Log in with a seeded admin account: `admin@millimore.app` / `password`.
   (`/admin/creators/pending`, `/approve`, `/reject`). Investor passwords are
   shown only as "provided (encrypted, not shown)" — never the value.
 
-## Deploy free
+## Deploy (single origin — nothing to do)
 
-The admin is a **fully static export** (`output: 'export'` in `next.config.mjs`)
-— 100% client-rendered, so it hosts anywhere static. Local preview of the
-production build: `npm run build && npm run preview` (serves `out/` on :3001).
+The admin is a **fully static export** (`output: 'export'`). The repo-root
+`render.yaml` builds it into `admin/out` as the **last step of the backend
+build**, and the API server serves it at its own root. So there is **one
+service, one URL**:
 
-### Option A — Render Static Site (same platform as the backend, recommended)
+- `https://millimore-backend.onrender.com/`      → this admin UI (login, etc.)
+- `https://millimore-backend.onrender.com/v1/...` → the API
 
-Already wired into the repo-root `render.yaml` as the `millimore-admin` service:
-free, **no instance hours, no cold start**. When you sync the Blueprint in
-Render it builds `millimore-backend/admin`, publishes `./out`, and gives the
-admin its own `…onrender.com` URL. `NEXT_PUBLIC_API_BASE_URL` is set there to the
-backend's `/v1` base.
+Same origin ⇒ no `NEXT_PUBLIC_API_BASE_URL` needed (defaults to relative `/v1`)
+and no CORS. Just deploy the backend; the admin comes with it.
 
-### Option B — Vercel
+### Local
 
-1. Import this repo; set **Root Directory** to `millimore-backend/admin`.
-2. Add env var `NEXT_PUBLIC_API_BASE_URL = https://<your-backend>.onrender.com/v1`.
-3. Deploy (Vercel auto-detects Next.js).
+- Split dev (hot reload): `npm run dev` (:3001) + backend on :3000, with
+  `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/v1` in `.env.local`.
+- Single-origin preview: build the admin (`npm run build`) then run the backend
+  — it serves `admin/out` at `/`, exactly like production.
 
-The backend sends permissive CORS (`CORS_ORIGINS=*` on Render), so either origin
-can call it out of the box; tighten `CORS_ORIGINS` to the real admin origin for
-production.
+### Host it separately instead (optional)
+
+The static `out/` also deploys to Vercel/Netlify/any static host. There, set
+`NEXT_PUBLIC_API_BASE_URL` to the backend's `https://…/v1` and the backend's
+`CORS_ORIGINS` to that web origin.

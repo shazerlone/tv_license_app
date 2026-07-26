@@ -60,10 +60,16 @@ milestones need it.
 2. In Render: **New → Blueprint**, pick this repo, and confirm the branch
    (`claude/millimore-backend-admin-yl2ffz`, or `main` after you merge).
 3. Render reads `render.yaml`, provisions the Postgres DB, injects `DATABASE_URL`,
-   generates `JWT_SECRET` + `CREDENTIAL_ENCRYPTION_KEY`, builds, migrates, seeds,
-   and starts the API. **Apply** and wait for the first deploy.
-4. Your API is at `https://<service>.onrender.com/v1` — point the app's base URL
-   there. Health check: `/v1/health`; Swagger: `/v1/docs`.
+   generates `JWT_SECRET` + `CREDENTIAL_ENCRYPTION_KEY`, builds the API **and the
+   admin UI**, migrates, seeds, and starts. **Apply** and wait for the first deploy.
+4. **One URL does both** (single origin):
+   - `https://<service>.onrender.com/` → the **admin dashboard** (login page).
+   - `https://<service>.onrender.com/v1/...` → the **API** (point the app here).
+   - Health: `/v1/health` · Swagger: `/v1/docs`.
+
+> The API server serves the admin's static export at `/` via
+> `@nestjs/serve-static`; everything under `/v1` stays the API. Nothing at `/`
+> returns raw JSON anymore — it's the login page.
 
 ### Keeping it warm (free)
 

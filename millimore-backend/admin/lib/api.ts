@@ -1,8 +1,12 @@
 // Thin fetch layer over the Millimore backend. All calls are client-side; the
 // JWT lives in localStorage. Base URL comes from NEXT_PUBLIC_API_BASE_URL.
 
+// Default is the relative, same-origin `/v1` — so when the backend serves this
+// static build at its own root (single-origin deploy), no config is needed.
+// For split local dev (admin on :3001, API on :3000) set
+// NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/v1 in .env.local.
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:3000/v1';
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || '/v1';
 
 const TOKEN_KEY = 'millimore_admin_token';
 const USER_KEY = 'millimore_admin_user';

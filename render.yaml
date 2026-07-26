@@ -1,14 +1,15 @@
-# Render Blueprint — deploys the Millimore backend (millimore-backend/) on the
-# free tier. Render reads this file from the repo root when you create a
+# Render Blueprint — deploys Millimore as a SINGLE service on the free tier:
+# one web service serves BOTH the admin UI (at /) and the API (at /v1) from the
+# same origin. Render reads this file from the repo root when you create a
 # "New > Blueprint" from this GitHub repo.
 #
 # Free-tier notes:
-#  - Web service sleeps after ~15 min idle and cold-starts on the next request
-#    (first hit after sleep takes ~30-60s). Fine for integration/demo.
+#  - The service sleeps after ~15 min idle and cold-starts on the next request
+#    (~30-60s). The keep-warm GitHub Action mitigates this.
 #  - Free Postgres is time-limited by Render (expires ~30 days after creation);
 #    upgrade the database plan before then to keep data.
-#  - Redis is NOT provisioned yet — milestone 1 doesn't use it. It gets added
-#    here when the realtime milestones (prices/portfolio/chat) land.
+#  - Redis is NOT provisioned yet — it gets added when the realtime milestones
+#    (prices/portfolio/chat) land.
 services:
   - type: web
     name: millimore-backend
@@ -17,10 +18,16 @@ services:
     branch: claude/millimore-backend-admin-yl2ffz
     rootDir: millimore-backend
     # --include=dev is required: Render sets NODE_ENV=production, under which npm
-    # skips devDependencies — but the build needs them (nest CLI, typescript,
-    # prisma CLI, ts-node for the seed). Runtime still uses prod deps only.
-    # migrate deploy runs here because Render's free tier has no preDeploy hook.
-    buildCommand: npm install --include=dev && npm run prisma:generate && npm run build && npx prisma migrate deploy && npm run db:seed
+    # skips devDependencies — but both builds need them (nest CLI, typescript,
+    # prisma CLI, ts-node, next). The final step builds the admin's static export
+    # into admin/out, which the API server then serves at `/`.
+    buildCommand: >-
+      npm install --include=dev &&
+      npm run prisma:generate &&
+      npm run build &&
+      npx prisma migrate deploy &&
+      npm run db:seed &&
+      cd admin && npm install --include=dev && npm run build
     startCommand: node dist/main.js
     healthCheckPath: /v1/health
     autoDeploy: true
@@ -55,28 +62,11 @@ services:
         value: '300'
       - key: OTP_CODE_LENGTH
         value: '6'
-      # Allow the app + admin to call the API. Tighten to real origins later.
+      # The mobile app (native, no browser origin) calls the API; the admin UI
+      # is now same-origin so it needs no CORS. '*' keeps the app working; tighten
+      # to real web origins later if you add browser clients.
       - key: CORS_ORIGINS
         value: '*'
-
-  # Admin dashboard — a free Render Static Site (no instance hours, no cold
-  # start). The admin is a fully static Next.js export (output: 'export'), so it
-  # serves the login page + dashboard from its own onrender.com URL.
-  - type: web
-    name: millimore-admin
-    runtime: static
-    branch: claude/millimore-backend-admin-yl2ffz
-    rootDir: millimore-backend/admin
-    # --include=dev so typescript/@types are present under NODE_ENV=production.
-    buildCommand: npm install --include=dev && npm run build
-    staticPublishPath: ./out
-    autoDeploy: true
-    envVars:
-      - key: NODE_VERSION
-        value: '22'
-      # Baked into the static build. Point at the backend service's API base.
-      - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://millimore-backend.onrender.com/v1
 
 databases:
   - name: millimore-db
