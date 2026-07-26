@@ -241,7 +241,8 @@ class _OnboardingPage extends StatelessWidget {
               opacity: fade,
               child: SlideTransition(
                 position: slide,
-                child: Column(
+                child: SingleChildScrollView(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -275,6 +276,7 @@ class _OnboardingPage extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
             ),

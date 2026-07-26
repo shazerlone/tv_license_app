@@ -424,19 +424,19 @@ class _MarketPainter extends CustomPainter {
   List<_Candle> _generateCandles(Size size) {
     final rng = math.Random(42);
     final candles = <_Candle>[];
-    const count = 14;
+    const count = 9;
     final candleW = size.width / count;
     double price = size.height * 0.55;
 
     for (int i = 0; i < count; i++) {
       final x = candleW * i + candleW / 2;
-      final move = (rng.nextDouble() - 0.44) * size.height * 0.07;
+      final move = (rng.nextDouble() - 0.44) * size.height * 0.09;
       final open = price;
       price = (price + move).clamp(size.height * 0.2, size.height * 0.8);
       final close = price;
       final high = math.min(open, close) - rng.nextDouble() * 8;
       final low = math.max(open, close) + rng.nextDouble() * 8;
-      candles.add(_Candle(x: x, open: open, close: close, high: high, low: low, width: candleW * 0.55));
+      candles.add(_Candle(x: x, open: open, close: close, high: high, low: low, width: candleW * 0.42));
     }
     return candles;
   }
