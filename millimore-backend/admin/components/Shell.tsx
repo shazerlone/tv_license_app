@@ -9,12 +9,14 @@ import { Avatar, Icons } from './ui';
 
 const NAV = [
   { href: '/', label: 'Overview', icon: Icons.overview },
+  { href: '/traders', label: 'Traders', icon: Icons.spark },
   { href: '/users', label: 'Users', icon: Icons.users },
   { href: '/creators', label: 'Creator queue', icon: Icons.queue },
 ];
 
 const TITLES: Record<string, string> = {
   '/': 'Overview',
+  '/traders': 'Traders',
   '/users': 'Users',
   '/creators': 'Creator verification',
 };

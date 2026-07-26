@@ -49,6 +49,60 @@ export function clearSession() {
   window.localStorage.removeItem(USER_KEY);
 }
 
+export interface Trader {
+  id: string;
+  name: string;
+  username: string;
+  photoUrl: string | null;
+  isVerified: boolean;
+  isLive: boolean;
+  returnPercent: number;
+  returnDays: number;
+  followers: number;
+  copiers: number;
+  aum: number;
+  winRate: number;
+  maxDrawdown: number;
+  totalTrades: number;
+  category: string;
+  tags: string[];
+  bio: string | null;
+}
+
+export interface Post {
+  id: string;
+  trader: Trader;
+  type: string;
+  content: string;
+  pair: string | null;
+  title: string | null;
+  points: string[];
+  likes: number;
+  comments: number;
+  createdAt: string;
+  isLiked: boolean;
+  saved: boolean;
+}
+
+export interface PublicTrade {
+  id: string;
+  pair: string;
+  isBuy: boolean;
+  status: string;
+  entryPrice: number;
+  exitPrice: number | null;
+  pnlAmount: number;
+  pnlPercent: number;
+  lots: number;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface EquityPoint {
+  t: string;
+  value: number;
+}
+
 /** Error carrying the contract's { code, message }. */
 export class ApiError extends Error {
   code: string;
