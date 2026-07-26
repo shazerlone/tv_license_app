@@ -401,3 +401,23 @@ unchanged; this section only pins down details the prose left open.
   (the `id` field of a queue item). Approve/reject also flips the applicant's
   `creatorStatus`. (WS `user → creator.status` push lands in milestone 5; until
   then the app learns via `GET /creator/status`.)
+
+### Traders / discover / social (milestone 3)
+- `GET /traders` — paginated `{ items, nextCursor }`; `sort=copiers|return`
+  (default `copiers`), plus `category` and `q` (name/username) filters.
+- `Trader` is returned exactly per §3 (no `isSubscribed` field). The app derives
+  follow state from `GET /subscriptions`.
+- `GET /traders/{id}/trades` and `/equity` are **synthetically generated**
+  (deterministic per trader id) until the real trade feed lands (milestone 4/6).
+  Trades match the `CopyPosition`-like shape; equity is `[{ t, value }]` ending
+  at `10000 × (1 + returnPercent/100)`.
+- `GET /discover/reels` returns `live` reels (one per live trader, with
+  `viewers`) followed by `trade`/`lesson` reels built from recent posts.
+- `Post` carries `likes`/`comments` **counts** plus per-user `isLiked`/`saved`.
+- `POST /posts` (compose) auto-creates a `Trader` profile for the author if they
+  don't have one yet (from their user name/username/market).
+- Response conventions:
+  - `POST|DELETE /posts/{id}/like` → `{ likes }` (200).
+  - `POST|DELETE /posts/{id}/save`, `POST|DELETE /subscriptions/{traderId}`,
+    `POST /subscriptions/{traderId}/notify` → `204 No Content`.
+  - `notify` requires an existing subscription (404 otherwise).

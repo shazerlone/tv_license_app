@@ -33,6 +33,13 @@ enum AccountStatus {
   error
 }
 
+enum PostType {
+  analysis
+  trade
+  lesson
+  update
+}
+
 /// A platform user. Serialized to the contract `User` shape (see UsersService.toDto).
 model User {
   id             String        @id // prefixed id, e.g. "u_abc123"
@@ -65,8 +72,118 @@ model User {
   creatorApplications CreatorApplication[]
   tradingAccounts     TradingAccount[]
 
+  trader        Trader?
+  subscriptions Subscription[]
+  postLikes     PostLike[]
+  postSaves     PostSave[]
+  comments      Comment[]
+
   @@index([role])
   @@index([creatorStatus])
+}
+
+/// A public trader profile (contract §3 Trader). Optionally linked to the
+/// creator User who owns it. Stats are stored (seeded/aggregated).
+model Trader {
+  id     String  @id // "t_..."
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name       String
+  username   String
+  photoUrl   String?
+  isVerified Boolean @default(false)
+  isLive     Boolean @default(false)
+
+  returnPercent Float @default(0)
+  returnDays    Int   @default(30)
+  followers     Int   @default(0)
+  copiers       Int   @default(0)
+  aum           Float @default(0)
+  winRate       Float @default(0)
+  maxDrawdown   Float @default(0)
+  totalTrades   Int   @default(0)
+
+  category String   @default("Forex")
+  tags     String[] @default([])
+  bio      String?
+
+  createdAt DateTime @default(now())
+
+  posts         Post[]
+  subscriptions Subscription[]
+
+  @@index([category])
+  @@index([copiers])
+  @@index([returnPercent])
+}
+
+/// A trader's content post (contract §3 Post).
+model Post {
+  id       String   @id // "p_..."
+  traderId String
+  trader   Trader   @relation(fields: [traderId], references: [id], onDelete: Cascade)
+  type     PostType
+  content  String
+  pair     String?
+  title    String?
+  points   String[] @default([])
+
+  createdAt DateTime @default(now())
+
+  likes    PostLike[]
+  saves    PostSave[]
+  comments Comment[]
+
+  @@index([traderId])
+  @@index([createdAt])
+}
+
+model PostLike {
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@index([postId])
+}
+
+model PostSave {
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id // "c_..."
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+}
+
+/// Follower → trader subscription (contract §4.5). `notify` = bell toggle.
+model Subscription {
+  userId    String
+  traderId  String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trader    Trader   @relation(fields: [traderId], references: [id], onDelete: Cascade)
+  notify    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@id([userId, traderId])
+  @@index([traderId])
 }
 
 /// A supported broker. GET /brokers?country= is gated by `countries`

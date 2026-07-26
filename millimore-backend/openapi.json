@@ -804,6 +804,719 @@
           }
         ]
       }
+    },
+    "/v1/traders": {
+      "get": {
+        "operationId": "TradersController_list",
+        "summary": "Discover traders — filter/sort/paginate (contract §4.4)",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Forex",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Search name / username.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "copiers",
+                "return"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraderPageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "traders"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/traders/{id}": {
+      "get": {
+        "operationId": "TradersController_getOne",
+        "summary": "Get a trader (contract §4.4)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraderDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "traders"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/traders/{id}/trades": {
+      "get": {
+        "operationId": "TradersController_trades",
+        "summary": "Public trades of a trader (contract §4.4)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "active",
+                "closed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicTradeDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "traders"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/traders/{id}/equity": {
+      "get": {
+        "operationId": "TradersController_equity",
+        "summary": "Equity curve of a trader (contract §4.4)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "30d",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EquityPointDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "traders"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/posts": {
+      "post": {
+        "operationId": "PostsController_compose",
+        "summary": "Compose a post (contract §4.6)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/posts/{id}/like": {
+      "post": {
+        "operationId": "PostsController_like",
+        "summary": "Like a post (contract §4.5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LikesDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "PostsController_unlike",
+        "summary": "Unlike a post (contract §4.5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LikesDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/posts/{id}/save": {
+      "post": {
+        "operationId": "PostsController_save",
+        "summary": "Save a post (contract §4.5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "PostsController_unsave",
+        "summary": "Unsave a post (contract §4.5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/posts/{id}/comments": {
+      "get": {
+        "operationId": "PostsController_comments",
+        "summary": "List comments on a post (contract §4.5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommentDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "PostsController_addComment",
+        "summary": "Add a comment (contract §4.5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/feed": {
+      "get": {
+        "operationId": "FeedController_feed",
+        "summary": "Posts from traders I subscribe to (contract §4.5)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "feed"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/saved": {
+      "get": {
+        "operationId": "FeedController_saved",
+        "summary": "Posts I saved (contract §4.5)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "feed"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/traders/{id}/posts": {
+      "get": {
+        "operationId": "FeedController_traderPosts",
+        "summary": "A trader's posts (contract §4.4)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "feed"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/discover/reels": {
+      "get": {
+        "operationId": "DiscoverController_reels",
+        "summary": "Mixed live/trade/lesson reels feed (contract §4.4)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReelDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "discover"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/subscriptions": {
+      "get": {
+        "operationId": "SubscriptionsController_list",
+        "summary": "Traders I subscribe to (contract §4.5)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TraderDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscriptions"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/subscriptions/{traderId}": {
+      "post": {
+        "operationId": "SubscriptionsController_subscribe",
+        "summary": "Subscribe to a trader (contract §4.5)",
+        "parameters": [
+          {
+            "name": "traderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "subscriptions"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "SubscriptionsController_unsubscribe",
+        "summary": "Unsubscribe from a trader (contract §4.5)",
+        "parameters": [
+          {
+            "name": "traderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "subscriptions"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/subscriptions/{traderId}/notify": {
+      "post": {
+        "operationId": "SubscriptionsController_notify",
+        "summary": "Toggle the notification bell (contract §4.5)",
+        "parameters": [
+          {
+            "name": "traderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "subscriptions"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
     }
   },
   "info": {
@@ -1620,6 +2333,413 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "TraderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "t_1"
+          },
+          "name": {
+            "type": "string",
+            "example": "Marcus Sterling"
+          },
+          "username": {
+            "type": "string",
+            "example": "marcussterling"
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "isLive": {
+            "type": "boolean"
+          },
+          "returnPercent": {
+            "type": "number",
+            "example": 18.45
+          },
+          "returnDays": {
+            "type": "number",
+            "example": 30
+          },
+          "followers": {
+            "type": "number",
+            "example": 12400
+          },
+          "copiers": {
+            "type": "number",
+            "example": 1840
+          },
+          "aum": {
+            "type": "number",
+            "example": 2300000
+          },
+          "winRate": {
+            "type": "number",
+            "example": 72
+          },
+          "maxDrawdown": {
+            "type": "number",
+            "example": 9.2
+          },
+          "totalTrades": {
+            "type": "number",
+            "example": 612
+          },
+          "category": {
+            "type": "string",
+            "example": "Forex"
+          },
+          "tags": {
+            "example": [
+              "Price Action",
+              "EUR/USD"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bio": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "username",
+          "isVerified",
+          "isLive",
+          "returnPercent",
+          "returnDays",
+          "followers",
+          "copiers",
+          "aum",
+          "winRate",
+          "maxDrawdown",
+          "totalTrades",
+          "category",
+          "tags"
+        ]
+      },
+      "TraderPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraderDto"
+            }
+          },
+          "nextCursor": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PublicTradeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "ptr_1"
+          },
+          "traderId": {
+            "type": "string",
+            "example": "t_1"
+          },
+          "traderName": {
+            "type": "string",
+            "example": "Marcus Sterling"
+          },
+          "pair": {
+            "type": "string",
+            "example": "EUR/USD"
+          },
+          "isBuy": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ]
+          },
+          "entryPrice": {
+            "type": "number",
+            "example": 1.0876
+          },
+          "exitPrice": {
+            "type": "object",
+            "nullable": true
+          },
+          "pnlAmount": {
+            "type": "number",
+            "example": 12.4
+          },
+          "pnlPercent": {
+            "type": "number",
+            "example": 0.47
+          },
+          "lots": {
+            "type": "number",
+            "example": 0.1
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "closedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "traderId",
+          "traderName",
+          "pair",
+          "isBuy",
+          "status",
+          "entryPrice",
+          "pnlAmount",
+          "pnlPercent",
+          "lots",
+          "openedAt"
+        ]
+      },
+      "EquityPointDto": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "string",
+            "example": "2026-06-26T00:00:00Z"
+          },
+          "value": {
+            "type": "number",
+            "example": 10240.5
+          }
+        },
+        "required": [
+          "t",
+          "value"
+        ]
+      },
+      "CreatePostDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "trade",
+              "analysis",
+              "lesson",
+              "update"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "pair": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "content"
+        ]
+      },
+      "PostDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "p_1"
+          },
+          "trader": {
+            "$ref": "#/components/schemas/TraderDto"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "analysis",
+              "trade",
+              "lesson",
+              "update"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "pair": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "object",
+            "nullable": true
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "likes": {
+            "type": "number",
+            "example": 284
+          },
+          "comments": {
+            "type": "number",
+            "example": 47
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "isLiked": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "trader",
+          "type",
+          "content",
+          "points",
+          "likes",
+          "comments",
+          "createdAt",
+          "isLiked",
+          "saved"
+        ]
+      },
+      "LikesDto": {
+        "type": "object",
+        "properties": {
+          "likes": {
+            "type": "number",
+            "example": 285
+          }
+        },
+        "required": [
+          "likes"
+        ]
+      },
+      "CommentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "c_1"
+          },
+          "author": {
+            "type": "string",
+            "example": "Priya"
+          },
+          "username": {
+            "type": "string",
+            "example": "priyatrades"
+          },
+          "text": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "byMe": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "username",
+          "text",
+          "createdAt",
+          "byMe"
+        ]
+      },
+      "CreateCommentDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "ReelDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "live",
+              "trade",
+              "lesson"
+            ]
+          },
+          "trader": {
+            "$ref": "#/components/schemas/TraderDto"
+          },
+          "post": {
+            "type": "object",
+            "nullable": true
+          },
+          "title": {
+            "type": "object",
+            "nullable": true
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "viewers": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "trader"
+        ]
+      },
+      "NotifyDto": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "on"
         ]
       }
     }

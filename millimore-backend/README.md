@@ -139,9 +139,28 @@ Backend endpoints:
 Plus the **admin dashboard** (`./admin`, Next.js) with login, users, and the
 creator approval queue. See [`admin/README.md`](./admin/README.md).
 
+### ✅ Milestone 3 — Traders / discover / feed / social (LIVE)
+
+| Method & path | Contract | Notes |
+| ------------- | -------- | ----- |
+| `GET /v1/traders` | §4.4 | Discover: `category`, `q`, `sort=copiers\|return`, cursor |
+| `GET /v1/traders/{id}` | §4.4 | Full trader profile |
+| `GET /v1/traders/{id}/posts` | §4.4 | A trader's posts |
+| `GET /v1/traders/{id}/trades` | §4.4 | Public trades (`status=active\|closed`) |
+| `GET /v1/traders/{id}/equity` | §4.4 | Equity curve (`range=30d`) |
+| `GET /v1/discover/reels` | §4.4 | Mixed live/trade/lesson feed |
+| `GET/POST/DELETE /v1/subscriptions[...]` | §4.5 | Follow / unfollow / list / `notify` bell |
+| `GET /v1/feed` | §4.5 | Posts from subscribed traders |
+| `POST/DELETE /v1/posts/{id}/like` | §4.5 | → `{ likes }` |
+| `POST/DELETE /v1/posts/{id}/save` · `GET /v1/saved` | §4.5 | Save / unsave / list |
+| `GET/POST /v1/posts/{id}/comments` | §4.5 | List / add comment |
+| `POST /v1/posts` | §4.6 | Compose (creator) |
+
+> Trader `trades`/`equity` are deterministic **synthetic** data until the real
+> trade feed arrives in milestone 4/6.
+
 ### ⏳ Next milestones (per contract §9)
 
-3. Traders / discover / feed / social (subscribe, saved, comments, likes)
 4. Copy engine + positions + portfolio + WS `prices`/`portfolio`
 5. Broadcasts (Cloudflare) + WS chat/viewers/reactions + YouTube chat ingest
 6. Live orders → MT bridge; payouts; full admin metrics/monitoring
