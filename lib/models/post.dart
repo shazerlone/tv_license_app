@@ -1,6 +1,20 @@
 import 'trader.dart';
+import 'api_models.dart';
 
 enum PostType { analysis, trade, live, update }
+
+PostType _postTypeFromApi(String t) {
+  switch (t) {
+    case 'trade':
+      return PostType.trade;
+    case 'update':
+      return PostType.update;
+    case 'lesson':
+    case 'analysis':
+    default:
+      return PostType.analysis;
+  }
+}
 
 class Post {
   final String id;
@@ -26,6 +40,19 @@ class Post {
     required this.createdAt,
     this.isLiked = false,
   });
+
+  /// Maps a backend ApiPost (openapi.json §4.5) onto the UI model.
+  factory Post.fromApi(ApiPost a) => Post(
+        id: a.id,
+        trader: Trader.fromApi(a.trader),
+        type: _postTypeFromApi(a.type),
+        content: a.content,
+        pair: a.pair,
+        likes: a.likes,
+        comments: a.comments,
+        createdAt: DateTime.tryParse(a.createdAt)?.toLocal() ?? DateTime.now(),
+        isLiked: a.isLiked,
+      );
 
   String get timeAgo {
     final diff = DateTime.now().difference(createdAt);

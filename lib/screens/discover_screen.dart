@@ -2,8 +2,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
+import '../models/api_models.dart';
+import '../services/backend_api.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/comments_sheet.dart';
@@ -34,12 +37,43 @@ class DiscoverTab extends StatefulWidget {
 
 class _DiscoverTabState extends State<DiscoverTab> {
   final _controller = PageController();
-  late final List<ReelItem> _reels;
+  late List<ReelItem> _reels;
 
   @override
   void initState() {
     super.initState();
-    _reels = _buildReels();
+    _reels = _buildReels(); // instant mock render; backend refines below
+    if (kUseBackend) _loadFromBackend();
+  }
+
+  /// GET /discover/reels (§4.4). Falls back silently to the mock feed on error
+  /// so Discover always has something to show. UI is unchanged.
+  Future<void> _loadFromBackend() async {
+    try {
+      final reels = await BackendApi.reels();
+      if (reels.isEmpty || !mounted) return;
+      setState(() => _reels = reels.map(_mapReel).toList());
+    } catch (_) {
+      // keep the mock feed
+    }
+  }
+
+  ReelItem _mapReel(Reel r) {
+    final t = Trader.fromApi(r.trader);
+    final kind = r.kind == 'live'
+        ? ReelKind.live
+        : (r.kind == 'lesson' ? ReelKind.education : ReelKind.trade);
+    final post = r.post != null
+        ? Post.fromApi(r.post!)
+        : _synthPost(t, r.kind, r.title ?? t.bio ?? 'Verified results on millimore.');
+    return ReelItem(
+      trader: t,
+      kind: kind,
+      post: post,
+      title: r.title,
+      points: r.points,
+      viewers: r.viewers ?? 0,
+    );
   }
 
   Trader _byId(String id) => mockTraders.firstWhere((t) => t.id == id, orElse: () => mockTraders.first);

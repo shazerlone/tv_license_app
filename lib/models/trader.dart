@@ -1,3 +1,5 @@
+import 'api_models.dart';
+
 class Trader {
   final String id;
   final String name;
@@ -36,6 +38,27 @@ class Trader {
     this.totalTrades = 0,
     this.category = 'Forex',
   });
+
+  /// Maps a backend ApiTrader (openapi.json §4.4) onto the UI model.
+  factory Trader.fromApi(ApiTrader a) => Trader(
+        id: a.id,
+        name: a.name,
+        username: a.username,
+        avatarUrl: a.photoUrl,
+        isVerified: a.isVerified,
+        isLive: a.isLive,
+        returnPercent: a.returnPercent,
+        returnDays: a.returnDays,
+        followers: a.followers,
+        aum: a.aum,
+        tags: a.tags,
+        bio: a.bio,
+        winRate: a.winRate,
+        maxDrawdown: a.maxDrawdown,
+        copiers: a.copiers,
+        totalTrades: a.totalTrades,
+        category: a.category,
+      );
 
   String get formattedFollowers {
     if (followers >= 1000) return '${(followers / 1000).toStringAsFixed(1)}K';
