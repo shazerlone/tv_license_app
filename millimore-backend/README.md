@@ -3,7 +3,7 @@
 One backend API serving two clients — the **Flutter mobile app** and the
 **admin dashboard** — for Millimore ("YouTube meets copy trading").
 
-- **Source of truth:** [`../docs/BACKEND_CONTRACT.md`](../docs/BACKEND_CONTRACT.md).
+- **Source of truth:** [`docs/BACKEND_CONTRACT.md`](docs/BACKEND_CONTRACT.md).
   Do not add endpoints that aren't in the contract without adding them there first.
 - **Stack:** NestJS (TypeScript) · PostgreSQL (Prisma) · Redis (WebSocket pub/sub) ·
   Next.js admin (added in a later milestone as `./admin`).
@@ -111,9 +111,30 @@ The app can flip login/register/onboarding from the demo store to these:
 verification against Apple/Google JWKS is a hardening TODO before production
 (marked in `auth.service.ts`).
 
+### ✅ Milestone 2 — Brokers + accounts + creator verify + admin queue (LIVE)
+
+Backend endpoints:
+
+| Method & path | Contract | Notes |
+| ------------- | -------- | ----- |
+| `GET  /v1/brokers?country=` | §4.3 | Country-gated broker list |
+| `GET  /v1/accounts` | §4.3 | My trading accounts (masked, no password) |
+| `POST /v1/accounts` | §4.3 | Connect account; password write-only/encrypted |
+| `DELETE /v1/accounts/{id}` | §4.3 | Disconnect |
+| `POST /v1/accounts/{id}/password` | §4.3 | Change account password |
+| `GET  /v1/creator/status` | §4.2 | `{ creatorStatus, reason? }` |
+| `POST /v1/creator/apply` | §4.2 | Apply → `creatorStatus: pending` |
+| `GET  /v1/admin/users` | §6 | Paginated, `?q=&role=&cursor=` (admin) |
+| `PATCH /v1/admin/users/{id}` | §6 | `role? / banned? / creatorStatus?` (admin) |
+| `GET  /v1/admin/creators/pending` | §6 | Verification queue (admin) |
+| `POST /v1/admin/creators/{id}/approve` | §6 | Approve application (admin) |
+| `POST /v1/admin/creators/{id}/reject` | §6 | Reject application (admin) |
+
+Plus the **admin dashboard** (`./admin`, Next.js) with login, users, and the
+creator approval queue. See [`admin/README.md`](./admin/README.md).
+
 ### ⏳ Next milestones (per contract §9)
 
-2. Brokers + trading accounts + creator verification + **admin approval queue**
 3. Traders / discover / feed / social (subscribe, saved, comments, likes)
 4. Copy engine + positions + portfolio + WS `prices`/`portfolio`
 5. Broadcasts (Cloudflare) + WS chat/viewers/reactions + YouTube chat ingest

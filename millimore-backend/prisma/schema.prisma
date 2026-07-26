@@ -26,6 +26,13 @@ enum CreatorStatus {
   suspended
 }
 
+enum AccountStatus {
+  connected
+  pending
+  disconnected
+  error
+}
+
 /// A platform user. Serialized to the contract `User` shape (see UsersService.toDto).
 model User {
   id             String        @id // prefixed id, e.g. "u_abc123"
@@ -56,9 +63,52 @@ model User {
   updatedAt DateTime @updatedAt
 
   creatorApplications CreatorApplication[]
+  tradingAccounts     TradingAccount[]
 
   @@index([role])
   @@index([creatorStatus])
+}
+
+/// A supported broker. GET /brokers?country= is gated by `countries`
+/// (empty list = available everywhere). Serialized to contract §3 `Broker`.
+model Broker {
+  id          String   @id // slug, e.g. "century", "xm"
+  name        String
+  domain      String
+  logoUrl     String?
+  recommended Boolean  @default(false)
+  countries   String[] @default([]) // ISO alpha-2 gate; empty = global
+  sortOrder   Int      @default(100)
+
+  createdAt DateTime @default(now())
+
+  accounts TradingAccount[]
+}
+
+/// A user's connected broker trading account (contract §3 TradingAccount).
+/// The password is write-only: AES-256-GCM encrypted, never serialized.
+model TradingAccount {
+  id            String        @id // "acc_..."
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerId      String
+  broker        Broker        @relation(fields: [brokerId], references: [id])
+  brokerName    String // denormalized snapshot for stable display
+  accountNumber String
+  server        String
+  currency      String        @default("USD")
+  balance       Float         @default(0) // populated by the MT bridge (milestone 6)
+  status        AccountStatus @default(connected)
+
+  // Write-only credential — never returned in responses.
+  passwordEnc String?
+
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([brokerId])
 }
 
 /// One-time-passcode request used by /auth/otp/request + /auth/otp/verify.

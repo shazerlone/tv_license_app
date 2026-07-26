@@ -103,12 +103,82 @@ async function main() {
     },
   });
 
+  // ── Brokers (country-gated list for GET /brokers?country=) ──────────
+  const brokers = [
+    {
+      id: 'century',
+      name: 'Century',
+      domain: 'centuryfinancial.ae',
+      logoUrl: 'https://logo.clearbit.com/centuryfinancial.ae',
+      recommended: true,
+      countries: ['AE', 'SA', 'IN'],
+      sortOrder: 1,
+    },
+    {
+      id: 'xm',
+      name: 'XM',
+      domain: 'xm.com',
+      logoUrl: 'https://logo.clearbit.com/xm.com',
+      recommended: true,
+      countries: [], // global
+      sortOrder: 2,
+    },
+    {
+      id: 'exness',
+      name: 'Exness',
+      domain: 'exness.com',
+      logoUrl: 'https://logo.clearbit.com/exness.com',
+      recommended: false,
+      countries: [], // global
+      sortOrder: 3,
+    },
+    {
+      id: 'icmarkets',
+      name: 'IC Markets',
+      domain: 'icmarkets.com',
+      logoUrl: 'https://logo.clearbit.com/icmarkets.com',
+      recommended: false,
+      countries: ['AU', 'IN', 'ZA', 'MY'],
+      sortOrder: 4,
+    },
+    {
+      id: 'pepperstone',
+      name: 'Pepperstone',
+      domain: 'pepperstone.com',
+      logoUrl: 'https://logo.clearbit.com/pepperstone.com',
+      recommended: false,
+      countries: ['AU', 'GB', 'AE'],
+      sortOrder: 5,
+    },
+  ];
+  for (const b of brokers) {
+    await prisma.broker.upsert({ where: { id: b.id }, update: b, create: b });
+  }
+
+  // ── A demo connected trading account for the follower ───────────────
+  await prisma.tradingAccount.upsert({
+    where: { id: 'acc_demo' },
+    update: {},
+    create: {
+      id: 'acc_demo',
+      userId: 'u_priya',
+      brokerId: 'xm',
+      brokerName: 'XM',
+      accountNumber: '50231487',
+      server: 'XM-Live3',
+      currency: 'USD',
+      balance: 5000,
+      status: 'connected',
+    },
+  });
+
   // eslint-disable-next-line no-console
   console.log('Seed complete:');
   console.log('  admin@millimore.app  / password   (admin)');
   console.log('  trader@millimore.app / password   (creator, approved)');
   console.log('  priya@millimore.app  / password   (follower)');
   console.log('  1 pending creator application (Aisha Khan) for the approval queue');
+  console.log(`  ${brokers.length} brokers + 1 demo trading account (XM ••••1487)`);
 }
 
 main()

@@ -321,6 +321,489 @@
           }
         ]
       }
+    },
+    "/v1/brokers": {
+      "get": {
+        "operationId": "BrokersController_list",
+        "summary": "List brokers, country-gated (contract §4.3)",
+        "parameters": [
+          {
+            "name": "country",
+            "required": false,
+            "in": "query",
+            "description": "ISO alpha-2 country filter.",
+            "schema": {
+              "example": "IN",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BrokerDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "brokers"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/accounts": {
+      "get": {
+        "operationId": "AccountsController_list",
+        "summary": "List my trading accounts (contract §4.3)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TradingAccountDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "AccountsController_connect",
+        "summary": "Connect a trading account (contract §4.3)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccountDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/accounts/{id}": {
+      "delete": {
+        "operationId": "AccountsController_remove",
+        "summary": "Disconnect a trading account (contract §4.3)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/accounts/{id}/password": {
+      "post": {
+        "operationId": "AccountsController_changePassword",
+        "summary": "Change an account password (contract §4.3)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAccountPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccountDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "accounts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/creator/status": {
+      "get": {
+        "operationId": "CreatorController_status",
+        "summary": "Get my creator verification status (contract §4.2)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/creator/apply": {
+      "post": {
+        "operationId": "CreatorController_apply",
+        "summary": "Apply for creator verification (contract §4.2)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyCreatorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/users": {
+      "get": {
+        "operationId": "AdminController_listUsers",
+        "summary": "List users, paginated + filtered (contract §6)",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Search name / username / email.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "follower",
+                "creator",
+                "admin"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/users/{id}": {
+      "patch": {
+        "operationId": "AdminController_updateUser",
+        "summary": "Update a user: role / banned / creatorStatus (contract §6)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdminUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/creators/pending": {
+      "get": {
+        "operationId": "AdminController_pending",
+        "summary": "Creator verification queue (contract §6)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApplicationDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/creators/{id}/approve": {
+      "post": {
+        "operationId": "AdminController_approve",
+        "summary": "Approve a creator application (contract §6)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/creators/{id}/reject": {
+      "post": {
+        "operationId": "AdminController_reject",
+        "summary": "Reject a creator application (contract §6)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
     }
   },
   "info": {
@@ -681,6 +1164,463 @@
             "type": "string"
           }
         }
+      },
+      "BrokerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "century"
+          },
+          "name": {
+            "type": "string",
+            "example": "Century"
+          },
+          "domain": {
+            "type": "string",
+            "example": "centuryfinancial.ae"
+          },
+          "logoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "recommended": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "domain",
+          "recommended"
+        ]
+      },
+      "TradingAccountDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "acc_1"
+          },
+          "brokerId": {
+            "type": "string",
+            "example": "xm"
+          },
+          "brokerName": {
+            "type": "string",
+            "example": "XM"
+          },
+          "accountNumber": {
+            "type": "string",
+            "example": "50231487"
+          },
+          "masked": {
+            "type": "string",
+            "example": "••••1487"
+          },
+          "server": {
+            "type": "string",
+            "example": "XM-Live3"
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "balance": {
+            "type": "number",
+            "example": 5000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "pending",
+              "disconnected",
+              "error"
+            ]
+          },
+          "connectedAt": {
+            "type": "string",
+            "example": "2026-07-01T00:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "brokerId",
+          "brokerName",
+          "accountNumber",
+          "masked",
+          "server",
+          "currency",
+          "balance",
+          "status",
+          "connectedAt"
+        ]
+      },
+      "ConnectAccountDto": {
+        "type": "object",
+        "properties": {
+          "brokerId": {
+            "type": "string",
+            "example": "xm"
+          },
+          "accountNumber": {
+            "type": "string",
+            "example": "50231487"
+          },
+          "server": {
+            "type": "string",
+            "example": "XM-Live3"
+          },
+          "password": {
+            "type": "string",
+            "example": "investor-or-trade-password",
+            "writeOnly": true
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          }
+        },
+        "required": [
+          "brokerId",
+          "accountNumber",
+          "server",
+          "password"
+        ]
+      },
+      "ChangeAccountPasswordDto": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "next": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "current",
+          "next"
+        ]
+      },
+      "CreatorStatusDto": {
+        "type": "object",
+        "properties": {
+          "creatorStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "approved",
+              "rejected",
+              "suspended"
+            ]
+          },
+          "reason": {
+            "type": "object",
+            "nullable": true,
+            "description": "Present when rejected/suspended."
+          }
+        },
+        "required": [
+          "creatorStatus"
+        ]
+      },
+      "ApplyCreatorDto": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "example": "Forex"
+          },
+          "platform": {
+            "type": "string",
+            "example": "MetaTrader 5"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/VerificationDto"
+          }
+        },
+        "required": [
+          "market",
+          "platform",
+          "verification"
+        ]
+      },
+      "AdminUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "u_123"
+          },
+          "name": {
+            "type": "string",
+            "example": "Marcus Sterling"
+          },
+          "username": {
+            "type": "string",
+            "example": "marcussterling"
+          },
+          "email": {
+            "type": "object",
+            "example": "marcus@x.com",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "example": "+91 90000 00000",
+            "nullable": true
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "follower",
+              "creator",
+              "admin"
+            ]
+          },
+          "creatorStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "approved",
+              "rejected",
+              "suspended"
+            ]
+          },
+          "residenceIso": {
+            "type": "object",
+            "example": "IN",
+            "nullable": true
+          },
+          "residenceCountry": {
+            "type": "object",
+            "example": "India",
+            "nullable": true
+          },
+          "market": {
+            "type": "object",
+            "example": "Forex",
+            "nullable": true
+          },
+          "platform": {
+            "type": "object",
+            "example": "MetaTrader 5",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-01-01T00:00:00Z"
+          },
+          "banned": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "username",
+          "role",
+          "creatorStatus",
+          "createdAt",
+          "banned"
+        ]
+      },
+      "AdminUserPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserDto"
+            }
+          },
+          "nextCursor": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "UpdateAdminUserDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "follower",
+              "creator",
+              "admin"
+            ]
+          },
+          "banned": {
+            "type": "boolean"
+          },
+          "creatorStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "approved",
+              "rejected",
+              "suspended"
+            ]
+          }
+        }
+      },
+      "ApplicationUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "residenceCountry": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "username"
+        ]
+      },
+      "ApplicationVerificationDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "example": "MetaTrader 5"
+          },
+          "server": {
+            "type": "object",
+            "nullable": true
+          },
+          "account": {
+            "type": "object",
+            "nullable": true
+          },
+          "statementUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "hasInvestorPassword": {
+            "type": "boolean",
+            "description": "Whether an investor password was provided."
+          }
+        },
+        "required": [
+          "platform",
+          "hasInvestorPassword"
+        ]
+      },
+      "ApplicationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "capp_1"
+          },
+          "userId": {
+            "type": "string",
+            "example": "u_1"
+          },
+          "user": {
+            "$ref": "#/components/schemas/ApplicationUserDto"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "approved",
+              "rejected",
+              "suspended"
+            ]
+          },
+          "market": {
+            "type": "string",
+            "example": "Forex"
+          },
+          "platform": {
+            "type": "string",
+            "example": "MetaTrader 5"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/ApplicationVerificationDto"
+          },
+          "reviewerNote": {
+            "type": "object",
+            "nullable": true
+          },
+          "rejectReason": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "user",
+          "status",
+          "market",
+          "platform",
+          "verification",
+          "createdAt"
+        ]
+      },
+      "ApproveDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "RejectDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
       }
     }
   }
