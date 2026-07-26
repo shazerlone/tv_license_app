@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
 class NavItem {
@@ -45,7 +46,10 @@ class MillimoreBottomNav extends StatelessWidget {
                 return Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => onTap(i),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onTap(i);
+                    },
                     child: Center(
                       child: Container(
                         width: 46,

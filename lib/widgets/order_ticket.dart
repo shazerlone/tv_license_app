@@ -42,6 +42,7 @@ class _OrderTicketState extends State<OrderTicket> {
   }
 
   void _submit(AppState store, bool isBuy) {
+    HapticFeedback.mediumImpact();
     final lots = double.tryParse(_lots.text) ?? 0.10;
     store.placeLiveOrder(
       symbol: _symbol,
