@@ -77,9 +77,40 @@ model User {
   postLikes     PostLike[]
   postSaves     PostSave[]
   comments      Comment[]
+  notifications Notification[]
+  devices       Device[]
 
   @@index([role])
   @@index([creatorStatus])
+}
+
+/// In-app notification (contract §4.12). Populated by events (milestone 4/5);
+/// the app polls these as a fallback to the realtime WS channel.
+model Notification {
+  id        String   @id // "n_..."
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // e.g. trader.live.started | trade.opened | trade.closed | creator.status
+  title     String
+  body      String?
+  data      Json? // arbitrary payload (traderId, pair, pnl, …)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// A registered push device (contract §4.12) for FCM/APNs delivery.
+model Device {
+  token      String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform   String // 'android' | 'ios'
+  appVersion String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
 }
 
 /// A public trader profile (contract §3 Trader). Optionally linked to the

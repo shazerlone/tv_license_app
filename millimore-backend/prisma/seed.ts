@@ -334,6 +334,25 @@ async function main() {
     create: { userId: 'u_priya', postId: 'p_3' },
   });
 
+  // ── Backfill: every approved creator must have a public Trader profile ──
+  // (so approved-but-inactive creators show up in GET /traders / search).
+  const approvedCreators = await prisma.user.findMany({
+    where: { role: 'creator', creatorStatus: 'approved', trader: { is: null } },
+  });
+  for (const u of approvedCreators) {
+    await prisma.trader.create({
+      data: {
+        id: `t_${u.id.replace(/^u_/, '')}`,
+        userId: u.id,
+        name: u.name,
+        username: u.username,
+        photoUrl: u.photoUrl,
+        isVerified: true,
+        category: u.market ?? 'Forex',
+      },
+    });
+  }
+
   // eslint-disable-next-line no-console
   console.log('Seed complete:');
   console.log('  admin@millimore.app  / password   (admin)');

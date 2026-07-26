@@ -2,7 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, CreatorApplication, User, CreatorStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { TradersService } from '../traders/traders.service';
 import { countryNameFromIso } from '../common/countries';
+import { genId } from '../common/ids';
 import { encodeCursor, decodeCursor, Paginated } from '../common/dto/pagination.dto';
 import {
   AdminUserDto,
@@ -18,6 +20,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly traders: TradersService,
   ) {}
 
   // ── users ──────────────────────────────────────────────────────────
@@ -119,7 +122,13 @@ export class AdminService {
         data: { creatorStatus: CreatorStatus.approved },
       }),
     ]);
-    // TODO(milestone 5): emit WS `user` → creator.status event to the applicant.
+    // Approved creators must be discoverable immediately (even with no trades):
+    // give them a public Trader profile if they don't already have one.
+    await this.traders.ensureForUser(app.userId);
+    await this.notify(app.userId, 'creator.status', 'You are approved 🎉', {
+      creatorStatus: 'approved',
+    });
+    // TODO(milestone 5): also push this over the WS `user` channel.
     return this.toApplicationDto(updated);
   }
 
@@ -136,8 +145,19 @@ export class AdminService {
         data: { creatorStatus: CreatorStatus.rejected },
       }),
     ]);
-    // TODO(milestone 5): emit WS `user` → creator.status event to the applicant.
+    await this.notify(app.userId, 'creator.status', 'Verification update', {
+      creatorStatus: 'rejected',
+      reason,
+    });
+    // TODO(milestone 5): also push this over the WS `user` channel.
     return this.toApplicationDto(updated);
+  }
+
+  /** Create an in-app notification (also surfaces via GET /notifications). */
+  private async notify(userId: string, type: string, title: string, data?: object) {
+    await this.prisma.notification.create({
+      data: { id: genId('n'), userId, type, title, data: data as any },
+    });
   }
 
   // ── helpers ────────────────────────────────────────────────────────

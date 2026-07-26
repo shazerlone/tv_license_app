@@ -174,7 +174,7 @@ export class PostsService {
 
   /** Compose a post (contract §4.6). Ensures the author has a trader profile. */
   async compose(userId: string, dto: CreatePostDto): Promise<PostDto> {
-    const trader = await this.ensureTraderForUser(userId);
+    const trader = await this.traders.ensureForUser(userId);
     const post = await this.prisma.post.create({
       data: {
         id: genId('p'),
@@ -188,24 +188,6 @@ export class PostsService {
       include: postInclude(userId),
     });
     return this.toDto(post);
-  }
-
-  private async ensureTraderForUser(userId: string) {
-    const existing = await this.prisma.trader.findUnique({ where: { userId } });
-    if (existing) return existing;
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException({ code: 'user_not_found', message: 'User not found' });
-    return this.prisma.trader.create({
-      data: {
-        id: genId('t'),
-        userId: user.id,
-        name: user.name,
-        username: user.username,
-        photoUrl: user.photoUrl,
-        isVerified: user.creatorStatus === 'approved',
-        category: user.market ?? 'Forex',
-      },
-    });
   }
 
   private async getPostOrThrow(postId: string) {

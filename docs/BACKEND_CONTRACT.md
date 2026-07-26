@@ -265,11 +265,15 @@ POST /broadcasts/{id}/chat            { text } → LiveChatMessage  // host or v
 > back to YouTube. Requires YouTube OAuth (`youtube.readonly`, `youtube.force-ssl`)
 > and quota management.
 
-### 4.12 Notifications
+### 4.12 Notifications & devices
 ```
-GET  /notifications            → [ { id, type, title, body, createdAt, read } ]
+GET  /notifications            → [ { id, type, title, body, data?, createdAt, read } ]
 POST /notifications/read       { ids: [] }
+POST /devices                  { platform:"android|ios", token, appVersion? }  // register push token
+DELETE /devices/{token}                                                        // on logout
 ```
+> `data` is an arbitrary payload (e.g. `{ traderId, pair, pnlAmount }`).
+> Notifications are the **poll fallback** for the realtime WS channel (milestone 5).
 
 ---
 
@@ -425,3 +429,22 @@ unchanged; this section only pins down details the prose left open.
   - `POST|DELETE /posts/{id}/save`, `POST|DELETE /subscriptions/{traderId}`,
     `POST /subscriptions/{traderId}/notify` → `204 No Content`.
   - `notify` requires an existing subscription (404 otherwise).
+
+### Answers to APP_REQUIREMENTS open questions (app session ↔ backend)
+1. **Approved creators appear in `GET /traders` immediately** — on admin approval
+   the backend creates the creator's public `Trader` profile (zeroed stats,
+   `isVerified:true`), so approved-but-inactive creators are discoverable and
+   searchable (`?q=`) right away. (Fixes "Aisha not showing".) Composing a post
+   also ensures the profile exists.
+2. **List shapes:** `GET /traders` and `GET /admin/users` return
+   `{ items, nextCursor }`; `GET /subscriptions`, `/feed`, `/saved`,
+   `/traders/{id}/posts`, `/brokers`, `/notifications` return **raw arrays**.
+   (The app accepts both, as noted.)
+3. **`GET /me` returns `{ user }`** (envelope) — safe to refresh session on launch.
+   `PATCH /me` also returns `{ user }`.
+4. **Realtime (6a) / push (6b):** the WS gateway is planned for **milestone 5**.
+   Until then use the REST fallback, which is **live now**: `GET /notifications`,
+   `POST /notifications/read`, and push-token registration `POST /devices` /
+   `DELETE /devices/{token}` (contract §4.12). Creator approve/reject already
+   writes a `creator.status` notification; trade/live events populate
+   notifications from milestone 4/5.

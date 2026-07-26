@@ -3,6 +3,7 @@ import { Prisma, Trader } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { encodeCursor, decodeCursor, Paginated } from '../common/dto/pagination.dto';
 import { seedFromString, mulberry32, round } from '../common/rng';
+import { genId } from '../common/ids';
 import {
   TraderDto,
   TradersQueryDto,
@@ -87,6 +88,29 @@ export class TradersService {
 
   async liveTraders(): Promise<Trader[]> {
     return this.prisma.trader.findMany({ where: { isLive: true }, orderBy: { copiers: 'desc' } });
+  }
+
+  /**
+   * Ensure a User has a public Trader profile. Called when a creator is approved
+   * and when they first compose — so approved creators appear in GET /traders
+   * immediately (with zeroed stats), even before any trading activity.
+   */
+  async ensureForUser(userId: string): Promise<Trader> {
+    const existing = await this.prisma.trader.findUnique({ where: { userId } });
+    if (existing) return existing;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException({ code: 'user_not_found', message: 'User not found' });
+    return this.prisma.trader.create({
+      data: {
+        id: genId('t'),
+        userId: user.id,
+        name: user.name,
+        username: user.username,
+        photoUrl: user.photoUrl,
+        isVerified: user.creatorStatus === 'approved',
+        category: user.market ?? 'Forex',
+      },
+    });
   }
 
   // ── synthetic (until the real trade feed lands) ─────────────────────
