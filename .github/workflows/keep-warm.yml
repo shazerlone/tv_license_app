@@ -1,0 +1,61 @@
+# Keep the free Render backend warm.
+# Render's free web service sleeps after ~15 min idle and cold-starts (~30-60s)
+# on the next request. This cron pings the health endpoint every ~10 min so the
+# app almost always hits a warm instance.
+#
+# SETUP (one line): after the Render deploy, set the health URL either by
+#   a) Repo Settings → Secrets and variables → Actions → Variables →
+#      New variable: name RENDER_HEALTH_URL, value https://<svc>.onrender.com/v1/health
+#   or
+#   b) editing DEFAULT_HEALTH_URL below.
+# Until one of those is set the job no-ops (it won't fail your Actions tab).
+#
+# Notes:
+#  - GitHub may delay scheduled runs under load; 10 min gives margin under the
+#    15 min sleep threshold.
+#  - GitHub disables cron workflows after 60 days with no repo activity — push
+#    anything (or use the manual "Run workflow" button) to re-enable.
+#  - One always-on free service uses ~720 h/mo, within Render's 750 free hours.
+name: keep-render-warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes (UTC)
+  workflow_dispatch: {} # manual trigger button
+
+# Don't stack pings if a run is slow.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping health endpoint
+        env:
+          # Prefer the repo variable; fall back to the value edited here.
+          RENDER_HEALTH_URL: ${{ vars.RENDER_HEALTH_URL }}
+          DEFAULT_HEALTH_URL: '' # e.g. https://millimore-backend.onrender.com/v1/health
+        run: |
+          URL="${RENDER_HEALTH_URL:-$DEFAULT_HEALTH_URL}"
+          if [ -z "$URL" ]; then
+            echo "No health URL configured yet — set the RENDER_HEALTH_URL repo variable"
+            echo "or DEFAULT_HEALTH_URL in this workflow. Skipping (not a failure)."
+            exit 0
+          fi
+          echo "Pinging $URL"
+          # Retry a few times so a cold start (which this very ping triggers) is
+          # given time to wake instead of being reported as a failure.
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 60 "$URL" || echo 000)
+            echo "attempt $attempt → HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Backend is awake."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check did not return 200 after retries."
+          exit 1

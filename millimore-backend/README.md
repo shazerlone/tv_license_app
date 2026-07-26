@@ -65,10 +65,21 @@ milestones need it.
 4. Your API is at `https://<service>.onrender.com/v1` — point the app's base URL
    there. Health check: `/v1/health`; Swagger: `/v1/docs`.
 
+### Keeping it warm (free)
+
+`.github/workflows/keep-warm.yml` pings `/v1/health` every ~10 min so the app
+usually hits a warm instance. After deploying, set the URL once:
+**repo → Settings → Secrets and variables → Actions → Variables →** add
+`RENDER_HEALTH_URL = https://<service>.onrender.com/v1/health` (or edit
+`DEFAULT_HEALTH_URL` in the workflow). Until set, the job safely no-ops.
+GitHub disables cron workflows after 60 days of repo inactivity — push anything
+or use the manual "Run workflow" button to re-enable.
+
 Notes on the free tier:
 
 - The web service **sleeps after ~15 min idle** and cold-starts (~30–60s) on the
-  next request. Fine for integration/demo; upgrade the instance to keep it warm.
+  next request. The keep-warm workflow above mitigates this; upgrading the
+  instance removes sleep entirely.
 - Free **Postgres expires ~30 days** after creation (Render policy) — upgrade the
   DB plan before then to keep data.
 - OTP runs in `console` mode, so codes come back as `devCode` in the response —
