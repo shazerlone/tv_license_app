@@ -17,3 +17,13 @@ const String kApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'https://millimore-backend.onrender.com/v1',
 );
+
+/// Build identity, stamped by Codemagic (--dart-define=BUILD_SHA=$CM_COMMIT).
+/// Shown on the login screen so we can always tell which build is on a device.
+const String kBuildSha = String.fromEnvironment('BUILD_SHA', defaultValue: 'local-dev');
+const String kBuildBranch = String.fromEnvironment('BUILD_BRANCH', defaultValue: '');
+
+String get kBuildLabel {
+  final sha = kBuildSha.length > 7 ? kBuildSha.substring(0, 7) : kBuildSha;
+  return kBuildBranch.isEmpty ? 'build $sha' : 'build $sha · $kBuildBranch';
+}

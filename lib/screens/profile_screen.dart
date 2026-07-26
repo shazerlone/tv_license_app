@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../services/api_client.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
@@ -134,6 +135,8 @@ class ProfileScreen extends StatelessWidget {
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: AppColors.red.withOpacity(0.3))),
               ),
             ),
+            const SizedBox(height: 16),
+            Center(child: Text('millimore · $kBuildLabel', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7)))),
           ],
         ),
       ),

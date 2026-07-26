@@ -18,7 +18,7 @@ workflows:
       - name: Flutter packages get
         script: flutter pub get
       - name: Build debug APK
-        script: flutter build apk --debug
+        script: flutter build apk --debug --dart-define=BUILD_SHA=${CM_COMMIT} --dart-define=BUILD_BRANCH=${CM_BRANCH}
     artifacts:
       - build/**/outputs/**/*.apk
     publishing:
@@ -47,7 +47,7 @@ workflows:
       - name: Flutter packages get
         script: flutter pub get
       - name: Build iOS (unsigned)
-        script: flutter build ios --release --no-codesign
+        script: flutter build ios --release --no-codesign --dart-define=BUILD_SHA=${CM_COMMIT} --dart-define=BUILD_BRANCH=${CM_BRANCH}
     artifacts:
       - build/ios/iphoneos/*.app
     publishing:

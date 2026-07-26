@@ -240,6 +240,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Spacer(),
                     const SizedBox(height: 24),
                     Center(
+                      child: Text(kBuildLabel, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7))),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
                       child: GestureDetector(
                         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountTypeScreen())),
                         behavior: HitTestBehavior.opaque,
