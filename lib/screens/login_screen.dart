@@ -77,6 +77,20 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _isLoading = true);
 
+    // Safety bypass: demo verified-trader always works, even in backend mode,
+    // so you can always get in if the backend is cold-starting or unreachable.
+    if (email == 'trader@millimore.app') {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      session.signInAsCreator(
+        name: 'Demo Trader', market: 'Forex', platform: 'MetaTrader 5',
+        residenceIso: 'IN', residenceCountry: 'India', status: CreatorStatus.approved,
+      );
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      return;
+    }
+
     // ── Live backend ──────────────────────────────────────────────────────────
     if (kUseBackend) {
       try {

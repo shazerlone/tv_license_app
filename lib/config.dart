@@ -6,9 +6,11 @@
 const bool kDevMode = true;
 
 /// When true, the app talks to the live backend (see docs/BACKEND_CONTRACT.md)
-/// instead of the local demo store. Flip to true once your backend is deployed.
-const bool kUseBackend = false;
+/// instead of the local demo store.
+const bool kUseBackend = true;
 
 /// Base URL of the Millimore backend API (no trailing slash).
-/// Example: https://api.millimore.app/v1  or  http://192.168.1.5:3000/v1 for local.
-const String kApiBaseUrl = 'https://api.millimore.app/v1';
+/// IMPORTANT: this must include the API path prefix the backend actually uses.
+/// If your backend serves endpoints at the root (e.g. /auth/login) instead of
+/// /v1/auth/login, remove the '/v1' below.
+const String kApiBaseUrl = 'https://millimore-backend.onrender.com/v1';
