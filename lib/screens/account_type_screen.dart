@@ -88,11 +88,15 @@ class _AccountTypeScreenState extends State<AccountTypeScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               const SizedBox(height: 20),
               FadeTransition(
                 opacity: _entryFade,
@@ -178,7 +182,10 @@ class _AccountTypeScreenState extends State<AccountTypeScreen>
                 ),
               ),
               const SizedBox(height: 28),
-            ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

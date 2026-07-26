@@ -144,23 +144,25 @@ class _LoginScreenState extends State<LoginScreen>
     final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: const Color(0xFF0B1120),
-      resizeToAvoidBottomInset: true,
-      body: Stack(
+      // The panel scrolls internally and pads for the keyboard, so we keep the
+      // scaffold from resizing (which would fight the Column layout).
+      resizeToAvoidBottomInset: false,
+      body: Column(
         children: [
-          FadeTransition(
-            opacity: _heroFade,
-            child: SizedBox(
-              width: size.width,
-              height: size.height * 0.52,
+          // Hero fills whatever space the panel leaves — candles never get
+          // covered, and it scales cleanly across phone sizes.
+          Expanded(
+            child: FadeTransition(
+              opacity: _heroFade,
               child: const _LoginHero(),
             ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SlideTransition(
-              position: _panelSlide,
-              child: FadeTransition(
-                opacity: _panelFade,
+          SlideTransition(
+            position: _panelSlide,
+            child: FadeTransition(
+              opacity: _panelFade,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: size.height * 0.62),
                 child: _LoginPanel(
                   formKey: _formKey,
                   emailController: _emailController,

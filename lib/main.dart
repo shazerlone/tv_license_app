@@ -44,6 +44,18 @@ class _MillimoreAppState extends State<MillimoreApp> {
           title: 'millimore',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.theme,
+          // Keep the layout compact and consistent regardless of the device's
+          // OS font-size setting: clamp text scaling to a tight range so the UI
+          // never balloons ("zoomed") or collapses on any phone.
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.05),
+              ),
+              child: child!,
+            );
+          },
           home: const SplashScreen(),
         ),
       ),
