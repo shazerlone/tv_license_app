@@ -8,6 +8,7 @@ import '../state/session.dart';
 import '../state/app_state.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/millimore_logo.dart';
+import '../widgets/verified_badge.dart';
 import '../widgets/feed_post.dart';
 import 'trader_profile_screen.dart';
 import 'live_stream_screen.dart';
@@ -84,6 +85,7 @@ class FollowerHome extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
     final subscribedIds = store.subscribedTraderIds;
+    final _topCreators = ([...mockTraders]..sort((a, b) => b.copiers.compareTo(a.copiers))).take(8).toList();
     final posts = mockPosts(mockTraders).where((p) => subscribedIds.contains(p.trader.id)).toList();
     final liveTraders = mockTraders.where((t) => t.isLive && subscribedIds.contains(t.id)).toList();
     final openCopied = mockTrades.where((t) => t.status == TradeStatus.open).toList();
@@ -133,6 +135,21 @@ class FollowerHome extends StatelessWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
+        // Top creators to copy
+        SliverToBoxAdapter(child: _SectionHeader(title: 'Top creators to copy', onSeeAll: () {})),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 176,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemCount: _topCreators.length,
+              itemBuilder: (_, i) => _CreatorMiniCard(trader: _topCreators[i]),
+            ),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 22)),
         SliverToBoxAdapter(child: _SectionHeader(title: 'From your subscriptions')),
         if (posts.isEmpty)
           SliverToBoxAdapter(child: _EmptyFeed())
@@ -471,7 +488,8 @@ class _QuickAction extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool dot;
-  const _SectionHeader({required this.title, this.dot = false});
+  final VoidCallback? onSeeAll;
+  const _SectionHeader({required this.title, this.dot = false, this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -483,8 +501,79 @@ class _SectionHeader extends StatelessWidget {
             Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
             const SizedBox(width: 6),
           ],
-          Text(title, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          Text(title, style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3)),
+          const Spacer(),
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: onSeeAll,
+              behavior: HitTestBehavior.opaque,
+              child: Text('See all', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _CreatorMiniCard extends StatelessWidget {
+  final Trader trader;
+  const _CreatorMiniCard({required this.trader});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = AppStateScope.of(context);
+    final subscribed = store.isSubscribed(trader.id);
+    final positive = trader.returnPercent >= 0;
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: trader))),
+      child: Container(
+        width: 158,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.border)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.1)),
+                  child: Center(child: Text(trader.name[0], style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.primary))),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(color: (positive ? AppColors.green : AppColors.red).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Text(trader.formattedReturn, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: positive ? AppColors.green : AppColors.red)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Flexible(child: Text(trader.name, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                if (trader.isVerified) ...[const SizedBox(width: 3), const VerifiedBadge(size: 13)],
+              ],
+            ),
+            Text('${trader.formattedCopiers} copiers · ${trader.winRate.toStringAsFixed(0)}% win', style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () => store.toggleSubscribe(trader.id),
+                child: Container(
+                  height: 34, alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: subscribed ? Colors.transparent : AppColors.textPrimary,
+                    borderRadius: BorderRadius.circular(20),
+                    border: subscribed ? Border.all(color: AppColors.border) : null,
+                  ),
+                  child: Text(subscribed ? 'Subscribed' : 'Subscribe', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: subscribed ? AppColors.textSecondary : Colors.white)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
