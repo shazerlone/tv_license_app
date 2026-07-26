@@ -9,11 +9,13 @@ import '../state/app_state.dart';
 import '../widgets/feed_post.dart';
 import '../widgets/verified_badge.dart';
 import 'trader_profile_screen.dart';
-import 'copy_trading_screen.dart';
 import 'login_screen.dart';
 import 'accounts_screen.dart';
+import 'copied_trades_screen.dart';
 import 'support_chat_screen.dart';
 
+/// One simple profile page: who you are, your copy performance, and clear
+/// buttons out to everything else. No tabs, no nested navigation.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -25,164 +27,104 @@ class ProfileScreen extends StatelessWidget {
     final name = user?.name ?? 'Guest';
     final isCreator = user?.isCreator ?? false;
 
-    final savedPosts = mockPosts(mockTraders).where((p) => store.isSaved(p.id)).toList();
-    final subs = mockTraders.where((t) => store.isSubscribed(t.id)).toList();
-
-    return DefaultTabController(
-      length: 3,
-      child: SafeArea(
-        bottom: false,
-        child: NestedScrollView(
-          headerSliverBuilder: (_, __) => [
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  // Top bar
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 14, 12, 0),
-                    child: Row(
-                      children: [
-                        Text('Profile', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
-                        const Spacer(),
-                        IconButton(icon: const Icon(Icons.share_outlined, color: AppColors.textPrimary, size: 22), onPressed: () => _toast(context, 'Share profile')),
-                        IconButton(icon: const Icon(Icons.settings_outlined, color: AppColors.textPrimary), onPressed: () => _openSettings(context, session)),
-                      ],
-                    ),
-                  ),
-                  // Identity
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 72, height: 72,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.primary.withOpacity(0.1),
-                            image: user?.photoUrl != null ? DecorationImage(image: NetworkImage(user!.photoUrl!), fit: BoxFit.cover) : null,
-                          ),
-                          child: user?.photoUrl == null
-                              ? Center(child: Text(name.isNotEmpty ? name[0] : '?', style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.primary)))
-                              : null,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(name, style: GoogleFonts.inter(fontSize: 21, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
-                              const SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  _Chip(
-                                    label: isCreator ? 'Creator' : 'Follower',
-                                    color: isCreator ? AppColors.primary : AppColors.green,
-                                  ),
-                                  if (user?.residenceCountry != null) ...[
-                                    const SizedBox(width: 8),
-                                    Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),
-                                    const SizedBox(width: 2),
-                                    Text(user!.residenceCountry!, style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Hero copy card
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
-                    child: _CopyHero(store: store),
-                  ),
-                  // Action buttons
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                    child: Row(
-                      children: [
-                        Expanded(child: _OutlineBtn(icon: Icons.edit_outlined, label: 'Edit profile', onTap: () => _toast(context, 'Edit profile'))),
-                        const SizedBox(width: 12),
-                        Expanded(child: _OutlineBtn(icon: Icons.account_balance_wallet_outlined, label: 'Accounts', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen())))),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _TabBarDelegate(
-                TabBar(
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: AppColors.textMuted,
-                  indicatorColor: AppColors.primary,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
-                  unselectedLabelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
-                  tabs: [
-                    Tab(text: 'Copying (${store.copyingCount})'),
-                    Tab(text: 'Saved (${store.savedCount})'),
-                    Tab(text: 'Subscriptions (${subs.length})'),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          body: TabBarView(
-            children: [
-              _CopyingTab(store: store),
-              _SavedTab(posts: savedPosts),
-              _SubscriptionsTab(traders: subs),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _toast(BuildContext context, String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
-
-  void _openSettings(BuildContext context, SessionController session) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+            // Header row
+            Row(
+              children: [
+                Text('Profile', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
+                const Spacer(),
+                _CircleIcon(icon: Icons.ios_share_rounded, onTap: () => _toast(context, 'Share profile')),
+              ],
+            ),
             const SizedBox(height: 20),
-            _SettingsRow(icon: Icons.account_balance_wallet_outlined, label: 'Trading accounts', onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
-            }),
-            _SettingsRow(icon: Icons.person_outline_rounded, label: 'Edit profile', onTap: () {
-              Navigator.pop(context);
-              _toast(context, 'Edit profile');
-            }),
-            _SettingsRow(icon: Icons.notifications_none_rounded, label: 'Notifications', onTap: () {
-              Navigator.pop(context);
-              _toast(context, 'Notification settings');
-            }),
-            _SettingsRow(icon: Icons.shield_outlined, label: 'Privacy & security', onTap: () {
-              Navigator.pop(context);
-              _toast(context, 'Privacy & security');
-            }),
-            _SettingsRow(icon: Icons.help_outline_rounded, label: 'Help & support', onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen()));
-            }),
-            const SizedBox(height: 12),
+
+            // Identity
+            Row(
+              children: [
+                Container(
+                  width: 76, height: 76,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary.withOpacity(0.1),
+                    image: user?.photoUrl != null ? DecorationImage(image: NetworkImage(user!.photoUrl!), fit: BoxFit.cover) : null,
+                  ),
+                  child: user?.photoUrl == null
+                      ? Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.primary)))
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _Chip(label: isCreator ? 'Creator' : 'Follower', color: isCreator ? AppColors.primary : AppColors.green),
+                          if (user?.residenceCountry != null) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),
+                            const SizedBox(width: 2),
+                            Flexible(child: Text(user!.residenceCountry!, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted))),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _toast(context, 'Edit profile'),
+                icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
+                label: Text('Edit profile', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: const BorderSide(color: AppColors.border)),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Copy performance
+            _CopyHero(store: store),
+            const SizedBox(height: 24),
+
+            // Menu — buttons out to pages
+            Text('Your activity', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
+            const SizedBox(height: 10),
+            _MenuCard(children: [
+              _MenuTile(icon: Icons.swap_vert_rounded, color: AppColors.primary, label: 'Copied trades', trailing: '${store.copyingCount}',
+                  onTap: () => _push(context, const CopiedTradesScreen())),
+              _MenuTile(icon: Icons.account_balance_wallet_outlined, color: AppColors.green, label: 'Trading accounts',
+                  onTap: () => _push(context, const AccountsScreen())),
+              _MenuTile(icon: Icons.bookmark_border_rounded, color: AppColors.purple, label: 'Saved posts', trailing: '${store.savedCount}',
+                  onTap: () => _push(context, const SavedPostsScreen())),
+              _MenuTile(icon: Icons.group_outlined, color: AppColors.primaryLight, label: 'Subscriptions', trailing: '${store.subscriptionCount}',
+                  onTap: () => _push(context, const SubscriptionsScreen()), last: true),
+            ]),
+            const SizedBox(height: 20),
+
+            Text('Support', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
+            const SizedBox(height: 10),
+            _MenuCard(children: [
+              _MenuTile(icon: Icons.notifications_none_rounded, color: AppColors.slate, label: 'Notifications', onTap: () => _toast(context, 'Notification settings')),
+              _MenuTile(icon: Icons.shield_outlined, color: AppColors.slate, label: 'Privacy & security', onTap: () => _toast(context, 'Privacy & security')),
+              _MenuTile(icon: Icons.help_outline_rounded, color: AppColors.slate, label: 'Help & support', onTap: () => _push(context, const SupportChatScreen()), last: true),
+            ]),
+            const SizedBox(height: 20),
+
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.pop(context);
                   ApiClient.instance.clear();
                   session.signOut();
                   Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
@@ -197,9 +139,14 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  static void _push(BuildContext context, Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  static void _toast(BuildContext context, String m) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 }
 
-// ── Hero copy card ────────────────────────────────────────────────────────────
+// ── Copy performance card ─────────────────────────────────────────────────────
 
 class _CopyHero extends StatelessWidget {
   final AppState store;
@@ -262,189 +209,84 @@ class _HeroStat extends StatelessWidget {
   }
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
+// ── Menu ──────────────────────────────────────────────────────────────────────
 
-class _CopyingTab extends StatelessWidget {
-  final AppState store;
-  const _CopyingTab({required this.store});
-
+class _MenuCard extends StatelessWidget {
+  final List<Widget> children;
+  const _MenuCard({required this.children});
   @override
   Widget build(BuildContext context) {
-    final copies = store.activeCopies;
-    if (copies.isEmpty) {
-      return _Empty(
-        icon: Icons.copy_all_rounded,
-        title: 'You\'re not copying anyone yet',
-        sub: 'Find a trader in Discover and tap Copy to mirror their trades automatically.',
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      itemCount: copies.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) {
-        final cfg = copies[i];
-        Trader? t;
-        for (final x in mockTraders) {
-          if (x.id == cfg.traderId) { t = x; break; }
-        }
-        if (t == null) return const SizedBox();
-        final pnl = store.positions.where((p) => p.traderId == t!.id).fold<double>(0, (s, p) => s + p.pnlAmount);
-        final positive = pnl >= 0;
-        return GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: t!))),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.1)),
-                      child: Center(child: Text(t.name[0], style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary))),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            Flexible(child: Text(t.name, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                            if (t.isVerified) ...[const SizedBox(width: 4), const VerifiedBadge(size: 14)],
-                          ]),
-                          Text('\$${cfg.amount.toStringAsFixed(0)} · ${cfg.risk.toStringAsFixed(1)}x risk', style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('${positive ? '+' : '-'}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: positive ? AppColors.green : AppColors.red)),
-                        Text('P/L', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: t!))),
-                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10), side: const BorderSide(color: AppColors.border)),
-                        child: Text('Manage', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          store.stopCopy(t!.id);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Stopped copying ${t.name}')));
-                        },
-                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10), side: BorderSide(color: AppColors.red.withOpacity(0.4))),
-                        child: Text('Stop', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.red)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(children: children),
     );
   }
 }
 
-class _SavedTab extends StatelessWidget {
-  final List<Post> posts;
-  const _SavedTab({required this.posts});
+class _MenuTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String? trailing;
+  final VoidCallback onTap;
+  final bool last;
+  const _MenuTile({required this.icon, required this.color, required this.label, this.trailing, required this.onTap, this.last = false});
 
   @override
   Widget build(BuildContext context) {
-    if (posts.isEmpty) {
-      return _Empty(icon: Icons.bookmark_border_rounded, title: 'No saved posts yet', sub: 'Tap the bookmark on any post to save it here for later.');
-    }
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: posts.length,
-      itemBuilder: (_, i) => FeedPost(
-        post: posts[i],
-        onOpenProfile: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          border: last ? null : const Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, size: 19, color: color),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+            if (trailing != null && trailing != '0') ...[
+              Text(trailing!, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+              const SizedBox(width: 6),
+            ],
+            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SubscriptionsTab extends StatelessWidget {
-  final List<Trader> traders;
-  const _SubscriptionsTab({required this.traders});
-
+class _CircleIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleIcon({required this.icon, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    if (traders.isEmpty) {
-      return _Empty(icon: Icons.group_outlined, title: 'No subscriptions yet', sub: 'Subscribe to traders to see their posts in your feed.');
-    }
-    final store = AppStateScope.of(context);
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      itemCount: traders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) {
-        final t = traders[i];
-        final positive = t.returnPercent >= 0;
-        return GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: t))),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-            child: Row(
-              children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.1)),
-                  child: Center(child: Text(t.name[0], style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary))),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Flexible(child: Text(t.name, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                        if (t.isVerified) ...[const SizedBox(width: 4), const VerifiedBadge(size: 14)],
-                      ]),
-                      Text('${t.formattedCopiers} copiers · ${t.formattedReturn}', style: GoogleFonts.inter(fontSize: 12, color: positive ? AppColors.green : AppColors.red, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => store.unsubscribe(t.id),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
-                    child: Text('Subscribed', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40, height: 40,
+        decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: AppColors.border)),
+        child: Icon(icon, size: 19, color: AppColors.textPrimary),
+      ),
     );
   }
 }
-
-// ── Bits ──────────────────────────────────────────────────────────────────────
 
 class _Chip extends StatelessWidget {
   final String label;
   final Color color;
   const _Chip({required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -455,29 +297,11 @@ class _Chip extends StatelessWidget {
   }
 }
 
-class _OutlineBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _OutlineBtn({required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18, color: AppColors.textPrimary),
-      label: Text(label, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), side: const BorderSide(color: AppColors.border)),
-    );
-  }
-}
-
 class _Empty extends StatelessWidget {
   final IconData icon;
   final String title;
   final String sub;
   const _Empty({required this.icon, required this.title, required this.sub});
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -498,48 +322,88 @@ class _Empty extends StatelessWidget {
   }
 }
 
-class _SettingsRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-  const _SettingsRow({required this.icon, required this.label, this.onTap});
+// ── Sub-pages reached from the menu ───────────────────────────────────────────
 
+class SavedPostsScreen extends StatelessWidget {
+  const SavedPostsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap ?? () => Navigator.pop(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: AppColors.textSecondary),
-            const SizedBox(width: 14),
-            Text(label, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
-            const Spacer(),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
-          ],
-        ),
-      ),
+    final store = AppStateScope.of(context);
+    final posts = mockPosts(mockTraders).where((p) => store.isSaved(p.id)).toList();
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: Text('Saved posts', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+      body: posts.isEmpty
+          ? _Empty(icon: Icons.bookmark_border_rounded, title: 'No saved posts yet', sub: 'Tap the bookmark on any post to save it here for later.')
+          : ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: posts.length,
+              itemBuilder: (_, i) => FeedPost(
+                post: posts[i],
+                onOpenProfile: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+              ),
+            ),
     );
   }
 }
 
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  const _TabBarDelegate(this.tabBar);
-
+class SubscriptionsScreen extends StatelessWidget {
+  const SubscriptionsScreen({super.key});
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      decoration: const BoxDecoration(color: AppColors.background, border: Border(bottom: BorderSide(color: AppColors.border))),
-      child: tabBar,
+  Widget build(BuildContext context) {
+    final store = AppStateScope.of(context);
+    final traders = mockTraders.where((t) => store.isSubscribed(t.id)).toList();
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: Text('Subscriptions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+      body: traders.isEmpty
+          ? _Empty(icon: Icons.group_outlined, title: 'No subscriptions yet', sub: 'Subscribe to traders to see their posts in your feed.')
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              itemCount: traders.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) {
+                final t = traders[i];
+                final positive = t.returnPercent >= 0;
+                return GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: t))),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44, height: 44,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.1)),
+                          child: Center(child: Text(t.name[0], style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary))),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Flexible(child: Text(t.name, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                if (t.isVerified) ...[const SizedBox(width: 4), const VerifiedBadge(size: 14)],
+                              ]),
+                              Text('${t.formattedCopiers} copiers · ${t.formattedReturn}', style: GoogleFonts.inter(fontSize: 12, color: positive ? AppColors.green : AppColors.red, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => store.unsubscribe(t.id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
+                            child: Text('Subscribed', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-  @override
-  bool shouldRebuild(_TabBarDelegate old) => true;
 }
