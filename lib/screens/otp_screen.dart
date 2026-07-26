@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../state/session.dart';
+import '../services/auth_api.dart';
+import '../services/api_client.dart';
 import 'home_screen.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -11,12 +14,14 @@ class OtpScreen extends StatefulWidget {
   final String name;
   final String? residenceIso;
   final String? residenceCountry;
+  final String? requestId; // set when the backend has issued an OTP request
   const OtpScreen({
     super.key,
     required this.phoneNumber,
     required this.name,
     this.residenceIso,
     this.residenceCountry,
+    this.requestId,
   });
 
   @override
@@ -83,11 +88,36 @@ class _OtpScreenState extends State<OtpScreen> {
   Future<void> _verify() async {
     if (!_isComplete || _isLoading) return;
     FocusScope.of(context).unfocus();
+    final session = SessionScope.of(context);
     setState(() => _isLoading = true);
+
+    // ── Live backend ──────────────────────────────────────────────────────────
+    if (kUseBackend && widget.requestId != null) {
+      try {
+        final user = await AuthApi.verifyOtp(requestId: widget.requestId!, code: _code);
+        if (!mounted) return;
+        session.applyBackendSession(user);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (_) => false,
+        );
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+      }
+      return;
+    }
+
+    // ── Demo (no backend) ─────────────────────────────────────────────────────
     await Future.delayed(const Duration(milliseconds: 1100));
     if (!mounted) return;
     setState(() => _isLoading = false);
-    SessionScope.of(context).signInAsFollower(
+    session.signInAsFollower(
       name: widget.name,
       residenceIso: widget.residenceIso,
       residenceCountry: widget.residenceCountry,

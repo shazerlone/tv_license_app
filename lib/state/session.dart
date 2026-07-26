@@ -5,6 +5,18 @@ enum UserRole { follower, creator }
 /// Whether a creator's verification is still being reviewed.
 enum CreatorStatus { none, pending, approved }
 
+UserRole _roleFrom(String? s) => s == 'creator' ? UserRole.creator : UserRole.follower;
+CreatorStatus _statusFrom(String? s) {
+  switch (s) {
+    case 'pending':
+      return CreatorStatus.pending;
+    case 'approved':
+      return CreatorStatus.approved;
+    default:
+      return CreatorStatus.none;
+  }
+}
+
 class UserProfile {
   final String name;
   final String? photoUrl;
@@ -27,6 +39,20 @@ class UserProfile {
   });
 
   bool get isCreator => role == UserRole.creator;
+
+  /// Maps a backend `User` (docs/BACKEND_CONTRACT.md §3) to a UserProfile.
+  factory UserProfile.fromJson(Map<String, dynamic> j) {
+    return UserProfile(
+      name: (j['name'] ?? '').toString(),
+      photoUrl: j['photoUrl'] as String?,
+      role: _roleFrom(j['role'] as String?),
+      market: j['market'] as String?,
+      platform: j['platform'] as String?,
+      residenceIso: j['residenceIso'] as String?,
+      residenceCountry: j['residenceCountry'] as String?,
+      creatorStatus: _statusFrom(j['creatorStatus'] as String?),
+    );
+  }
 
   UserProfile copyWith({
     String? name,
@@ -59,6 +85,12 @@ class SessionController extends ChangeNotifier {
 
   bool get isSignedIn => _user != null;
   bool get isCreator => _user?.isCreator ?? false;
+
+  /// Applies a session returned by the backend ({ token, user }).
+  void applyBackendSession(UserProfile user) {
+    _user = user;
+    notifyListeners();
+  }
 
   void signInAsFollower({required String name, String? photoUrl, String? residenceIso, String? residenceCountry}) {
     _user = UserProfile(

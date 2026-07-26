@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../data/countries.dart';
 import '../widgets/phone_field.dart';
 import '../services/image_picker_service.dart';
+import '../services/auth_api.dart';
+import '../services/api_client.dart';
 import 'otp_screen.dart';
 
 class FollowerRegisterScreen extends StatefulWidget {
@@ -84,17 +87,46 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
       );
       return;
     }
+    final phone = '${_country.dialCode} ${_phoneController.text.trim()}';
+    final name = _nameController.text.trim();
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+
+    String? requestId;
+    if (kUseBackend) {
+      try {
+        requestId = await AuthApi.registerFollower(
+          name: name,
+          phone: phone,
+          residenceIso: _residence!.iso,
+          experience: _experience,
+          interests: _interests.toList(),
+          photoUrl: _photoDataUrl,
+        );
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+        return;
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 600));
+    }
+
     if (!mounted) return;
     setState(() => _isLoading = false);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OtpScreen(
-          phoneNumber: '${_country.dialCode} ${_phoneController.text.trim()}',
-          name: _nameController.text.trim(),
+          phoneNumber: phone,
+          name: name,
           residenceIso: _residence!.iso,
           residenceCountry: _residence!.name,
+          requestId: requestId,
         ),
       ),
     );

@@ -2,7 +2,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../state/session.dart';
+import '../services/auth_api.dart';
+import '../services/api_client.dart';
 import '../widgets/millimore_logo.dart';
 import 'account_type_screen.dart';
 import 'home_screen.dart';
@@ -69,17 +72,35 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
+    final session = SessionScope.of(context);
+    final email = _emailController.text.trim().toLowerCase();
+
     setState(() => _isLoading = true);
+
+    // ── Live backend ──────────────────────────────────────────────────────────
+    if (kUseBackend) {
+      try {
+        final user = await AuthApi.login(email: email, password: _passwordController.text);
+        if (!mounted) return;
+        session.applyBackendSession(user);
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+      }
+      return;
+    }
+
+    // ── Demo (no backend) ─────────────────────────────────────────────────────
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _isLoading = false);
-
-    final session = SessionScope.of(context);
-    final email = _emailController.text.trim().toLowerCase();
     final nameFromEmail = email.contains('@') ? email.split('@').first : 'Trader';
-
-    // Demo verified-trader login (until backend auth exists).
-    // Sign in with trader@millimore.app to enter as an APPROVED creator.
     if (email == 'trader@millimore.app') {
       session.signInAsCreator(
         name: 'Demo Trader',
@@ -92,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen>
     } else {
       session.signInAsFollower(name: nameFromEmail);
     }
-
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
