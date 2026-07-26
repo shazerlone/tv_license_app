@@ -19,7 +19,7 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function Avatar({ name, seed, size = 38 }: { name: string; seed?: string; size?: number }) {
+export function Avatar({ name, seed, size = 32 }: { name: string; seed?: string; size?: number }) {
   const color = AVATAR_COLORS[hash(seed || name) % AVATAR_COLORS.length];
   return (
     <div
