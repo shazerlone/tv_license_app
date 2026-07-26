@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'screens/home_screen.dart';
 import 'state/session.dart';
 import 'state/app_state.dart';
+import 'services/api_client.dart';
+import 'services/auth_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +29,27 @@ class MillimoreApp extends StatefulWidget {
 class _MillimoreAppState extends State<MillimoreApp> {
   final SessionController _session = SessionController();
   final AppState _appState = AppState();
+
+  bool _booting = true;
+  bool _hasSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  /// Remember-me: if a session is persisted, restore it and open straight to
+  /// the home screen (no splash/onboarding animations on return visits).
+  Future<void> _restore() async {
+    final data = await AuthStore.load();
+    if (data.token != null) ApiClient.instance.setToken(data.token);
+    if (data.user != null) {
+      _session.restore(data.user!);
+      _hasSession = true;
+    }
+    if (mounted) setState(() => _booting = false);
+  }
 
   @override
   void dispose() {
@@ -56,7 +80,9 @@ class _MillimoreAppState extends State<MillimoreApp> {
               child: child!,
             );
           },
-          home: const SplashScreen(),
+          home: _booting
+              ? const ColoredBox(color: AppColors.background)
+              : (_hasSession ? const HomeScreen() : const SplashScreen()),
         ),
       ),
     );

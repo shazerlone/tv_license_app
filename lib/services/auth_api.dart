@@ -1,4 +1,5 @@
 import 'api_client.dart';
+import 'auth_store.dart';
 import '../state/session.dart';
 
 /// Result of an OTP request. In dev/console OTP mode the backend also returns
@@ -19,7 +20,10 @@ class AuthApi {
   /// Applies { token, user } from a response: stores token, returns profile.
   static UserProfile _session(Map res) {
     final token = res['token'] as String?;
-    if (token != null) _api.setToken(token);
+    if (token != null) {
+      _api.setToken(token);
+      AuthStore.saveToken(token);
+    }
     final user = (res['user'] as Map).cast<String, dynamic>();
     return UserProfile.fromJson(user);
   }

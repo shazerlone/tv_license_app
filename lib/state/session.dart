@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_store.dart';
 
 enum UserRole { follower, creator }
 
@@ -39,6 +40,30 @@ class UserProfile {
   });
 
   bool get isCreator => role == UserRole.creator;
+
+  static String _roleStr(UserRole r) => r == UserRole.creator ? 'creator' : 'follower';
+  static String _statusStr(CreatorStatus s) {
+    switch (s) {
+      case CreatorStatus.pending:
+        return 'pending';
+      case CreatorStatus.approved:
+        return 'approved';
+      case CreatorStatus.none:
+        return 'none';
+    }
+  }
+
+  /// Serialised form for local persistence (remember-me).
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'photoUrl': photoUrl,
+        'role': _roleStr(role),
+        'market': market,
+        'platform': platform,
+        'residenceIso': residenceIso,
+        'residenceCountry': residenceCountry,
+        'creatorStatus': _statusStr(creatorStatus),
+      };
 
   /// Maps a backend `User` (docs/BACKEND_CONTRACT.md §3) to a UserProfile.
   factory UserProfile.fromJson(Map<String, dynamic> j) {
@@ -86,9 +111,16 @@ class SessionController extends ChangeNotifier {
   bool get isSignedIn => _user != null;
   bool get isCreator => _user?.isCreator ?? false;
 
+  /// Restores a persisted session at launch WITHOUT re-persisting it.
+  void restore(UserProfile user) {
+    _user = user;
+    notifyListeners();
+  }
+
   /// Applies a session returned by the backend ({ token, user }).
   void applyBackendSession(UserProfile user) {
     _user = user;
+    AuthStore.save(user: user);
     notifyListeners();
   }
 
@@ -100,6 +132,7 @@ class SessionController extends ChangeNotifier {
       residenceIso: residenceIso,
       residenceCountry: residenceCountry,
     );
+    AuthStore.save(user: _user!);
     notifyListeners();
   }
 
@@ -122,6 +155,7 @@ class SessionController extends ChangeNotifier {
       residenceCountry: residenceCountry,
       creatorStatus: status,
     );
+    AuthStore.save(user: _user!);
     notifyListeners();
   }
 
@@ -130,12 +164,14 @@ class SessionController extends ChangeNotifier {
     final u = _user;
     if (u != null && u.isCreator) {
       _user = u.copyWith(creatorStatus: CreatorStatus.approved);
+      AuthStore.save(user: _user!);
       notifyListeners();
     }
   }
 
   void signOut() {
     _user = null;
+    AuthStore.clear();
     notifyListeners();
   }
 }
