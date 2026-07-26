@@ -16,8 +16,11 @@ services:
     plan: free
     branch: claude/millimore-backend-admin-yl2ffz
     rootDir: millimore-backend
+    # --include=dev is required: Render sets NODE_ENV=production, under which npm
+    # skips devDependencies — but the build needs them (nest CLI, typescript,
+    # prisma CLI, ts-node for the seed). Runtime still uses prod deps only.
     # migrate deploy runs here because Render's free tier has no preDeploy hook.
-    buildCommand: npm install && npm run prisma:generate && npm run build && npx prisma migrate deploy && npm run db:seed
+    buildCommand: npm install --include=dev && npm run prisma:generate && npm run build && npx prisma migrate deploy && npm run db:seed
     startCommand: node dist/main.js
     healthCheckPath: /v1/health
     autoDeploy: true
