@@ -33,15 +33,26 @@ Log in with a seeded admin account: `admin@millimore.app` / `password`.
   (`/admin/creators/pending`, `/approve`, `/reject`). Investor passwords are
   shown only as "provided (encrypted, not shown)" — never the value.
 
-## Deploy free (Vercel recommended)
+## Deploy free
 
-Next.js hosts best on **Vercel's free tier** (and it keeps the backend's single
-free Render web-service budget intact — see the backend README).
+The admin is a **fully static export** (`output: 'export'` in `next.config.mjs`)
+— 100% client-rendered, so it hosts anywhere static. Local preview of the
+production build: `npm run build && npm run preview` (serves `out/` on :3001).
 
-1. Import this repo in Vercel; set **Root Directory** to `millimore-backend/admin`.
+### Option A — Render Static Site (same platform as the backend, recommended)
+
+Already wired into the repo-root `render.yaml` as the `millimore-admin` service:
+free, **no instance hours, no cold start**. When you sync the Blueprint in
+Render it builds `millimore-backend/admin`, publishes `./out`, and gives the
+admin its own `…onrender.com` URL. `NEXT_PUBLIC_API_BASE_URL` is set there to the
+backend's `/v1` base.
+
+### Option B — Vercel
+
+1. Import this repo; set **Root Directory** to `millimore-backend/admin`.
 2. Add env var `NEXT_PUBLIC_API_BASE_URL = https://<your-backend>.onrender.com/v1`.
-3. Deploy. Vercel auto-detects Next.js (`npm run build`).
+3. Deploy (Vercel auto-detects Next.js).
 
-The backend already sends permissive CORS (`CORS_ORIGINS=*` on Render), so the
-Vercel origin can call it out of the box; tighten `CORS_ORIGINS` to the real
-admin origin when you go to production.
+The backend sends permissive CORS (`CORS_ORIGINS=*` on Render), so either origin
+can call it out of the box; tighten `CORS_ORIGINS` to the real admin origin for
+production.

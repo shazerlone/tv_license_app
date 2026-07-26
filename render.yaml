@@ -59,6 +59,25 @@ services:
       - key: CORS_ORIGINS
         value: '*'
 
+  # Admin dashboard — a free Render Static Site (no instance hours, no cold
+  # start). The admin is a fully static Next.js export (output: 'export'), so it
+  # serves the login page + dashboard from its own onrender.com URL.
+  - type: web
+    name: millimore-admin
+    runtime: static
+    branch: claude/millimore-backend-admin-yl2ffz
+    rootDir: millimore-backend/admin
+    # --include=dev so typescript/@types are present under NODE_ENV=production.
+    buildCommand: npm install --include=dev && npm run build
+    staticPublishPath: ./out
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # Baked into the static build. Point at the backend service's API base.
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://millimore-backend.onrender.com/v1
+
 databases:
   - name: millimore-db
     plan: free
