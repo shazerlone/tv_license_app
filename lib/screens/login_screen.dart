@@ -81,18 +81,30 @@ class _LoginScreenState extends State<LoginScreen>
     // Seeded accounts (password: "password"): priya@millimore.app (follower),
     // trader@millimore.app (creator), admin@millimore.app (admin).
     if (kUseBackend) {
+      // The free-tier server may be asleep; let the user know the wait is normal.
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted && _isLoading) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            duration: Duration(seconds: 30),
+            content: Text('Waking up the server — this can take up to a minute on first launch…'),
+          ));
+        }
+      });
       try {
         final user = await AuthApi.login(email: email, password: _passwordController.text);
         if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         session.applyBackendSession(user);
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
         return;
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
         return;
       } catch (_) {
+        if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
         // Network error / cold start. Fall through to the demo safety net below
         // for the demo trader so you can always get in to review the UI.
         if (email != 'trader@millimore.app') {
