@@ -98,7 +98,8 @@ title?, points[], viewers?`.
 | GET `/saved` | — | `[Post]` | ✅ saved screen |
 | GET `/posts/{id}/comments` | — | `[Comment]` | ✅ comment sheet |
 | POST `/posts/{id}/comments` | `{ text }` | the created `Comment` | ✅ |
-| POST `/posts` | `{ type, content, pair?, title?, points? }` | `Post` | 🔴 (compose) |
+| POST `/posts` | `{ type, content, pair?, title?, points? }` | `Post` | ✅ creator compose |
+| GET `/traders/{myId}/posts` | — | `[Post]` (own posts on creator home) | ✅ (needs `user.id` in auth response — see below) |
 
 `Post` app reads: `id, trader (Trader), type (analysis|trade|lesson|update),
 content, pair?, title?, points[], likes, comments, createdAt, isLiked, saved`.
@@ -108,6 +109,24 @@ content, pair?, title?, points[], likes, comments, createdAt, isLiked, saved`.
 > counts must reflect the authenticated user** — the app trusts server state.
 
 ---
+
+## 5b. Creator side — needed to finish the creator experience 🔴
+
+The follower flow is fully wired; the **creator** flow is the next gap. The app
+already calls these / is built for them — please implement:
+
+| Method · Path | App sends | App expects | Priority |
+| --- | --- | --- | --- |
+| **`user.id` in every auth/me response** | — | the `UserDto.id` (app now stores it and calls `/traders/{id}/posts` for "my posts") | **P0 — small, unblocks creator home** |
+| GET `/creator/stats` (or fields on `/me`) | — | `{ followers, copiers, aum, return30d, earnings }` for the creator dashboard card (currently zeros) | P1 |
+| GET `/creator/followers?cursor=` | — | `[User]` — "See who copies you" | P1 |
+| GET `/creator/earnings` | — | `{ balance, currency, pending, history[] }` — Studio → Earnings & payouts | P1 |
+| POST `/uploads` (or presigned URL) | multipart / `{ contentType }` | `{ url }` — for **profile photos** and **P&L statements** (app currently sends base64 data URLs as `photoUrl`, which won't scale) | **P1 — media storage** |
+| PATCH `/posts/{id}` · DELETE `/posts/{id}` | — | edit / delete own post | P2 |
+
+> **P0 note:** please confirm `AuthResponseDto.user` and `GET /me` both include
+> `id`. The app persists it and uses it for the creator's own posts; without it
+> the creator home can't show their posts.
 
 ## 6. NEW things the app needs (please add to the contract, then build)
 
@@ -146,4 +165,24 @@ subscription for followed trader ids, **and** a fallback REST poll:
 3. `GET /me` — confirm it returns `{ user }` (envelope) so the app can refresh session on launch.
 4. For 6a/6b — is a WebSocket gateway planned, or should the app poll `/notifications`?
 
-_Maintained by the app session. Last updated for app build `a1e2d6b`._
+## 8. Proposed milestone sequencing (app is ready for these)
+
+The app UI already exists for all of these behind `kUseBackend`/demo fallbacks,
+so it lights up as each ships:
+
+- **Milestone 4 — Copy engine & portfolio:** copy config CRUD, positions,
+  portfolio summary, WS `prices`/`portfolio`. Unblocks the real numbers on Home,
+  Copied Trades and Profile.
+- **Milestone 5 — Realtime & notifications:** WS gateway + `GET /notifications`
+  + `POST /devices` (FCM/APNs) + events `trader.live.started`, `trade.opened`,
+  `trade.closed` (§6a/6b). Unblocks push + the in-app notification center's
+  server feed.
+- **Milestone 5 — Live streaming:** broadcast create/ingest (Cloudflare), WS
+  chat/viewers/reactions, YouTube chat ingest (§6c).
+- **Milestone 6 — Payouts & real trade feed:** creator earnings/payouts, real
+  (non-synthetic) trades & equity, admin metrics.
+
+Also fold in **§5b (creator side)** and the **P0 `user.id`** item — small, high
+value, unblocks the creator home now.
+
+_Maintained by the app session. Last updated for app build `894a4c0`._
