@@ -101,7 +101,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
         expand: false,
         builder: (_, scrollController) {
           return Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
@@ -118,7 +118,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                       const Spacer(),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Icon(Icons.close_rounded, size: 22, color: AppColors.textMuted),
+                        child: Icon(Icons.close_rounded, size: 22, color: AppColors.textMuted),
                       ),
                     ],
                   ),
@@ -213,7 +213,7 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
@@ -235,7 +235,7 @@ class _Composer extends StatelessWidget {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.primary)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.primary)),
               ),
             ),
           ),
@@ -244,7 +244,7 @@ class _Composer extends StatelessWidget {
             onTap: onSend,
             child: Container(
               padding: const EdgeInsets.all(11),
-              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
               child: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.white),
             ),
           ),

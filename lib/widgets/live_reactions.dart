@@ -58,7 +58,7 @@ class _HeartState extends State<_Heart> with SingleTickerProviderStateMixin {
   late final Color _color;
 
   static final _rng = math.Random();
-  static const _palette = [AppColors.red, AppColors.primary, AppColors.green, Color(0xFFF59E0B)];
+  static final _palette = [AppColors.red, AppColors.primary, AppColors.green, const Color(0xFFF59E0B)];
 
   @override
   void initState() {

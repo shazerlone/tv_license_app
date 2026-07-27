@@ -129,7 +129,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
       backgroundColor: Colors.transparent,
       isDismissible: false,
       builder: (_) => Container(
-        decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -383,7 +383,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
       builder: (_) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,

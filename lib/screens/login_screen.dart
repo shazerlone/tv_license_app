@@ -155,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             autocorrect: false,
                             textInputAction: TextInputAction.next,
                             style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'you@example.com',
                               prefixIcon: Icon(Icons.mail_outline_rounded, size: 20, color: AppColors.textMuted),
                             ),
@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                             decoration: InputDecoration(
                               hintText: 'Your password',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: AppColors.textMuted),
+                              prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: AppColors.textMuted),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,

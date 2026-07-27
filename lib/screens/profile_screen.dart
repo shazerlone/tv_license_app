@@ -8,6 +8,7 @@ import '../models/trader.dart';
 import '../models/post.dart';
 import '../state/session.dart';
 import '../state/app_state.dart';
+import '../state/theme_controller.dart';
 import '../widgets/feed_post.dart';
 import '../widgets/verified_badge.dart';
 import 'trader_profile_screen.dart';
@@ -72,7 +73,7 @@ class ProfileScreen extends StatelessWidget {
                           _Chip(label: isCreator ? 'Creator' : 'Follower', color: isCreator ? AppColors.primary : AppColors.green),
                           if (user?.residenceCountry != null) ...[
                             const SizedBox(width: 8),
-                            const Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),
+                            Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),
                             const SizedBox(width: 2),
                             Flexible(child: Text(user!.residenceCountry!, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted))),
                           ],
@@ -88,9 +89,9 @@ class ProfileScreen extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () => _toast(context, 'Edit profile'),
-                icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
+                icon: Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
                 label: Text('Edit profile', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: const BorderSide(color: AppColors.border)),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.border)),
               ),
             ),
             const SizedBox(height: 20),
@@ -114,6 +115,11 @@ class ProfileScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 20),
 
+            Text('Preferences', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
+            const SizedBox(height: 10),
+            _MenuCard(children: const [_DarkModeTile()]),
+            const SizedBox(height: 20),
+
             Text('Support', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
             const SizedBox(height: 10),
             _MenuCard(children: [
@@ -131,7 +137,7 @@ class ProfileScreen extends StatelessWidget {
                   session.signOut();
                   Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
                 },
-                icon: const Icon(Icons.logout_rounded, size: 18, color: AppColors.red),
+                icon: Icon(Icons.logout_rounded, size: 18, color: AppColors.red),
                 label: Text('Sign out', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.red)),
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: AppColors.red.withOpacity(0.3))),
               ),
@@ -247,7 +253,7 @@ class _MenuTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          border: last ? null : const Border(bottom: BorderSide(color: AppColors.border)),
+          border: last ? null : Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: Row(
           children: [
@@ -262,9 +268,37 @@ class _MenuTile extends StatelessWidget {
               Text(trailing!, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
               const SizedBox(width: 6),
             ],
-            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DarkModeTile extends StatelessWidget {
+  const _DarkModeTile();
+  @override
+  Widget build(BuildContext context) {
+    final theme = ThemeScope.of(context);
+    final isDark = AppColors.isDark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+            child: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, size: 19, color: AppColors.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Text('Dark mode', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+          Switch(
+            value: isDark,
+            activeColor: AppColors.primary,
+            onChanged: (v) => theme.toggleDark(v),
+          ),
+        ],
       ),
     );
   }

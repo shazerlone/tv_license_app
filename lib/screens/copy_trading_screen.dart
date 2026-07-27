@@ -187,7 +187,7 @@ class _ConnectAccountCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.link_rounded, color: AppColors.primary, size: 20),
+              Icon(Icons.link_rounded, color: AppColors.primary, size: 20),
               const SizedBox(width: 10),
               Expanded(child: Text('No trading account connected', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
             ],
@@ -251,7 +251,7 @@ class _AccountSelector extends StatelessWidget {
           onTap: onAdd,
           child: Row(
             children: [
-              const Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
+              Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
               const SizedBox(width: 6),
               Text('Add another account', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
             ],

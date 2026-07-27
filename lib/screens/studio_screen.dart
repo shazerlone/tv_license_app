@@ -34,7 +34,7 @@ class StudioScreen extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _checkStatus(context, session),
-                  icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+                  icon: Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
                   label: Text('Check verification status', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
                   style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.primary.withOpacity(0.4))),
                 ),
@@ -50,7 +50,7 @@ class StudioScreen extends StatelessWidget {
                       const SnackBar(content: Text('Verified (demo) — you can now go live')),
                     );
                   },
-                  icon: const Icon(Icons.verified_rounded, size: 18, color: AppColors.green),
+                  icon: Icon(Icons.verified_rounded, size: 18, color: AppColors.green),
                   label: Text('Mark as verified (demo)', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.green)),
                   style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.green.withOpacity(0.4))),
                 ),
@@ -128,7 +128,7 @@ class _LockedBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_clock_rounded, color: AppColors.primary, size: 20),
+          Icon(Icons.lock_clock_rounded, color: AppColors.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text('Going live and posting unlock once your account is verified (24–48h).',
@@ -220,7 +220,7 @@ class _Row extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             ],
           ),
         ),

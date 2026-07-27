@@ -456,7 +456,7 @@ class _PendingBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.hourglass_top_rounded, color: AppColors.primary, size: 20),
+          Icon(Icons.hourglass_top_rounded, color: AppColors.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -577,7 +577,7 @@ class _SectionHeader extends StatelessWidget {
       child: Row(
         children: [
           if (dot) ...[
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
             const SizedBox(width: 6),
           ],
           Text(title, style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3)),
@@ -760,7 +760,7 @@ class _NotifRow extends StatelessWidget {
               Text(n.time, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
               if (n.unread) ...[
                 const SizedBox(height: 6),
-                Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
               ],
             ],
           ),

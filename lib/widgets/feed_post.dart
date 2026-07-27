@@ -28,7 +28,7 @@ class FeedPost extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        border: showDivider ? const Border(bottom: BorderSide(color: AppColors.border)) : null,
+        border: showDivider ? Border(bottom: BorderSide(color: AppColors.border)) : null,
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 16, 14),
@@ -70,7 +70,7 @@ class FeedPost extends StatelessWidget {
                       const SizedBox(width: 2),
                       GestureDetector(
                         onTap: () => _moreSheet(context),
-                        child: const Icon(Icons.more_horiz_rounded, size: 20, color: AppColors.textMuted),
+                        child: Icon(Icons.more_horiz_rounded, size: 20, color: AppColors.textMuted),
                       ),
                     ],
                   ),
@@ -308,14 +308,14 @@ class _TradeChip extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.candlestick_chart_rounded, size: 16, color: AppColors.primary),
+            child: Icon(Icons.candlestick_chart_rounded, size: 16, color: AppColors.primary),
           ),
           const SizedBox(width: 10),
           Text(pair, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           const Spacer(),
           Text(type == PostType.trade ? 'Trade' : 'Analysis', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
           const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+          Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
         ],
       ),
     );
@@ -328,7 +328,7 @@ class _ActionIcon extends StatelessWidget {
   final bool active;
   final Color activeColor;
   final VoidCallback onTap;
-  const _ActionIcon({required this.icon, this.count, this.active = false, this.activeColor = AppColors.textMuted, required this.onTap});
+  _ActionIcon({required this.icon, this.count, this.active = false, this.activeColor = AppColors.textMuted, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -363,7 +363,7 @@ class _SimpleSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
       child: Column(
         mainAxisSize: MainAxisSize.min,

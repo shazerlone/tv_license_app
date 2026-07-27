@@ -63,7 +63,7 @@ class _PhoneFieldState extends State<PhoneField> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const Icon(Icons.keyboard_arrow_down_rounded,
+                  Icon(Icons.keyboard_arrow_down_rounded,
                       size: 18, color: AppColors.textMuted),
                 ],
               ),
@@ -140,7 +140,7 @@ class CountryField extends StatelessWidget {
             ] else
               Text(hint, style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
             const Spacer(),
-            const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppColors.textMuted),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppColors.textMuted),
           ],
         ),
       ),
@@ -172,7 +172,7 @@ class CountryPickerSheetState extends State<CountryPickerSheet> {
       maxChildSize: 0.92,
       builder: (_, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -207,7 +207,7 @@ class CountryPickerSheetState extends State<CountryPickerSheet> {
                       style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'Search country or code',
-                        prefixIcon: const Icon(Icons.search_rounded,
+                        prefixIcon: Icon(Icons.search_rounded,
                             size: 20, color: AppColors.textMuted),
                         filled: true,
                         fillColor: AppColors.surface,

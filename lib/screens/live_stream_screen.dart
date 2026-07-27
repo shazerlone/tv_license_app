@@ -244,7 +244,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                           width: 44, height: 44,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-                          child: const Icon(Icons.favorite_rounded, size: 20, color: AppColors.red),
+                          child: Icon(Icons.favorite_rounded, size: 20, color: AppColors.red),
                         ),
                       ),
                       const SizedBox(width: 8),

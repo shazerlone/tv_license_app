@@ -30,7 +30,7 @@ class CopiedTradesScreen extends StatelessWidget {
                   Text('Copy trading', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.textPrimary),
+                    icon: Icon(Icons.account_balance_wallet_outlined, color: AppColors.textPrimary),
                     tooltip: 'Manage accounts',
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen())),
                   ),
@@ -46,7 +46,7 @@ class CopiedTradesScreen extends StatelessWidget {
                     _SummaryCard(store: store),
                     if (store.activeCopies.isNotEmpty) _CopyingStrip(store: store),
                     const SizedBox(height: 4),
-                    const TabBar(
+                    TabBar(
                       labelColor: AppColors.primary,
                       unselectedLabelColor: AppColors.textMuted,
                       indicatorColor: AppColors.primary,
@@ -202,7 +202,7 @@ class _CopyingStrip extends StatelessWidget {
                       store.stopCopy(cfg.traderId);
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Stopped copying $name')));
                     },
-                    child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                    child: Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
                   ),
                 ],
               ),

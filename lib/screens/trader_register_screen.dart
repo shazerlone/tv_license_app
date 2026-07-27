@@ -353,7 +353,7 @@ class _StepIntro extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.verified_rounded, size: 13, color: AppColors.primary),
+                      Icon(Icons.verified_rounded, size: 13, color: AppColors.primary),
                       const SizedBox(width: 5),
                       Text('VERIFIED CREATOR',
                           style: GoogleFonts.inter(

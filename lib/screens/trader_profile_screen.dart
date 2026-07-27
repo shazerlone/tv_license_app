@@ -94,7 +94,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
               if (trader.isLive)
                 TextButton.icon(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LiveStreamScreen(trader: trader))),
-                  icon: const Icon(Icons.radio_button_checked_rounded, size: 14, color: AppColors.red),
+                  icon: Icon(Icons.radio_button_checked_rounded, size: 14, color: AppColors.red),
                   label: Text('Watch Live', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.red)),
                 ),
               const SizedBox(width: 8),
@@ -175,9 +175,9 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: trader))),
-                      icon: const Icon(Icons.copy_all_rounded, size: 18, color: AppColors.primary),
+                      icon: Icon(Icons.copy_all_rounded, size: 18, color: AppColors.primary),
                       label: Text('Copy this trader', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: const BorderSide(color: AppColors.primary)),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: AppColors.primary)),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -245,7 +245,7 @@ class _SubscribeButton extends StatelessWidget {
           onPressed: onUnsub,
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(104, 42),
-            side: const BorderSide(color: AppColors.border),
+            side: BorderSide(color: AppColors.border),
           ),
           child: Text('Subscribed', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
         ),
@@ -502,7 +502,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),

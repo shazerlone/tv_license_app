@@ -354,7 +354,7 @@ class _ReelPageState extends State<_ReelPage> with SingleTickerProviderStateMixi
     showModalBottomSheet(
       context: context, backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,7 +725,7 @@ class _SearchSheetState extends State<_SearchSheet> {
       child: DraggableScrollableSheet(
         initialChildSize: 0.85, maxChildSize: 0.95, minChildSize: 0.5, expand: false,
         builder: (_, scroll) => Container(
-          decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
           child: Column(
             children: [
               const SizedBox(height: 12),
@@ -738,7 +738,7 @@ class _SearchSheetState extends State<_SearchSheet> {
                   style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Search traders, pairs, strategies',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
                     filled: true, fillColor: AppColors.surface,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),

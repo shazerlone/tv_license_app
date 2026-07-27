@@ -79,7 +79,7 @@ class _LiveChatFeedState extends State<LiveChatFeed> {
                 onTap: _send,
                 child: Container(
                   width: 40, height: 40,
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                   child: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.white),
                 ),
               ),

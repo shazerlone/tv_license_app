@@ -135,7 +135,7 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
         expand: false,
         builder: (_, scrollController) {
           return Container(
-            decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+            decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
             child: Column(
               children: [
                 const SizedBox(height: 12),
@@ -159,7 +159,7 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                                  child: const Icon(Icons.link_rounded, color: AppColors.primary, size: 22),
+                                  child: Icon(Icons.link_rounded, color: AppColors.primary, size: 22),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
@@ -235,7 +235,7 @@ class _AddAccountSheetState extends State<AddAccountSheet> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.primary),
+                                  Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.primary),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text('Credentials are encrypted and used only to mirror trades on your account. You can disconnect anytime.',

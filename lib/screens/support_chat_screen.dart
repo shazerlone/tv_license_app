@@ -108,7 +108,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                 Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.12), shape: BoxShape.circle),
-                  child: const Icon(Icons.support_agent_rounded, color: AppColors.primary, size: 20),
+                  child: Icon(Icons.support_agent_rounded, color: AppColors.primary, size: 20),
                 ),
                 Positioned(
                   right: 0, bottom: 0,
@@ -264,7 +264,7 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).viewInsets.bottom),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
@@ -285,9 +285,9 @@ class _Composer extends StatelessWidget {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   filled: true,
                   fillColor: AppColors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
                 ),
               ),
             ),
@@ -296,7 +296,7 @@ class _Composer extends StatelessWidget {
               onTap: onSend,
               child: Container(
                 width: 46, height: 46,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                 child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
               ),
             ),

@@ -194,7 +194,7 @@ class _MillimoreLogo extends StatelessWidget {
               ),
             ),
           ),
-          const Positioned(
+          Positioned(
             top: 18,
             right: 24,
             child: CustomPaint(

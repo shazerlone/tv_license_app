@@ -559,7 +559,7 @@ class _LiveStreamVisualState extends State<_LiveStreamVisual>
                   ),
                 ),
                 const SizedBox(width: 5),
-                const Icon(Icons.verified_rounded,
+                Icon(Icons.verified_rounded,
                     size: 14, color: AppColors.primaryLight),
               ],
             ),

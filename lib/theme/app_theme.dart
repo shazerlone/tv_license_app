@@ -1,53 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Theme-aware palette. Colours resolve against [AppColors.isDark], which the
+/// app sets from the active [ThemeController] before building the tree. All
+/// members are getters (not const) so a single toggle recolours the whole app.
 class AppColors {
-  static const Color primary = Color(0xFF2563EB);
-  static const Color primaryLight = Color(0xFF60A5FA);
-  static const Color purple = Color(0xFFA78BFA);
-  static const Color green = Color(0xFF22C55E);
-  static const Color red = Color(0xFFEF4444);
-  static const Color slate = Color(0xFF64748B);
-  static const Color background = Color(0xFFFFFFFF);
-  static const Color surface = Color(0xFFF8FAFC);
-  static const Color border = Color(0xFFE2E8F0);
-  static const Color textPrimary = Color(0xFF0F172A);
-  static const Color textSecondary = Color(0xFF64748B);
-  static const Color textMuted = Color(0xFF94A3B8);
+  static bool isDark = false;
+
+  // Brand accents (mostly shared; primary brightens slightly in dark).
+  static Color get primary => isDark ? const Color(0xFF3B82F6) : const Color(0xFF2563EB);
+  static Color get primaryLight => const Color(0xFF60A5FA);
+  static Color get purple => const Color(0xFFA78BFA);
+  static Color get green => const Color(0xFF22C55E);
+  static Color get red => const Color(0xFFEF4444);
+  static Color get slate => const Color(0xFF64748B);
+
+  // Neutrals flip with the theme.
+  static Color get background => isDark ? const Color(0xFF0B1120) : const Color(0xFFFFFFFF);
+  static Color get surface => isDark ? const Color(0xFF141C2E) : const Color(0xFFF8FAFC);
+  static Color get border => isDark ? const Color(0xFF25304A) : const Color(0xFFE2E8F0);
+  static Color get textPrimary => isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+  static Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  static Color get textMuted => isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
 }
 
 class AppTheme {
-  static ThemeData get theme {
+  static ThemeData get light => _build(Brightness.light);
+  static ThemeData get dark => _build(Brightness.dark);
+
+  static ThemeData _build(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    // Resolve palette for this theme (AppColors.isDark is also set globally by
+    // the app shell before build; this keeps ThemeData self-consistent).
+    final bg = isDark ? const Color(0xFF0B1120) : const Color(0xFFFFFFFF);
+    final surface = isDark ? const Color(0xFF141C2E) : const Color(0xFFF8FAFC);
+    final border = isDark ? const Color(0xFF25304A) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final textMuted = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+    final primary = isDark ? const Color(0xFF3B82F6) : const Color(0xFF2563EB);
+
     return ThemeData(
       useMaterial3: true,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.primary,
-        secondary: AppColors.primaryLight,
-        surface: AppColors.surface,
+      brightness: brightness,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primary,
+        brightness: brightness,
+        primary: primary,
+        surface: surface,
         onPrimary: Colors.white,
-        onSurface: AppColors.textPrimary,
+        onSurface: textPrimary,
       ),
-      scaffoldBackgroundColor: AppColors.background,
-      textTheme: GoogleFonts.interTextTheme(const TextTheme(
-        displayLarge: TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -1.5),
-        displayMedium: TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -1.0),
-        displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.5),
-        headlineLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
-        titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-        bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textPrimary),
-        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-        bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted),
+      scaffoldBackgroundColor: bg,
+      textTheme: GoogleFonts.interTextTheme(TextTheme(
+        displayLarge: TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: textPrimary, letterSpacing: -1.5),
+        displayMedium: TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: textPrimary, letterSpacing: -1.0),
+        displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
+        headlineLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: textPrimary),
+        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: textPrimary),
+        headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary),
+        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
+        titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textPrimary),
+        titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: textSecondary),
+        bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: textPrimary),
+        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: textSecondary),
+        bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: textMuted),
         labelLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white, letterSpacing: 0.1),
-        labelMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-        labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted, letterSpacing: 0.5),
+        labelMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: textSecondary),
+        labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textMuted, letterSpacing: 0.5),
       )),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: primary,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -57,44 +81,31 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: primary,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: AppColors.border, width: 1.5),
+          side: BorderSide(color: border, width: 1.5),
           textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
+        fillColor: surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 1.5)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted),
+        hintStyle: GoogleFonts.inter(fontSize: 15, color: textMuted),
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+      appBarTheme: AppBarTheme(
+        backgroundColor: bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: AppColors.textPrimary,
+        foregroundColor: textPrimary,
         centerTitle: false,
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.border,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: border, thickness: 1, space: 1),
     );
   }
 }

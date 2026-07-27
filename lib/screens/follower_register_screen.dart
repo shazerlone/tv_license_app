@@ -315,7 +315,7 @@ class _PhotoPicker extends StatelessWidget {
                       : null,
                 ),
                 child: dataUrl == null
-                    ? const Icon(Icons.person_rounded, size: 44, color: AppColors.textMuted)
+                    ? Icon(Icons.person_rounded, size: 44, color: AppColors.textMuted)
                     : null,
               ),
               Positioned(
@@ -399,7 +399,7 @@ class _RadioRow extends StatelessWidget {
                       child: Container(
                         width: 10,
                         height: 10,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),

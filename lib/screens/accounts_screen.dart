@@ -32,7 +32,7 @@ class AccountsScreen extends StatelessWidget {
                   onPressed: () => AddAccountSheet.open(context),
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add another account'),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary)),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), foregroundColor: AppColors.primary, side: BorderSide(color: AppColors.primary)),
                 ),
               ],
             ),
@@ -72,7 +72,7 @@ class _AccountCard extends StatelessWidget {
                 decoration: BoxDecoration(color: AppColors.green.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
                 child: Row(
                   children: [
-                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+                    Container(width: 6, height: 6, decoration: BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
                     const SizedBox(width: 5),
                     Text('Connected', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.green)),
                   ],
@@ -96,7 +96,7 @@ class _AccountCard extends StatelessWidget {
               Expanded(
                 child: TextButton.icon(
                   onPressed: () => _changePassword(context),
-                  icon: const Icon(Icons.key_rounded, size: 17, color: AppColors.textSecondary),
+                  icon: Icon(Icons.key_rounded, size: 17, color: AppColors.textSecondary),
                   label: Text('Change password', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                 ),
               ),
@@ -104,7 +104,7 @@ class _AccountCard extends StatelessWidget {
               Expanded(
                 child: TextButton.icon(
                   onPressed: () => _remove(context),
-                  icon: const Icon(Icons.link_off_rounded, size: 17, color: AppColors.red),
+                  icon: Icon(Icons.link_off_rounded, size: 17, color: AppColors.red),
                   label: Text('Disconnect', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.red)),
                 ),
               ),
@@ -184,7 +184,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
         child: Form(
           key: _formKey,
