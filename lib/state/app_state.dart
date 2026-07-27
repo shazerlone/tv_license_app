@@ -6,6 +6,7 @@ import '../models/post.dart';
 import '../models/comment.dart';
 import '../models/trader.dart';
 import '../models/copy_models.dart';
+import '../models/app_notification.dart';
 import '../services/backend_api.dart';
 
 enum BroadcastPhase { idle, connecting, live }
@@ -25,6 +26,64 @@ class AppState extends ChangeNotifier {
   final Map<String, int> _likeCount = {};
   // postId -> comments
   final Map<String, List<Comment>> _comments = {};
+
+  // ── Notifications ────────────────────────────────────────────────────────
+  final List<AppNotification> _notifications = [];
+  final Set<String> _liveNotified = {}; // traderIds we've already alerted for
+  List<AppNotification> get notifications => List.unmodifiable(_notifications);
+  int get unreadNotifications => _notifications.where((n) => !n.read).length;
+
+  /// Pulls server notifications (docs/APP_REQUIREMENTS.md §6a). Endpoint may not
+  /// exist yet — fails soft. Merges without duplicating by id.
+  Future<void> loadNotifications() async {
+    if (!kUseBackend) return;
+    try {
+      final raw = await BackendApi.notifications();
+      final existing = _notifications.map((n) => n.id).toSet();
+      final incoming = raw.where((n) => !existing.contains(n.id)).toList();
+      if (incoming.isNotEmpty) {
+        _notifications.insertAll(0, incoming);
+        _notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        notifyListeners();
+      }
+    } catch (_) {
+      // no /notifications endpoint yet — ignore
+    }
+  }
+
+  /// Client-derived "trader is live" alerts for followed traders (until the
+  /// backend pushes real events). Deduped per trader per session.
+  void notifyLiveTraders(Iterable<Trader> liveFollowed) {
+    var added = false;
+    for (final t in liveFollowed) {
+      if (_liveNotified.contains(t.id)) continue;
+      _liveNotified.add(t.id);
+      _notifications.insert(
+        0,
+        AppNotification(
+          id: 'live_${t.id}',
+          type: AppNotificationType.live,
+          title: '${t.name} is live',
+          body: 'Tap to watch and copy trades in real time.',
+          createdAt: DateTime.now(),
+          traderId: t.id,
+        ),
+      );
+      added = true;
+    }
+    if (added) notifyListeners();
+  }
+
+  void markNotificationsRead() {
+    var changed = false;
+    for (final n in _notifications) {
+      if (!n.read) {
+        n.read = true;
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
 
   /// Loads the real social graph (subscriptions) from the backend. Called once
   /// after sign-in / at home load. No-op in demo mode.

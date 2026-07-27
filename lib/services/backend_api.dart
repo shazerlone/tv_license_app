@@ -1,5 +1,6 @@
 import 'api_client.dart';
 import '../models/api_models.dart';
+import '../models/app_notification.dart';
 
 /// Typed access to Millimore backend Milestones 2 & 3
 /// (brokers, accounts, creator verification, traders, feed, social).
@@ -168,6 +169,19 @@ class BackendApi {
   static Future<void> subscribe(String traderId) => _api.post('/subscriptions/$traderId');
   static Future<void> unsubscribe(String traderId) => _api.delete('/subscriptions/$traderId');
   static Future<void> setNotify(String traderId, bool on) => _api.post('/subscriptions/$traderId/notify', {'on': on});
+
+  // ── Notifications (§6a — may not be live yet) ─────────────────────────────
+  static Future<List<AppNotification>> notifications({String? cursor}) async {
+    final res = await _api.get('/notifications${cursor != null ? '?cursor=$cursor' : ''}');
+    return _list(res, res is Map ? 'items' : null).map(AppNotification.fromJson).toList();
+  }
+
+  static Future<void> markNotificationsRead(List<String> ids) =>
+      _api.post('/notifications/read', {'ids': ids});
+
+  /// Register a device push token (§6b — FCM/APNs). Safe to call best-effort.
+  static Future<void> registerDevice({required String platform, required String token, String? appVersion}) =>
+      _api.post('/devices', {'platform': platform, 'token': token, if (appVersion != null) 'appVersion': appVersion});
 
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }

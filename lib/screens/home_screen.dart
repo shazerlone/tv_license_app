@@ -5,6 +5,7 @@ import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
 import '../models/trade.dart';
+import '../models/app_notification.dart';
 import '../services/backend_api.dart';
 import '../state/session.dart';
 import '../state/app_state.dart';
@@ -122,12 +123,16 @@ class _FollowerHomeState extends State<FollowerHome> {
   /// Live data: top creators (GET /traders?sort=copiers) + subscription feed
   /// (GET /feed). No demo content when useBackend.
   Future<void> _load() async {
-    AppStateScope.of(context).loadSocial(); // refresh real follow graph
+    final store = AppStateScope.of(context);
+    await store.loadSocial(); // refresh real follow graph first
+    store.loadNotifications(); // server notifications (if endpoint exists)
     try {
       final page = await BackendApi.traders(sort: 'copiers');
       final feed = await BackendApi.feed();
       if (!mounted) return;
       final traders = page.items.map(Trader.fromApi).toList();
+      // Alert for followed traders that are currently live.
+      store.notifyLiveTraders(traders.where((t) => t.isLive && store.isSubscribed(t.id)));
       setState(() {
         _topCreators = traders.take(8).toList();
         _liveTraders = traders.where((t) => t.isLive).toList();
@@ -168,7 +173,7 @@ class _FollowerHomeState extends State<FollowerHome> {
             _AppBarIcon(
                 icon: Icons.notifications_none_rounded,
                 onTap: () => showNotificationsSheet(context),
-                dot: true),
+                dot: store.unreadNotifications > 0),
             const SizedBox(width: 16),
           ],
         ),
@@ -393,7 +398,7 @@ class CreatorHome extends StatelessWidget {
             _AppBarIcon(
                 icon: Icons.notifications_none_rounded,
                 onTap: () => showNotificationsSheet(context),
-                dot: true),
+                dot: AppStateScope.of(context).unreadNotifications > 0),
             const SizedBox(width: 16),
           ],
         ),
@@ -660,29 +665,8 @@ class _CreatorMiniCard extends StatelessWidget {
 
 // ── Notifications ───────────────────────────────────────────────────────────
 
-class _Notif {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String body;
-  final String time;
-  final bool unread;
-  const _Notif(this.icon, this.color, this.title, this.body, this.time, {this.unread = false});
-}
-
 void showNotificationsSheet(BuildContext context) {
-  final items = <_Notif>[
-    _Notif(Icons.podcasts_rounded, AppColors.red, 'Marcus Sterling is live',
-        'Trading gold — placing setups now.', '2m', unread: true),
-    _Notif(Icons.trending_up_rounded, AppColors.green, 'Copied trade closed +3.2%',
-        'EUR/USD long hit take-profit.', '18m', unread: true),
-    _Notif(Icons.person_add_rounded, AppColors.primary, 'New copier',
-        'Ava R. started copying your trades.', '1h'),
-    _Notif(Icons.verified_rounded, AppColors.primary, 'You\'re verified',
-        'Your creator account is approved.', '3h'),
-    _Notif(Icons.campaign_rounded, AppColors.purple, 'Weekly recap ready',
-        'See how your copied traders performed.', '1d'),
-  ];
+  final store = AppStateScope.of(context);
   showModalBottomSheet(
     context: context,
     backgroundColor: AppColors.background,
@@ -693,37 +677,61 @@ void showNotificationsSheet(BuildContext context) {
       minChildSize: 0.4,
       maxChildSize: 0.92,
       expand: false,
-      builder: (context, controller) => Column(
-        children: [
-          const SizedBox(height: 10),
-          Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-            child: Row(
-              children: [
-                Text('Notifications', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
-                const Spacer(),
-                Text('Mark all read', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
-              ],
+      builder: (sheetContext, controller) {
+        final items = store.notifications;
+        return Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+              child: Row(
+                children: [
+                  Text('Notifications', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
+                  const Spacer(),
+                  if (store.unreadNotifications > 0)
+                    GestureDetector(
+                      onTap: () => store.markNotificationsRead(),
+                      child: Text('Mark all read', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              controller: controller,
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 4),
-              itemBuilder: (_, i) => _NotifRow(items[i]),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.notifications_none_rounded, size: 46, color: AppColors.textMuted.withOpacity(0.5)),
+                            const SizedBox(height: 14),
+                            Text('You\'re all caught up', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            const SizedBox(height: 6),
+                            Text('Live alerts and trade updates from traders you follow will show up here.',
+                                textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted, height: 1.5)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
+                      itemBuilder: (_, i) => _NotifRow(items[i]),
+                    ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     ),
-  );
+  ).whenComplete(() => store.markNotificationsRead());
 }
 
 class _NotifRow extends StatelessWidget {
-  final _Notif n;
+  final AppNotification n;
   const _NotifRow(this.n);
 
   @override
@@ -731,7 +739,7 @@ class _NotifRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: n.unread ? AppColors.primary.withOpacity(0.04) : Colors.transparent,
+        color: !n.read ? AppColors.primary.withOpacity(0.04) : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -757,8 +765,8 @@ class _NotifRow extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(n.time, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
-              if (n.unread) ...[
+              Text(n.timeAgo, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+              if (!n.read) ...[
                 const SizedBox(height: 6),
                 Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
               ],
