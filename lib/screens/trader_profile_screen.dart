@@ -9,6 +9,7 @@ import '../models/post.dart';
 import '../services/backend_api.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
+import '../widgets/avatar.dart';
 import '../widgets/trade_card.dart';
 import '../widgets/feed_post.dart';
 import 'copy_trading_screen.dart';
@@ -112,17 +113,11 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          Container(
-                            width: 76,
-                            height: 76,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.primary.withOpacity(0.1),
-                              border: trader.isLive ? Border.all(color: AppColors.red, width: 2.5) : null,
-                            ),
-                            child: Center(
-                              child: Text(trader.name[0], style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                            ),
+                          Avatar(
+                            name: trader.name,
+                            photoUrl: trader.avatarUrl,
+                            size: 76,
+                            ringColor: trader.isLive ? AppColors.red : null,
                           ),
                           if (trader.isLive)
                             Positioned(

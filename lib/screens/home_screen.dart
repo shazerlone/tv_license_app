@@ -12,6 +12,7 @@ import '../state/app_state.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/millimore_logo.dart';
 import '../widgets/verified_badge.dart';
+import '../widgets/avatar.dart';
 import '../widgets/feed_post.dart';
 import 'trader_profile_screen.dart';
 import 'live_stream_screen.dart';
@@ -619,11 +620,7 @@ class _CreatorMiniCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.1)),
-                  child: Center(child: Text(trader.name[0], style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.primary))),
-                ),
+                Avatar(name: trader.name, photoUrl: trader.avatarUrl, size: 40),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -791,19 +788,7 @@ class _LiveTraderAvatar extends StatelessWidget {
         children: [
           Stack(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.red, width: 2.5),
-                  color: AppColors.surface,
-                ),
-                child: Center(
-                  child: Text(trader.name[0],
-                      style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                ),
-              ),
+              Avatar(name: trader.name, photoUrl: trader.avatarUrl, size: 64, ringColor: AppColors.red),
               Positioned(
                 bottom: 0,
                 right: 0,
