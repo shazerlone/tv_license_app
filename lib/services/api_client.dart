@@ -22,6 +22,11 @@ class ApiClient {
   void setToken(String? t) => _token = t;
   void clear() => _token = null;
 
+  /// Invoked when the server rejects the token (401). The app wires this to
+  /// sign the user out and return to login. Called at most once per burst.
+  void Function()? onUnauthorized;
+  bool _handling401 = false;
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (_token != null) 'Authorization': 'Bearer $_token',
@@ -83,6 +88,14 @@ class ApiClient {
       }
     }
     if (ok) return body;
+    if (r.statusCode == 401 && _token != null) {
+      _token = null;
+      if (!_handling401) {
+        _handling401 = true;
+        onUnauthorized?.call();
+        Future.delayed(const Duration(seconds: 2), () => _handling401 = false);
+      }
+    }
     final err = (body is Map && body['error'] is Map) ? body['error'] as Map : const {};
     throw ApiException(
       r.statusCode,
