@@ -171,6 +171,7 @@ GET  /creator/status           → { creatorStatus, reason? }
 POST /creator/apply            { market, platform, verification{...} } → { creatorStatus:"pending" }
 GET  /creator/stats            → { followers, copiers, aum, return30d, earnings }  // creator dashboard
 GET  /creator/followers        → [ User ]                                          // who follows me
+GET  /creator/earnings         → { balance, currency, pending, history[] }         // Studio → payouts
 ```
 > Admin flips status; app polls or receives WS `creator.status` event.
 > This replaces the demo "Mark as verified" button.
@@ -212,6 +213,10 @@ POST   /posts/{id}/comments  { text }  → Comment
 ### 4.6 Creator content (compose)
 ```
 POST /posts   { type:"trade|analysis|lesson", content, pair?, title?, points?[] } → Post
+PATCH  /posts/{id}   { content?, title?, pair?, points?[] } → Post   // owner-only edit
+DELETE /posts/{id}                                                   // owner-only delete
+POST /uploads  { contentType, data(base64) } → { id, url }          // media (photos, statements)
+GET  /uploads/{id}                                                  // serve file (public URL)
 ```
 
 ### 4.7 Copy trading
@@ -258,7 +263,8 @@ GET  /broadcasts/{id}/history  → [ ClosedTrade ]
 ### 4.11 Live chat (aggregated)
 ```
 GET  /broadcasts/{id}/chat            → [ LiveChatMessage ]   // recent
-POST /broadcasts/{id}/chat            { text } → LiveChatMessage  // host or viewer
+POST /broadcasts/{id}/chat            { text } → LiveChatMessage  // host or viewer, pushed over WS
+POST /broadcasts/{id}/react          { count? }   // heart reactions, pushed over WS
 ```
 > **YouTube chat ingestion (server-side):** backend uses YouTube Data API v3:
 > `liveBroadcasts.list` → `activeLiveChatId`, then poll `liveChatMessages.list`
@@ -473,3 +479,27 @@ unchanged; this section only pins down details the prose left open.
 - `GET /creator/stats` → `{ followers, copiers, aum, return30d, earnings }` — copiers
   and aum are real (from active copy configs); `earnings` is 0 until payouts (milestone 6).
 - `GET /creator/followers` → `[User]` who subscribe to the creator.
+
+### Realtime events, live streaming & media (milestone 5)
+- **WS `user` channel** (contract §5): the server pushes per-user events —
+  `creator.status`, `trade.opened` `{ traderId, name, pair, isBuy, entryPrice }`,
+  `trade.closed` `{ traderId, pair, pnlPercent, pnlAmount }`,
+  `trader.live.started` `{ traderId, name, broadcastId }` (to the trader's followers).
+  Each event is also written to `GET /notifications` and fires a push (when a
+  device is registered + FCM configured).
+- **Push** (§6b): `POST /devices` / `DELETE /devices/{token}` register tokens.
+  Real FCM/APNs send needs `FCM_SERVER_KEY` — a deliberate later step; the
+  registry and all trigger points are already live.
+- **Broadcasts** (§4.9): `POST /broadcasts` returns `ingestUrl`+`streamKey`+`hlsUrl`
+  **to the owner only** — `GET /broadcasts/live` and non-owner `GET /broadcasts/{id}`
+  omit the ingest credentials. `start` notifies followers (`trader.live.started`);
+  `end` returns `{ duration, peakViewers, trades, pnl }`. Cloudflare Stream Live is
+  used when `CLOUDFLARE_STREAM_TOKEN`+`CLOUDFLARE_ACCOUNT_ID` are set; otherwise a
+  synthetic dev input is returned (same shape).
+- **WS `broadcast:{id}` channel:** `type:"chat"` (from `POST …/chat`),
+  `type:"reaction"` (from `POST …/react`), `type:"viewers"` (auto on join/leave).
+  Viewer count is derived from live subscribers. YouTube chat ingest and on-stream
+  MT orders (§4.10) arrive in milestone 6 with the MT bridge.
+- **Uploads** (§5b): `POST /uploads { contentType, data(base64) }` → `{ id, url }`;
+  served at `GET /uploads/{id}`. Dev stores bytes in Postgres; set `STORAGE_*` for
+  S3+CloudFront in production. Retires base64 photoUrls.

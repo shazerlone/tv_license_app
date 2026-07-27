@@ -6,9 +6,12 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -27,6 +30,17 @@ import {
   LikesDto,
 } from './dto/post.dto';
 
+class UpdatePostDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() content?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() pair?: string;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  points?: string[];
+}
+
 @ApiTags('posts')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
@@ -39,6 +53,24 @@ export class PostsController {
   @ApiCreatedResponse({ type: PostDto })
   compose(@CurrentUser() u: AuthUser, @Body() dto: CreatePostDto): Promise<PostDto> {
     return this.posts.compose(u.userId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Edit own post (contract §5b)' })
+  @ApiOkResponse({ type: PostDto })
+  update(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdatePostDto,
+  ): Promise<PostDto> {
+    return this.posts.update(u.userId, id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete own post (contract §5b)' })
+  async remove(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    await this.posts.remove(u.userId, id);
   }
 
   @Post(':id/like')

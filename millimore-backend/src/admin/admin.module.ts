@@ -3,9 +3,10 @@ import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { UsersModule } from '../users/users.module';
 import { TradersModule } from '../traders/traders.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [UsersModule, TradersModule],
+  imports: [UsersModule, TradersModule, NotificationsModule],
   providers: [AdminService],
   controllers: [AdminController],
 })

@@ -3,8 +3,8 @@ import { Prisma, CreatorApplication, User, CreatorStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { TradersService } from '../traders/traders.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { countryNameFromIso } from '../common/countries';
-import { genId } from '../common/ids';
 import { encodeCursor, decodeCursor, Paginated } from '../common/dto/pagination.dto';
 import {
   AdminUserDto,
@@ -21,6 +21,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly traders: TradersService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── users ──────────────────────────────────────────────────────────
@@ -125,10 +126,9 @@ export class AdminService {
     // Approved creators must be discoverable immediately (even with no trades):
     // give them a public Trader profile if they don't already have one.
     await this.traders.ensureForUser(app.userId);
-    await this.notify(app.userId, 'creator.status', 'You are approved 🎉', {
-      creatorStatus: 'approved',
+    await this.notifications.pushEvent(app.userId, 'creator.status', 'You are approved 🎉', {
+      data: { creatorStatus: 'approved' },
     });
-    // TODO(milestone 5): also push this over the WS `user` channel.
     return this.toApplicationDto(updated);
   }
 
@@ -145,19 +145,10 @@ export class AdminService {
         data: { creatorStatus: CreatorStatus.rejected },
       }),
     ]);
-    await this.notify(app.userId, 'creator.status', 'Verification update', {
-      creatorStatus: 'rejected',
-      reason,
+    await this.notifications.pushEvent(app.userId, 'creator.status', 'Verification update', {
+      data: { creatorStatus: 'rejected', reason },
     });
-    // TODO(milestone 5): also push this over the WS `user` channel.
     return this.toApplicationDto(updated);
-  }
-
-  /** Create an in-app notification (also surfaces via GET /notifications). */
-  private async notify(userId: string, type: string, title: string, data?: object) {
-    await this.prisma.notification.create({
-      data: { id: genId('n'), userId, type, title, data: data as any },
-    });
   }
 
   // ── helpers ────────────────────────────────────────────────────────

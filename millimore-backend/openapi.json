@@ -587,6 +587,33 @@
         ]
       }
     },
+    "/v1/creator/earnings": {
+      "get": {
+        "operationId": "CreatorController_earnings",
+        "summary": "Creator earnings & payouts (contract §5b)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorEarningsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/creator/apply": {
       "post": {
         "operationId": "CreatorController_apply",
@@ -1075,6 +1102,125 @@
         ]
       }
     },
+    "/v1/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "summary": "List my notifications (contract §4.12)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/notifications/read": {
+      "post": {
+        "operationId": "NotificationsController_markRead",
+        "summary": "Mark notifications read (contract §4.12)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/devices": {
+      "post": {
+        "operationId": "NotificationsController_register",
+        "summary": "Register a push device token (contract §4.12)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/devices/{token}": {
+      "delete": {
+        "operationId": "NotificationsController_remove",
+        "summary": "Unregister a push device (contract §4.12)",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/posts": {
       "post": {
         "operationId": "PostsController_compose",
@@ -1100,6 +1246,79 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/posts/{id}": {
+      "patch": {
+        "operationId": "PostsController_update",
+        "summary": "Edit own post (contract §5b)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "PostsController_remove",
+        "summary": "Delete own post (contract §5b)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
           }
         },
         "tags": [
@@ -1575,125 +1794,6 @@
         ]
       }
     },
-    "/v1/notifications": {
-      "get": {
-        "operationId": "NotificationsController_list",
-        "summary": "List my notifications (contract §4.12)",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/NotificationDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "notifications"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/v1/notifications/read": {
-      "post": {
-        "operationId": "NotificationsController_markRead",
-        "summary": "Mark notifications read (contract §4.12)",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarkReadDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "notifications"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/v1/devices": {
-      "post": {
-        "operationId": "NotificationsController_register",
-        "summary": "Register a push device token (contract §4.12)",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterDeviceDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "notifications"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/v1/devices/{token}": {
-      "delete": {
-        "operationId": "NotificationsController_remove",
-        "summary": "Unregister a push device (contract §4.12)",
-        "parameters": [
-          {
-            "name": "token",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "notifications"
-        ],
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
     "/v1/symbols": {
       "get": {
         "operationId": "MarketController_symbols",
@@ -1931,6 +2031,430 @@
         },
         "tags": [
           "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/uploads": {
+      "post": {
+        "operationId": "UploadsController_upload",
+        "summary": "Upload media, returns a hosted URL (contract §5b)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "uploads"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/uploads/{id}": {
+      "get": {
+        "operationId": "UploadsController_serve",
+        "summary": "Serve an uploaded file (public)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/v1/broadcasts": {
+      "post": {
+        "operationId": "BroadcastsController_create",
+        "summary": "Create a broadcast (ingest+key+hls) (contract §4.9)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBroadcastDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/live": {
+      "get": {
+        "operationId": "BroadcastsController_liveNow",
+        "summary": "Who's live now (contract §4.9)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BroadcastDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}": {
+      "get": {
+        "operationId": "BroadcastsController_get",
+        "summary": "Get a broadcast (contract §4.9)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/start": {
+      "post": {
+        "operationId": "BroadcastsController_start",
+        "summary": "Go live; notifies followers (contract §4.9)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/end": {
+      "post": {
+        "operationId": "BroadcastsController_end",
+        "summary": "End the broadcast; returns a summary (contract §4.9)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/destinations/youtube/connect": {
+      "post": {
+        "operationId": "BroadcastsController_connectYoutube",
+        "summary": "Begin YouTube simulcast OAuth (contract §4.9)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/destinations/{platform}/disconnect": {
+      "post": {
+        "operationId": "BroadcastsController_disconnect",
+        "summary": "Disconnect a simulcast destination (contract §4.9)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/chat": {
+      "get": {
+        "operationId": "BroadcastsController_chat",
+        "summary": "Recent live chat (contract §4.11)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LiveChatMessageDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "BroadcastsController_sendChat",
+        "summary": "Send a chat message; pushed over WS (contract §4.11)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveChatMessageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/react": {
+      "post": {
+        "operationId": "BroadcastsController_react",
+        "summary": "Send a heart reaction; pushed over WS (contract §5)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "broadcasts"
         ],
         "security": [
           {
@@ -2497,6 +3021,36 @@
           "earnings"
         ]
       },
+      "CreatorEarningsDto": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "number",
+            "example": 0
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "pending": {
+            "type": "number",
+            "example": 0
+          },
+          "history": {
+            "example": [],
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "balance",
+          "currency",
+          "pending",
+          "history"
+        ]
+      },
       "ApplyCreatorDto": {
         "type": "object",
         "properties": {
@@ -2989,6 +3543,80 @@
           "value"
         ]
       },
+      "NotificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "n_1"
+          },
+          "type": {
+            "type": "string",
+            "example": "creator.status"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "description": "Arbitrary payload (traderId, pair, pnl…)."
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "createdAt",
+          "read"
+        ]
+      },
+      "MarkReadDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "RegisterDeviceDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "description": "FCM/APNs device token."
+          },
+          "appVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform",
+          "token"
+        ]
+      },
       "CreatePostDto": {
         "type": "object",
         "properties": {
@@ -3088,6 +3716,26 @@
           "isLiked",
           "saved"
         ]
+      },
+      "UpdatePostDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "pair": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "LikesDto": {
         "type": "object",
@@ -3194,80 +3842,6 @@
         },
         "required": [
           "on"
-        ]
-      },
-      "NotificationDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "n_1"
-          },
-          "type": {
-            "type": "string",
-            "example": "creator.status"
-          },
-          "title": {
-            "type": "string"
-          },
-          "body": {
-            "type": "object",
-            "nullable": true
-          },
-          "data": {
-            "type": "object",
-            "description": "Arbitrary payload (traderId, pair, pnl…)."
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "read": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "type",
-          "title",
-          "createdAt",
-          "read"
-        ]
-      },
-      "MarkReadDto": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "ids"
-        ]
-      },
-      "RegisterDeviceDto": {
-        "type": "object",
-        "properties": {
-          "platform": {
-            "type": "string",
-            "enum": [
-              "android",
-              "ios"
-            ]
-          },
-          "token": {
-            "type": "string",
-            "description": "FCM/APNs device token."
-          },
-          "appVersion": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "platform",
-          "token"
         ]
       },
       "StartCopyDto": {
@@ -3447,6 +4021,214 @@
           "closedCount",
           "invested"
         ]
+      },
+      "UploadDto": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "data": {
+            "type": "string",
+            "description": "Base64 file data (raw or data-URL)."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Optional label, e.g. \"statement\"."
+          }
+        },
+        "required": [
+          "contentType",
+          "data"
+        ]
+      },
+      "UploadResultDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://…/v1/uploads/up_123"
+          },
+          "id": {
+            "type": "string",
+            "example": "up_123"
+          }
+        },
+        "required": [
+          "url",
+          "id"
+        ]
+      },
+      "CreateBroadcastDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Live trading — London session"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "BroadcastDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "b_1"
+          },
+          "creatorId": {
+            "type": "string",
+            "example": "u_1"
+          },
+          "title": {
+            "type": "string",
+            "example": "Live trading"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "connecting",
+              "live",
+              "ended"
+            ]
+          },
+          "ingestUrl": {
+            "type": "object",
+            "description": "Owner-only",
+            "nullable": true
+          },
+          "streamKey": {
+            "type": "object",
+            "description": "Owner-only",
+            "nullable": true
+          },
+          "hlsUrl": {
+            "type": "string"
+          },
+          "viewers": {
+            "type": "number",
+            "example": 42
+          },
+          "peakViewers": {
+            "type": "number",
+            "example": 80
+          },
+          "startedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "endedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "destinations": {
+            "example": [
+              {
+                "id": "youtube",
+                "connected": true
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "title",
+          "phase",
+          "hlsUrl",
+          "viewers",
+          "peakViewers",
+          "destinations"
+        ]
+      },
+      "BroadcastSummaryDto": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "type": "number",
+            "example": 3600,
+            "description": "seconds"
+          },
+          "peakViewers": {
+            "type": "number",
+            "example": 80
+          },
+          "trades": {
+            "type": "number",
+            "example": 0
+          },
+          "pnl": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "duration",
+          "peakViewers",
+          "trades",
+          "pnl"
+        ]
+      },
+      "LiveChatMessageDto": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "type": "string",
+            "example": "alex_t"
+          },
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "millimore",
+              "youtube",
+              "facebook"
+            ]
+          },
+          "byHost": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "author",
+          "text",
+          "source",
+          "byHost",
+          "createdAt"
+        ]
+      },
+      "SendChatDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "ReactDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "example": 1,
+            "default": 1
+          }
+        }
       }
     }
   }

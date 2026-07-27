@@ -17,6 +17,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MarketModule } from './market/market.module';
 import { CopyModule } from './copy/copy.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { RealtimeBusModule } from './realtime/realtime.bus';
+import { UploadsModule } from './uploads/uploads.module';
+import { BroadcastsModule } from './broadcasts/broadcasts.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -38,6 +41,7 @@ const staticModules = existsSync(ADMIN_DIR)
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RealtimeBusModule,
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -52,6 +56,8 @@ const staticModules = existsSync(ADMIN_DIR)
     MarketModule,
     CopyModule,
     RealtimeModule,
+    UploadsModule,
+    BroadcastsModule,
     ...staticModules,
   ],
   controllers: [HealthController],

@@ -175,10 +175,25 @@ creator approval queue. See [`admin/README.md`](./admin/README.md).
 > the WS protocol and JSON shapes won't change when the real feed lands. The WS
 > gateway is single-instance now — Redis pub/sub makes it horizontal (ARCHITECTURE.md).
 
-### ⏳ Next milestones (per contract §9)
+### ✅ Milestone 5 — Realtime events + live streaming (LIVE)
 
-5. Broadcasts (Cloudflare) + WS chat/viewers/reactions + YouTube chat ingest
-6. Live orders → MT bridge; payouts; full admin metrics/monitoring
+| Method & path | Contract | Notes |
+| ------------- | -------- | ----- |
+| WS `user` channel | §5/§6a | `trade.opened`/`trade.closed`/`trader.live.started`/`creator.status` |
+| `POST/DELETE /v1/devices` | §6b | Push-token registry (FCM send behind `FCM_SERVER_KEY`) |
+| `POST /v1/broadcasts` · `/start` · `/end` · `GET /broadcasts/{id}` · `/live` | §4.9 | Ingest/key owner-only; Cloudflare env-gated |
+| `.../destinations/youtube/connect` · `/{platform}/disconnect` | §4.9 | Simulcast OAuth |
+| `GET/POST /v1/broadcasts/{id}/chat` · `POST .../react` | §4.11/§5 | WS `broadcast:{id}` chat/reaction/viewers |
+| `POST /v1/uploads` · `GET /uploads/{id}` | §5b | Media storage (Postgres dev → S3 env) |
+| `GET /v1/creator/earnings` · `PATCH/DELETE /v1/posts/{id}` | §5b | Earnings stub; post edit/delete |
+
+> Realtime events also write to `/notifications` and fire push. YouTube chat
+> ingest and on-stream MT orders (§4.10) arrive with the MT bridge in milestone 6.
+
+### ⏳ Next milestone (per contract §9)
+
+6. Live orders → MT bridge; payouts; **real (non-synthetic) prices/trades/equity**;
+   YouTube chat ingest; full admin metrics/monitoring
 
 ## Scripts
 

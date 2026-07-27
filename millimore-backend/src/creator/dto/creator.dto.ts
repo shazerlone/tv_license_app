@@ -22,6 +22,14 @@ export class CreatorStatsDto {
   earnings: number;
 }
 
+/** GET /creator/earnings (contract §5b). Real payouts land in milestone 6. */
+export class CreatorEarningsDto {
+  @ApiProperty({ example: 0 }) balance: number;
+  @ApiProperty({ example: 'USD' }) currency: string;
+  @ApiProperty({ example: 0 }) pending: number;
+  @ApiProperty({ type: [Object], example: [] }) history: unknown[];
+}
+
 /** POST /creator/apply body (contract §4.2). */
 export class ApplyCreatorDto {
   @ApiProperty({ example: 'Forex' })

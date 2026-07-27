@@ -3,10 +3,34 @@ import { Notification } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { genId } from '../common/ids';
 import { NotificationDto, RegisterDeviceDto } from './dto/notification.dto';
+import { RealtimeBus } from '../realtime/realtime.bus';
+import { PushService } from './push.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bus: RealtimeBus,
+    private readonly push: PushService,
+  ) {}
+
+  /**
+   * One call to notify a user everywhere: persist (for the notification center),
+   * deliver live over the WS `user` channel, and fire a push. Used by creator
+   * approval, trade events, live-started, etc.
+   */
+  async pushEvent(
+    userId: string,
+    type: string,
+    title: string,
+    opts: { body?: string; data?: object; push?: boolean } = {},
+  ): Promise<void> {
+    await this.create(userId, type, title, opts.body, opts.data);
+    this.bus.emitUser(userId, { ch: 'user', type, data: opts.data ?? { title } });
+    if (opts.push !== false) {
+      await this.push.sendToUser(userId, { title, body: opts.body, data: opts.data });
+    }
+  }
 
   private toDto(n: Notification): NotificationDto {
     return {

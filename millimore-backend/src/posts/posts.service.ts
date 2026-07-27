@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma, PostType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradersService } from '../traders/traders.service';
@@ -188,6 +188,44 @@ export class PostsService {
       include: postInclude(userId),
     });
     return this.toDto(post);
+  }
+
+  /** Edit own post (contract §5b). */
+  async update(
+    userId: string,
+    postId: string,
+    patch: { content?: string; title?: string; pair?: string; points?: string[] },
+  ): Promise<PostDto> {
+    await this.ownedPostOrThrow(userId, postId);
+    const post = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        content: patch.content,
+        title: patch.title,
+        pair: patch.pair,
+        points: patch.points,
+      },
+      include: postInclude(userId),
+    });
+    return this.toDto(post);
+  }
+
+  /** Delete own post (contract §5b). */
+  async remove(userId: string, postId: string): Promise<void> {
+    await this.ownedPostOrThrow(userId, postId);
+    await this.prisma.post.delete({ where: { id: postId } });
+  }
+
+  private async ownedPostOrThrow(userId: string, postId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { trader: { select: { userId: true } } },
+    });
+    if (!post) throw new NotFoundException({ code: 'post_not_found', message: 'Post not found' });
+    if (post.trader.userId !== userId) {
+      throw new ForbiddenException({ code: 'forbidden', message: 'Not your post' });
+    }
+    return post;
   }
 
   private async getPostOrThrow(postId: string) {

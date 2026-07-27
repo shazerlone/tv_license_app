@@ -81,9 +81,74 @@ model User {
   devices       Device[]
   copyConfigs   CopyConfig[]
   copyPositions CopyPosition[]
+  broadcasts    Broadcast[]
+  uploads       Upload[]
 
   @@index([role])
   @@index([creatorStatus])
+}
+
+enum BroadcastPhase {
+  connecting
+  live
+  ended
+}
+
+/// A creator live stream (contract §3 Broadcast, §4.9). Cloudflare Stream Live
+/// provides ingest/HLS in production; a synthetic dev fallback is used when
+/// CLOUDFLARE_STREAM_TOKEN is unset.
+model Broadcast {
+  id           String         @id // "b_..."
+  creatorId    String
+  creator      User           @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  traderId     String?
+  title        String
+  phase        BroadcastPhase @default(connecting)
+  ingestUrl    String
+  streamKey    String
+  hlsUrl       String
+  cfInputId    String? // Cloudflare live input id
+  viewers      Int            @default(0)
+  peakViewers  Int            @default(0)
+  destinations Json           @default("[]") // [{ id:"youtube", connected:true }]
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime       @default(now())
+
+  chat BroadcastChat[]
+
+  @@index([phase])
+  @@index([creatorId])
+}
+
+/// A live chat message (contract §3 LiveChatMessage). `source` distinguishes
+/// millimore/youtube/facebook; ingested YouTube chat lands here too.
+model BroadcastChat {
+  id          String    @id
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  author      String
+  text        String
+  source      String    @default("millimore")
+  byHost      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([broadcastId, createdAt])
+}
+
+/// Uploaded media (contract §5b). Dev stores bytes in Postgres (stateless across
+/// instances) and serves via GET /uploads/{id}; production writes to S3 via
+/// STORAGE_* env and stores only the URL. Base64 data-URLs are thus retired.
+model Upload {
+  id          String   @id // "up_..."
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentType String
+  data        Bytes? // dev only; null when stored in object storage
+  url         String? // set when stored in S3/CDN
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// A follower copying a trader (contract §3 CopyConfig, §4.7). One active row

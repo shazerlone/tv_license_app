@@ -3,7 +3,12 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { CreatorService } from './creator.service';
-import { CreatorStatusDto, ApplyCreatorDto, CreatorStatsDto } from './dto/creator.dto';
+import {
+  CreatorStatusDto,
+  ApplyCreatorDto,
+  CreatorStatsDto,
+  CreatorEarningsDto,
+} from './dto/creator.dto';
 import { UserDto } from '../users/dto/user.dto';
 
 @ApiTags('creator')
@@ -32,6 +37,13 @@ export class CreatorController {
   @ApiOkResponse({ type: [UserDto] })
   followers(@CurrentUser() user: AuthUser): Promise<UserDto[]> {
     return this.creator.followers(user.userId);
+  }
+
+  @Get('earnings')
+  @ApiOperation({ summary: 'Creator earnings & payouts (contract §5b)' })
+  @ApiOkResponse({ type: CreatorEarningsDto })
+  earnings(@CurrentUser() user: AuthUser): Promise<CreatorEarningsDto> {
+    return this.creator.earnings(user.userId);
   }
 
   @Post('apply')

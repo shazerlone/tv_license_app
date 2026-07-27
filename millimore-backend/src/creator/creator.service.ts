@@ -37,6 +37,11 @@ export class CreatorService {
     };
   }
 
+  /** Creator earnings & payouts (contract §5b). Zeroed until milestone 6. */
+  async earnings(_userId: string) {
+    return { balance: 0, currency: 'USD', pending: 0, history: [] as unknown[] };
+  }
+
   /** Users who follow this creator (contract §5b "see who copies you"). */
   async followers(userId: string): Promise<UserDto[]> {
     const trader = await this.prisma.trader.findUnique({ where: { userId } });

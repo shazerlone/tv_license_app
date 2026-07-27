@@ -6,6 +6,7 @@ import {
 import { CopyConfig, CopyPosition } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricesService } from '../market/prices.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { genId } from '../common/ids';
 import { round } from '../common/rng';
 import {
@@ -27,6 +28,7 @@ export class CopyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly prices: PricesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── live P/L helpers ────────────────────────────────────────────────
@@ -136,6 +138,7 @@ export class CopyService {
       const pair = pairs[Math.floor(Math.random() * pairs.length)];
       const entry = this.prices.price(pair);
       if (entry == null) continue;
+      const isBuy = Math.random() > 0.45;
       await this.prisma.copyPosition.create({
         data: {
           id: genId('pos'),
@@ -144,10 +147,14 @@ export class CopyService {
           traderName,
           accountId,
           pair,
-          isBuy: Math.random() > 0.45,
+          isBuy,
           entryPrice: entry,
           lots: round(lotBase * (0.6 + Math.random() * 0.8), 2),
         },
+      });
+      // Live event: a copied trader opened a position (contract §6a).
+      await this.notifications.pushEvent(userId, 'trade.opened', `${traderName} opened ${pair}`, {
+        data: { traderId, name: traderName, pair, isBuy, entryPrice: entry },
       });
     }
   }
@@ -167,6 +174,10 @@ export class CopyService {
       await this.prisma.copyPosition.update({
         where: { id: p.id },
         data: { status: 'closed', exitPrice: cur, pnlAmount, pnlPercent, closedAt: new Date() },
+      });
+      // Live event: position closed with booked P/L (contract §6a).
+      await this.notifications.pushEvent(userId, 'trade.closed', `${p.pair} closed ${pnlPercent}%`, {
+        data: { traderId, pair: p.pair, pnlPercent, pnlAmount },
       });
     }
   }
