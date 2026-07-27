@@ -190,6 +190,27 @@ class AppState extends ChangeNotifier {
   List<TradingAccount> get accounts => List.unmodifiable(_accounts);
   bool get hasAccount => _accounts.isNotEmpty;
 
+  /// Loads connected accounts from the backend (§4.3). No-op in demo mode.
+  Future<void> loadAccounts() async {
+    if (!kUseBackend) return;
+    try {
+      final list = await BackendApi.accounts();
+      _accounts
+        ..clear()
+        ..addAll(list.map((a) => TradingAccount(
+              id: a.id,
+              brokerId: a.brokerId,
+              brokerName: a.brokerName,
+              accountNumber: a.accountNumber,
+              server: a.server,
+              currency: a.currency,
+              balance: a.balance,
+              connectedAt: DateTime.tryParse(a.connectedAt)?.toLocal() ?? DateTime.now(),
+            )));
+      notifyListeners();
+    } catch (_) {}
+  }
+
   TradingAccount addAccount({
     required String brokerId,
     required String brokerName,
@@ -214,16 +235,18 @@ class AppState extends ChangeNotifier {
   void removeAccount(String id) {
     _accounts.removeWhere((a) => a.id == id);
     notifyListeners();
+    if (kUseBackend) BackendApi.disconnectAccount(id).catchError((_) {});
   }
 
   // ── Copy engine ───────────────────────────────────────────────────────────
   final Map<String, CopyConfig> _copying = {};
   final List<CopyPosition> _positions = [];
+  PortfolioSummary? _summary; // backend portfolio (milestone 4)
 
   bool isCopying(String traderId) => _copying.containsKey(traderId);
   CopyConfig? copyConfig(String traderId) => _copying[traderId];
   List<CopyConfig> get activeCopies => _copying.values.toList();
-  int get copyingCount => _copying.length;
+  int get copyingCount => _summary?.copyingCount ?? _copying.length;
 
   List<CopyPosition> get positions => List.unmodifiable(_positions);
   List<CopyPosition> get activePositions =>
@@ -231,13 +254,34 @@ class AppState extends ChangeNotifier {
   List<CopyPosition> get closedPositions =>
       _positions.where((p) => p.status == PositionStatus.closed).toList();
 
-  double get openPnl => activePositions.fold(0, (s, p) => s + p.pnlAmount);
-  double get bookedProfit =>
+  double get openPnl => _summary?.openPnl ?? activePositions.fold(0, (s, p) => s + p.pnlAmount);
+  double get bookedProfit => _summary?.bookedProfit ??
       closedPositions.where((p) => p.pnlAmount >= 0).fold(0, (s, p) => s + p.pnlAmount);
-  double get bookedLoss =>
+  double get bookedLoss => _summary?.bookedLoss ??
       closedPositions.where((p) => p.pnlAmount < 0).fold(0, (s, p) => s + p.pnlAmount);
-  double get netPnl => openPnl + bookedProfit + bookedLoss;
-  double get totalInvested => _copying.values.fold(0, (s, c) => s + c.amount);
+  double get netPnl => _summary?.netPnl ?? (openPnl + bookedProfit + bookedLoss);
+  double get totalInvested => _summary?.invested ?? _copying.values.fold(0, (s, c) => s + c.amount);
+
+  /// Loads the real copy engine (milestone 4): who you copy, positions, and the
+  /// portfolio summary. No-op in demo mode.
+  Future<void> loadCopyEngine() async {
+    if (!kUseBackend) return;
+    try {
+      final configs = await BackendApi.copyConfigs();
+      final pos = await BackendApi.positions();
+      final summary = await BackendApi.portfolioSummary();
+      _copying
+        ..clear()
+        ..addEntries(configs.map((c) => MapEntry(c.traderId, c)));
+      _positions
+        ..clear()
+        ..addAll(pos);
+      _summary = summary;
+      notifyListeners();
+    } catch (_) {
+      // leave whatever we have
+    }
+  }
 
   void startCopy(Trader trader, {required String accountId, required double amount, required double risk, required bool autoCopy}) {
     _copying[trader.id] = CopyConfig(
@@ -248,13 +292,20 @@ class AppState extends ChangeNotifier {
       autoCopy: autoCopy,
       startedAt: DateTime.now(),
     );
-    _seedPositions(trader, accountId, amount);
+    if (kUseBackend) {
+      BackendApi.startCopy(trader.id, accountId: accountId, amount: amount, risk: risk, autoCopy: autoCopy)
+          .then((_) => loadCopyEngine())
+          .catchError((_) {});
+    } else {
+      _seedPositions(trader, accountId, amount);
+    }
     notifyListeners();
   }
 
   void stopCopy(String traderId) {
     _copying.remove(traderId);
     notifyListeners();
+    if (kUseBackend) BackendApi.stopCopy(traderId).then((_) => loadCopyEngine()).catchError((_) {});
   }
 
   void _seedPositions(Trader trader, String accountId, double amount) {

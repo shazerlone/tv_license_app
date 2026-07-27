@@ -32,8 +32,21 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _navIndex = 0;
+  bool _loadedOnce = false;
 
   void goToTab(int i) => setState(() => _navIndex = i);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadedOnce) return;
+    _loadedOnce = true;
+    // Load the real copy engine + accounts (milestone 4) once, so every tab
+    // (Home portfolio, Trades, Profile) shows live numbers.
+    final store = AppStateScope.of(context);
+    store.loadAccounts();
+    store.loadCopyEngine();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,8 +163,9 @@ class _FollowerHomeState extends State<FollowerHome> {
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final openCopied = mockTrades.where((t) => t.status == TradeStatus.open).toList();
-    final totalPnl = openCopied.fold<double>(0, (s, t) => s + t.pnlPercent);
+    final invested = store.totalInvested;
+    final totalPnl = invested > 0 ? (store.netPnl / invested) * 100 : 0.0;
+    final openCount = store.activePositions.length;
 
     return RefreshIndicator(
       color: AppColors.primary,
@@ -183,7 +197,7 @@ class _FollowerHomeState extends State<FollowerHome> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-            child: _PortfolioCard(totalPnl: totalPnl, openCount: openCopied.length, following: store.subscriptionCount),
+            child: _PortfolioCard(totalPnl: totalPnl, openCount: openCount, following: store.subscriptionCount),
           ),
         ),
         if (_liveTraders.isNotEmpty) ...[

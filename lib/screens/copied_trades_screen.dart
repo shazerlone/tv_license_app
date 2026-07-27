@@ -181,7 +181,10 @@ class _CopyingStrip extends StatelessWidget {
               break;
             }
           }
-          final name = t?.name ?? 'Trader';
+          // Backend traders aren't in the mock list — use the name embedded in
+          // the copied positions.
+          final fromPos = store.positions.where((p) => p.traderId == cfg.traderId);
+          final name = t?.name ?? (fromPos.isNotEmpty ? fromPos.first.traderName : 'Trader');
           return GestureDetector(
             onTap: t == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: t!))),
             child: Container(

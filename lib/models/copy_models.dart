@@ -43,6 +43,45 @@ class CopyConfig {
     required this.autoCopy,
     required this.startedAt,
   });
+
+  factory CopyConfig.fromJson(Map<String, dynamic> j) => CopyConfig(
+        traderId: j['traderId'].toString(),
+        accountId: j['accountId'].toString(),
+        amount: (j['amount'] as num?)?.toDouble() ?? 0,
+        risk: (j['risk'] as num?)?.toDouble() ?? 1,
+        autoCopy: j['autoCopy'] == true,
+        startedAt: DateTime.tryParse('${j['startedAt']}')?.toLocal() ?? DateTime.now(),
+      );
+}
+
+/// Aggregated copy-trading portfolio numbers (GET /portfolio/summary).
+class PortfolioSummary {
+  final double netPnl, openPnl, bookedProfit, bookedLoss, invested;
+  final int copyingCount, activeCount, closedCount;
+  const PortfolioSummary({
+    required this.netPnl,
+    required this.openPnl,
+    required this.bookedProfit,
+    required this.bookedLoss,
+    required this.invested,
+    required this.copyingCount,
+    required this.activeCount,
+    required this.closedCount,
+  });
+  factory PortfolioSummary.fromJson(Map<String, dynamic> j) {
+    double d(k) => (j[k] as num?)?.toDouble() ?? 0;
+    int i(k) => (j[k] as num?)?.toInt() ?? 0;
+    return PortfolioSummary(
+      netPnl: d('netPnl'),
+      openPnl: d('openPnl'),
+      bookedProfit: d('bookedProfit'),
+      bookedLoss: d('bookedLoss'),
+      invested: d('invested'),
+      copyingCount: i('copyingCount'),
+      activeCount: i('activeCount'),
+      closedCount: i('closedCount'),
+    );
+  }
 }
 
 enum ChatSource { millimore, youtube, facebook }
@@ -155,4 +194,21 @@ class CopyPosition {
   });
 
   bool get isProfit => pnlAmount >= 0;
+
+  factory CopyPosition.fromJson(Map<String, dynamic> j) => CopyPosition(
+        id: j['id'].toString(),
+        traderId: j['traderId'].toString(),
+        traderName: j['traderName'].toString(),
+        pair: j['pair'].toString(),
+        isBuy: j['isBuy'] == true,
+        status: j['status'] == 'closed' ? PositionStatus.closed : PositionStatus.active,
+        entryPrice: (j['entryPrice'] as num?)?.toDouble() ?? 0,
+        exitPrice: (j['exitPrice'] as num?)?.toDouble(),
+        pnlAmount: (j['pnlAmount'] as num?)?.toDouble() ?? 0,
+        pnlPercent: (j['pnlPercent'] as num?)?.toDouble() ?? 0,
+        lots: (j['lots'] as num?)?.toDouble() ?? 0,
+        openedAt: DateTime.tryParse('${j['openedAt']}')?.toLocal() ?? DateTime.now(),
+        closedAt: j['closedAt'] != null ? DateTime.tryParse('${j['closedAt']}')?.toLocal() : null,
+        accountId: j['accountId']?.toString() ?? '',
+      );
 }

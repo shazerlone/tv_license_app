@@ -1,6 +1,7 @@
 import 'api_client.dart';
 import '../models/api_models.dart';
 import '../models/app_notification.dart';
+import '../models/copy_models.dart';
 
 /// Typed access to Millimore backend Milestones 2 & 3
 /// (brokers, accounts, creator verification, traders, feed, social).
@@ -182,6 +183,62 @@ class BackendApi {
   /// Register a device push token (§6b — FCM/APNs). Safe to call best-effort.
   static Future<void> registerDevice({required String platform, required String token, String? appVersion}) =>
       _api.post('/devices', {'platform': platform, 'token': token, if (appVersion != null) 'appVersion': appVersion});
+
+  // ── Copy engine / portfolio / prices (milestone 4) ────────────────────────
+  static Future<List<CopyConfig>> copyConfigs() async {
+    final res = await _api.get('/copy');
+    return _list(res, res is Map ? 'items' : null).map(CopyConfig.fromJson).toList();
+  }
+
+  static Future<CopyConfig> startCopy(String traderId, {required String accountId, required double amount, double? risk, bool? autoCopy}) async {
+    final res = await _api.post('/copy/$traderId/start', {
+      'accountId': accountId,
+      'amount': amount,
+      if (risk != null) 'risk': risk,
+      if (autoCopy != null) 'autoCopy': autoCopy,
+    });
+    return CopyConfig.fromJson((res as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> stopCopy(String traderId) => _api.post('/copy/$traderId/stop');
+
+  static Future<List<CopyPosition>> positions() async {
+    final res = await _api.get('/positions');
+    return _list(res, res is Map ? 'items' : null).map(CopyPosition.fromJson).toList();
+  }
+
+  static Future<PortfolioSummary> portfolioSummary() async {
+    final res = await _api.get('/portfolio/summary');
+    return PortfolioSummary.fromJson((res as Map).cast<String, dynamic>());
+  }
+
+  static Future<Map<String, double>> prices() async {
+    final res = await _api.get('/prices');
+    final m = <String, double>{};
+    if (res is Map) {
+      res.forEach((k, v) {
+        if (v is num) m[k.toString()] = v.toDouble();
+      });
+    }
+    return m;
+  }
+
+  static Future<List<String>> symbols() async {
+    final res = await _api.get('/symbols');
+    if (res is List) return res.map((e) => e.toString()).toList();
+    return const [];
+  }
+
+  // ── Creator dashboard (§5b) ───────────────────────────────────────────────
+  static Future<Map<String, dynamic>> creatorStats() async {
+    final res = await _api.get('/creator/stats');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<List<ApiTrader>> creatorFollowers() async {
+    final res = await _api.get('/creator/followers');
+    return _list(res, res is Map ? 'items' : null).map(ApiTrader.fromJson).toList();
+  }
 
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }
