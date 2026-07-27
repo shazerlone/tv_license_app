@@ -12,6 +12,16 @@ export class CreatorStatusDto {
   reason?: string | null;
 }
 
+/** GET /creator/stats — creator dashboard card (contract §5b). */
+export class CreatorStatsDto {
+  @ApiProperty({ example: 1284 }) followers: number;
+  @ApiProperty({ example: 42 }) copiers: number;
+  @ApiProperty({ example: 21000 }) aum: number;
+  @ApiProperty({ example: 18.45 }) return30d: number;
+  @ApiProperty({ example: 0, description: 'Populated with real payouts in milestone 6.' })
+  earnings: number;
+}
+
 /** POST /creator/apply body (contract §4.2). */
 export class ApplyCreatorDto {
   @ApiProperty({ example: 'Forex' })

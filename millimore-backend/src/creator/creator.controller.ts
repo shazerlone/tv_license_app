@@ -3,7 +3,8 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { CreatorService } from './creator.service';
-import { CreatorStatusDto, ApplyCreatorDto } from './dto/creator.dto';
+import { CreatorStatusDto, ApplyCreatorDto, CreatorStatsDto } from './dto/creator.dto';
+import { UserDto } from '../users/dto/user.dto';
 
 @ApiTags('creator')
 @ApiBearerAuth('bearer')
@@ -17,6 +18,20 @@ export class CreatorController {
   @ApiOkResponse({ type: CreatorStatusDto })
   status(@CurrentUser() user: AuthUser): Promise<CreatorStatusDto> {
     return this.creator.getStatus(user.userId);
+  }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Creator dashboard stats (contract §5b)' })
+  @ApiOkResponse({ type: CreatorStatsDto })
+  stats(@CurrentUser() user: AuthUser): Promise<CreatorStatsDto> {
+    return this.creator.stats(user.userId);
+  }
+
+  @Get('followers')
+  @ApiOperation({ summary: 'Users who follow me (contract §5b)' })
+  @ApiOkResponse({ type: [UserDto] })
+  followers(@CurrentUser() user: AuthUser): Promise<UserDto[]> {
+    return this.creator.followers(user.userId);
   }
 
   @Post('apply')

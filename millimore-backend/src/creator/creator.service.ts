@@ -2,15 +2,53 @@ import { Injectable } from '@nestjs/common';
 import { CreatorStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../common/crypto/crypto.service';
+import { UsersService } from '../users/users.service';
 import { genId } from '../common/ids';
-import { CreatorStatusDto, ApplyCreatorDto } from './dto/creator.dto';
+import { CreatorStatusDto, ApplyCreatorDto, CreatorStatsDto } from './dto/creator.dto';
+import { UserDto } from '../users/dto/user.dto';
 
 @Injectable()
 export class CreatorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    private readonly users: UsersService,
   ) {}
+
+  /** Creator dashboard stats (contract §5b). Real copiers/AUM from copy configs. */
+  async stats(userId: string): Promise<CreatorStatsDto> {
+    const trader = await this.prisma.trader.findUnique({ where: { userId } });
+    if (!trader) return { followers: 0, copiers: 0, aum: 0, return30d: 0, earnings: 0 };
+
+    const [followers, copyAgg] = await Promise.all([
+      this.prisma.subscription.count({ where: { traderId: trader.id } }),
+      this.prisma.copyConfig.aggregate({
+        where: { traderId: trader.id, active: true },
+        _count: true,
+        _sum: { amount: true },
+      }),
+    ]);
+    return {
+      followers,
+      copiers: copyAgg._count,
+      aum: copyAgg._sum.amount ?? 0,
+      return30d: trader.returnPercent,
+      earnings: 0, // real payouts land in milestone 6
+    };
+  }
+
+  /** Users who follow this creator (contract §5b "see who copies you"). */
+  async followers(userId: string): Promise<UserDto[]> {
+    const trader = await this.prisma.trader.findUnique({ where: { userId } });
+    if (!trader) return [];
+    const subs = await this.prisma.subscription.findMany({
+      where: { traderId: trader.id },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { user: true },
+    });
+    return subs.map((s) => this.users.toDto(s.user));
+  }
 
   async getStatus(userId: string): Promise<CreatorStatusDto> {
     const user = await this.prisma.user.findUnique({

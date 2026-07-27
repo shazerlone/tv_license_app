@@ -159,9 +159,24 @@ creator approval queue. See [`admin/README.md`](./admin/README.md).
 > Trader `trades`/`equity` are deterministic **synthetic** data until the real
 > trade feed arrives in milestone 4/6.
 
+### ✅ Milestone 4 — Copy engine + portfolio + realtime (LIVE)
+
+| Method & path | Contract | Notes |
+| ------------- | -------- | ----- |
+| `POST /v1/copy/{traderId}/start` | §4.7 | Opens mirrored positions; one config per trader |
+| `POST /v1/copy/{traderId}/stop` | §4.7 | Closes positions, books P/L |
+| `GET /v1/copy` · `GET /v1/positions?status=` | §4.7 | Configs + positions (live P/L) |
+| `GET /v1/portfolio/summary` | §4.7 | net/open/booked P/L, invested, counts |
+| `GET /v1/symbols` · `GET /v1/prices?symbols=` | §4.8 | Symbol list + price snapshot |
+| **`WS /v1/ws?token=`** | §5 | Subscribe `prices` (~1/sec) + `portfolio` (live P/L) |
+| `GET /v1/creator/stats` · `/creator/followers` | §5b | Creator dashboard (real copiers/AUM) |
+
+> Prices + trader trades/equity are synthetic until the MT bridge (milestone 6);
+> the WS protocol and JSON shapes won't change when the real feed lands. The WS
+> gateway is single-instance now — Redis pub/sub makes it horizontal (ARCHITECTURE.md).
+
 ### ⏳ Next milestones (per contract §9)
 
-4. Copy engine + positions + portfolio + WS `prices`/`portfolio`
 5. Broadcasts (Cloudflare) + WS chat/viewers/reactions + YouTube chat ingest
 6. Live orders → MT bridge; payouts; full admin metrics/monitoring
 

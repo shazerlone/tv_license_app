@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { buildOpenApiConfig } from './openapi';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { RealtimeGateway } from './realtime/realtime.gateway';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
@@ -38,6 +39,9 @@ async function bootstrap() {
   // Swagger / OpenAPI generated from the same decorators the routes use.
   const document = SwaggerModule.createDocument(app, buildOpenApiConfig().build());
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
+
+  // Attach the realtime WebSocket gateway to the same HTTP server (/v1/ws).
+  app.get(RealtimeGateway).bind(app.getHttpServer());
 
   const port = Number(config.get<string>('PORT', '3000'));
   // Bind to 0.0.0.0 so the container is reachable on hosts like Render.

@@ -14,6 +14,9 @@ import { TradersModule } from './traders/traders.module';
 import { PostsModule } from './posts/posts.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { MarketModule } from './market/market.module';
+import { CopyModule } from './copy/copy.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -46,6 +49,9 @@ const staticModules = existsSync(ADMIN_DIR)
     PostsModule,
     SubscriptionsModule,
     NotificationsModule,
+    MarketModule,
+    CopyModule,
+    RealtimeModule,
     ...staticModules,
   ],
   controllers: [HealthController],

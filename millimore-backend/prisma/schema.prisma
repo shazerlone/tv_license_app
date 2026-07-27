@@ -79,9 +79,58 @@ model User {
   comments      Comment[]
   notifications Notification[]
   devices       Device[]
+  copyConfigs   CopyConfig[]
+  copyPositions CopyPosition[]
 
   @@index([role])
   @@index([creatorStatus])
+}
+
+/// A follower copying a trader (contract §3 CopyConfig, §4.7). One active row
+/// per (user, trader).
+model CopyConfig {
+  id        String   @id // "cc_..."
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traderId  String
+  accountId String
+  amount    Float
+  risk      Float    @default(1.0)
+  autoCopy  Boolean  @default(true)
+  active    Boolean  @default(true)
+  startedAt DateTime @default(now())
+  stoppedAt DateTime?
+
+  @@unique([userId, traderId])
+  @@index([userId])
+}
+
+enum PositionStatus {
+  active
+  closed
+}
+
+/// A copied position (contract §3 CopyPosition, §4.7). P/L is computed live from
+/// current prices for active rows; exitPrice + booked P/L are stored on close.
+model CopyPosition {
+  id         String         @id // "pos_..."
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traderId   String
+  traderName String
+  accountId  String
+  pair       String
+  isBuy      Boolean
+  status     PositionStatus @default(active)
+  entryPrice Float
+  exitPrice  Float?
+  lots       Float
+  pnlAmount  Float          @default(0) // last computed / booked
+  pnlPercent Float          @default(0)
+  openedAt   DateTime       @default(now())
+  closedAt   DateTime?
+
+  @@index([userId, status])
 }
 
 /// In-app notification (contract §4.12). Populated by events (milestone 4/5);

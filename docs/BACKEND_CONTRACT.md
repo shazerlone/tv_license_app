@@ -169,6 +169,8 @@ POST /auth/logout
 ```
 GET  /creator/status           → { creatorStatus, reason? }
 POST /creator/apply            { market, platform, verification{...} } → { creatorStatus:"pending" }
+GET  /creator/stats            → { followers, copiers, aum, return30d, earnings }  // creator dashboard
+GET  /creator/followers        → [ User ]                                          // who follows me
 ```
 > Admin flips status; app polls or receives WS `creator.status` event.
 > This replaces the demo "Mark as verified" button.
@@ -448,3 +450,26 @@ unchanged; this section only pins down details the prose left open.
    `DELETE /devices/{token}` (contract §4.12). Creator approve/reject already
    writes a `creator.status` notification; trade/live events populate
    notifications from milestone 4/5.
+
+### Copy engine, market data & realtime (milestone 4)
+- `POST /copy/{traderId}/start` `{ accountId, amount, risk?, autoCopy? }` → `CopyConfig`;
+  opens 2–3 mirrored positions at current prices. One active config per (user, trader).
+- `POST /copy/{traderId}/stop` → `204`; closes that trader's open positions at the
+  current price and books their P/L.
+- `GET /copy` → active `[CopyConfig]`. `GET /positions?status=active|closed` →
+  `[CopyPosition]` — **P/L on active rows is computed live** from current prices.
+- `GET /portfolio/summary` → `{ netPnl, openPnl, bookedProfit, bookedLoss,
+  copyingCount, activeCount, closedCount, invested }` (openPnl is live).
+- `GET /symbols` → `[string]`; `GET /prices?symbols=A,B` → `{ "A": 1.23, … }` snapshot.
+  Prices tick ~1/sec (synthetic now → MT bridge in milestone 6; shape unchanged).
+- **WebSocket** `wss://…/v1/ws?token=<JWT>` (contract §5). Client sends
+  `{ op:"subscribe", channels:["prices","portfolio"] }`. Server pushes
+  `{ ch:"prices", data:{sym:price,…} }` ~1/sec and
+  `{ ch:"portfolio", type:"position", data: CopyPosition }` with live P/L. Single
+  instance today; Redis pub/sub makes it multi-instance without protocol change.
+
+### Creator side (milestone 4 / §5b)
+- `AuthResponseDto.user` and `GET /me` **include `user.id`** (P0 — confirmed).
+- `GET /creator/stats` → `{ followers, copiers, aum, return30d, earnings }` — copiers
+  and aum are real (from active copy configs); `earnings` is 0 until payouts (milestone 6).
+- `GET /creator/followers` → `[User]` who subscribe to the creator.

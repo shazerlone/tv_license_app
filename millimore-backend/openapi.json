@@ -530,6 +530,63 @@
         ]
       }
     },
+    "/v1/creator/stats": {
+      "get": {
+        "operationId": "CreatorController_stats",
+        "summary": "Creator dashboard stats (contract §5b)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/creator/followers": {
+      "get": {
+        "operationId": "CreatorController_followers",
+        "summary": "Users who follow me (contract §5b)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/creator/apply": {
       "post": {
         "operationId": "CreatorController_apply",
@@ -1636,6 +1693,251 @@
           }
         ]
       }
+    },
+    "/v1/symbols": {
+      "get": {
+        "operationId": "MarketController_symbols",
+        "summary": "List tradable symbols (contract §4.8)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "market"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/prices": {
+      "get": {
+        "operationId": "MarketController_snapshot",
+        "summary": "Price snapshot; realtime comes over WS (contract §4.8)",
+        "parameters": [
+          {
+            "name": "symbols",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "XAU/USD,EUR/USD",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "XAU/USD": 2015.3,
+                    "EUR/USD": 1.0851
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "market"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/copy/{traderId}/start": {
+      "post": {
+        "operationId": "CopyController_start",
+        "summary": "Start copying a trader (contract §4.7)",
+        "parameters": [
+          {
+            "name": "traderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCopyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyConfigDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/copy/{traderId}/stop": {
+      "post": {
+        "operationId": "CopyController_stop",
+        "summary": "Stop copying a trader; closes open positions (contract §4.7)",
+        "parameters": [
+          {
+            "name": "traderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/copy": {
+      "get": {
+        "operationId": "CopyController_configs",
+        "summary": "My active copy configs (contract §4.7)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CopyConfigDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/positions": {
+      "get": {
+        "operationId": "CopyController_positions",
+        "summary": "My copied positions with live P/L (contract §4.7)",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "active",
+                "closed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CopyPositionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/portfolio/summary": {
+      "get": {
+        "operationId": "CopyController_summary",
+        "summary": "Portfolio summary (contract §4.7)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
     }
   },
   "info": {
@@ -2160,6 +2462,39 @@
         },
         "required": [
           "creatorStatus"
+        ]
+      },
+      "CreatorStatsDto": {
+        "type": "object",
+        "properties": {
+          "followers": {
+            "type": "number",
+            "example": 1284
+          },
+          "copiers": {
+            "type": "number",
+            "example": 42
+          },
+          "aum": {
+            "type": "number",
+            "example": 21000
+          },
+          "return30d": {
+            "type": "number",
+            "example": 18.45
+          },
+          "earnings": {
+            "type": "number",
+            "example": 0,
+            "description": "Populated with real payouts in milestone 6."
+          }
+        },
+        "required": [
+          "followers",
+          "copiers",
+          "aum",
+          "return30d",
+          "earnings"
         ]
       },
       "ApplyCreatorDto": {
@@ -2933,6 +3268,184 @@
         "required": [
           "platform",
           "token"
+        ]
+      },
+      "StartCopyDto": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "example": "acc_1"
+          },
+          "amount": {
+            "type": "number",
+            "example": 500
+          },
+          "risk": {
+            "type": "number",
+            "example": 1,
+            "default": 1
+          },
+          "autoCopy": {
+            "type": "boolean",
+            "example": true,
+            "default": true
+          }
+        },
+        "required": [
+          "accountId",
+          "amount"
+        ]
+      },
+      "CopyConfigDto": {
+        "type": "object",
+        "properties": {
+          "traderId": {
+            "type": "string",
+            "example": "t_1"
+          },
+          "accountId": {
+            "type": "string",
+            "example": "acc_1"
+          },
+          "amount": {
+            "type": "number",
+            "example": 500
+          },
+          "risk": {
+            "type": "number",
+            "example": 1
+          },
+          "autoCopy": {
+            "type": "boolean",
+            "example": true
+          },
+          "startedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "traderId",
+          "accountId",
+          "amount",
+          "risk",
+          "autoCopy",
+          "startedAt"
+        ]
+      },
+      "CopyPositionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pos_1"
+          },
+          "traderId": {
+            "type": "string",
+            "example": "t_1"
+          },
+          "traderName": {
+            "type": "string",
+            "example": "Marcus"
+          },
+          "pair": {
+            "type": "string",
+            "example": "EUR/USD"
+          },
+          "isBuy": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ]
+          },
+          "entryPrice": {
+            "type": "number",
+            "example": 1.0876
+          },
+          "exitPrice": {
+            "type": "object",
+            "nullable": true
+          },
+          "pnlAmount": {
+            "type": "number",
+            "example": 12.4
+          },
+          "pnlPercent": {
+            "type": "number",
+            "example": 0.47
+          },
+          "lots": {
+            "type": "number",
+            "example": 0.1
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "closedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "accountId": {
+            "type": "string",
+            "example": "acc_1"
+          }
+        },
+        "required": [
+          "id",
+          "traderId",
+          "traderName",
+          "pair",
+          "isBuy",
+          "status",
+          "entryPrice",
+          "pnlAmount",
+          "pnlPercent",
+          "lots",
+          "openedAt",
+          "accountId"
+        ]
+      },
+      "PortfolioSummaryDto": {
+        "type": "object",
+        "properties": {
+          "netPnl": {
+            "type": "number"
+          },
+          "openPnl": {
+            "type": "number"
+          },
+          "bookedProfit": {
+            "type": "number"
+          },
+          "bookedLoss": {
+            "type": "number"
+          },
+          "copyingCount": {
+            "type": "number"
+          },
+          "activeCount": {
+            "type": "number"
+          },
+          "closedCount": {
+            "type": "number"
+          },
+          "invested": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "netPnl",
+          "openPnl",
+          "bookedProfit",
+          "bookedLoss",
+          "copyingCount",
+          "activeCount",
+          "closedCount",
+          "invested"
         ]
       }
     }
