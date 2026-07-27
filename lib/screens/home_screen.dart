@@ -21,6 +21,7 @@ import 'copied_trades_screen.dart';
 import 'profile_screen.dart';
 import 'discover_screen.dart';
 import 'leaderboard_screen.dart';
+import 'compose_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -372,14 +373,57 @@ class _MiniStat extends StatelessWidget {
 // CREATOR HOME
 // ════════════════════════════════════════════════════════════════════════════
 
-class CreatorHome extends StatelessWidget {
+class CreatorHome extends StatefulWidget {
   const CreatorHome();
+
+  @override
+  State<CreatorHome> createState() => _CreatorHomeState();
+}
+
+class _CreatorHomeState extends State<CreatorHome> {
+  List<Post> _posts = const [];
+  bool _loading = false;
+  bool _loaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loaded) return;
+    _loaded = true;
+    final id = SessionScope.of(context).user?.id;
+    if (kUseBackend && id != null) {
+      _loading = true;
+      _loadPosts(id);
+    } else if (!kUseBackend) {
+      _posts = mockPosts(mockTraders).take(2).toList();
+    }
+  }
+
+  Future<void> _loadPosts(String id) async {
+    try {
+      final list = await BackendApi.traderPosts(id);
+      if (!mounted) return;
+      setState(() {
+        _posts = list.map(Post.fromApi).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  void _compose() async {
+    final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const ComposePostScreen()));
+    final id = SessionScope.of(context).user?.id;
+    if (ok == true && id != null) _loadPosts(id);
+  }
 
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
     final pending = session.user?.creatorStatus == CreatorStatus.pending;
-    final posts = mockPosts(mockTraders).take(2).toList();
+    final posts = _posts;
 
     return CustomScrollView(
       slivers: [
@@ -423,22 +467,41 @@ class CreatorHome extends StatelessWidget {
               children: [
                 Expanded(child: _QuickAction(icon: Icons.podcasts_rounded, label: 'Go Live', color: AppColors.red, onTap: () => _openStudio(context))),
                 const SizedBox(width: 12),
-                Expanded(child: _QuickAction(icon: Icons.add_chart_rounded, label: 'Post Trade', color: AppColors.primary, onTap: () => _openStudio(context))),
+                Expanded(child: _QuickAction(icon: Icons.add_chart_rounded, label: 'Post Trade', color: AppColors.primary, onTap: pending ? () => _openStudio(context) : _compose)),
               ],
             ),
           ),
         ),
         SliverToBoxAdapter(child: _SectionHeader(title: 'Your recent posts')),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (_, i) => FeedPost(
-              post: posts[i],
-              onOpenProfile: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+        if (_loading)
+          const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator())))
+        else if (posts.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                children: [
+                  Icon(Icons.post_add_rounded, size: 42, color: AppColors.textMuted.withOpacity(0.5)),
+                  const SizedBox(height: 12),
+                  Text('No posts yet', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const SizedBox(height: 4),
+                  Text('Share a trade idea or lesson to grow your following.',
+                      textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                ],
+              ),
             ),
-            childCount: posts.length,
+          )
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (_, i) => FeedPost(
+                post: posts[i],
+                onOpenProfile: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
+              ),
+              childCount: posts.length,
+            ),
           ),
-        ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );

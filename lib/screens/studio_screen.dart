@@ -6,6 +6,7 @@ import '../state/session.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
 import 'go_live_screen.dart';
+import 'compose_post_screen.dart';
 
 class StudioScreen extends StatelessWidget {
   const StudioScreen({super.key});
@@ -66,7 +67,10 @@ class StudioScreen extends StatelessWidget {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const GoLiveScreen()));
                 })),
                 const SizedBox(width: 12),
-                Expanded(child: _BigAction(icon: Icons.add_chart_rounded, title: 'Post Trade', sub: 'Share a setup', color: AppColors.primary, locked: pending, onTap: () => _action(context, 'Post Trade'))),
+                Expanded(child: _BigAction(icon: Icons.add_chart_rounded, title: 'Post Trade', sub: 'Share a setup', color: AppColors.primary, locked: pending, onTap: () {
+                  if (pending) { _action(context, 'Post Trade'); return; }
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ComposePostScreen()));
+                })),
               ],
             ),
             const SizedBox(height: 20),

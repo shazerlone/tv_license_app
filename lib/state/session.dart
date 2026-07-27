@@ -19,6 +19,7 @@ CreatorStatus _statusFrom(String? s) {
 }
 
 class UserProfile {
+  final String? id;
   final String name;
   final String? photoUrl;
   final UserRole role;
@@ -29,6 +30,7 @@ class UserProfile {
   final CreatorStatus creatorStatus;
 
   const UserProfile({
+    this.id,
     required this.name,
     this.photoUrl,
     required this.role,
@@ -55,6 +57,7 @@ class UserProfile {
 
   /// Serialised form for local persistence (remember-me).
   Map<String, dynamic> toJson() => {
+        'id': id,
         'name': name,
         'photoUrl': photoUrl,
         'role': _roleStr(role),
@@ -68,6 +71,7 @@ class UserProfile {
   /// Maps a backend `User` (docs/BACKEND_CONTRACT.md §3) to a UserProfile.
   factory UserProfile.fromJson(Map<String, dynamic> j) {
     return UserProfile(
+      id: j['id'] as String?,
       name: (j['name'] ?? '').toString(),
       photoUrl: j['photoUrl'] as String?,
       role: _roleFrom(j['role'] as String?),
@@ -80,6 +84,7 @@ class UserProfile {
   }
 
   UserProfile copyWith({
+    String? id,
     String? name,
     String? photoUrl,
     UserRole? role,
@@ -90,6 +95,7 @@ class UserProfile {
     CreatorStatus? creatorStatus,
   }) {
     return UserProfile(
+      id: id ?? this.id,
       name: name ?? this.name,
       photoUrl: photoUrl ?? this.photoUrl,
       role: role ?? this.role,

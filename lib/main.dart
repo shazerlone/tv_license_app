@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
@@ -22,6 +23,56 @@ class MillimoreApp extends StatefulWidget {
 
   @override
   State<MillimoreApp> createState() => _MillimoreAppState();
+}
+
+/// Shows a slim "you're offline" bar over the app when requests can't reach the
+/// server, and hides it automatically once connectivity returns.
+class _OfflineWrapper extends StatelessWidget {
+  final Widget child;
+  const _OfflineWrapper({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ApiClient.instance.offline,
+      builder: (context, offline, _) {
+        return Directionality(
+          textDirection: TextDirection.ltr,
+          child: Stack(
+            children: [
+              child,
+              if (offline)
+                Positioned(
+                  left: 0, right: 0,
+                  bottom: MediaQuery.of(context).padding.bottom + 8,
+                  child: Center(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1F2937),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 4))],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.wifi_off_rounded, size: 16, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text('You\'re offline', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _MillimoreAppState extends State<MillimoreApp> {
@@ -114,7 +165,7 @@ class _MillimoreAppState extends State<MillimoreApp> {
                     data: mq.copyWith(
                       textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.05),
                     ),
-                    child: child!,
+                    child: _OfflineWrapper(child: child!),
                   );
                 },
                 home: _booting

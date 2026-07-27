@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config.dart';
 
@@ -27,6 +28,17 @@ class ApiClient {
   void Function()? onUnauthorized;
   bool _handling401 = false;
 
+  /// True when the last request failed to reach the server (network/timeout).
+  /// The app shows an offline banner while this is true; cleared on any success.
+  final ValueNotifier<bool> offline = ValueNotifier<bool>(false);
+  void _online() {
+    if (offline.value) offline.value = false;
+  }
+
+  void _markOffline() {
+    if (!offline.value) offline.value = true;
+  }
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (_token != null) 'Authorization': 'Bearer $_token',
@@ -44,7 +56,9 @@ class ApiClient {
     Object? lastError;
     for (var i = 0; i <= backoff.length; i++) {
       try {
-        return await attempt().timeout(timeout);
+        final r = await attempt().timeout(timeout);
+        _online(); // reached the server
+        return r;
       } on ApiException {
         rethrow; // real HTTP error — don't retry
       } catch (e) {
@@ -52,6 +66,7 @@ class ApiClient {
         if (i < backoff.length) await Future.delayed(backoff[i]);
       }
     }
+    _markOffline();
     throw lastError ?? Exception('Request failed');
   }
 
