@@ -92,5 +92,10 @@ class AuthApi {
     return UserProfile.fromJson(((res as Map)['user'] as Map).cast<String, dynamic>());
   }
 
+  static Future<UserProfile> updateMe(Map<String, dynamic> fields) async {
+    final res = await _api.patch('/me', fields);
+    return UserProfile.fromJson(((res as Map)['user'] as Map).cast<String, dynamic>());
+  }
+
   static void logout() => _api.clear();
 }

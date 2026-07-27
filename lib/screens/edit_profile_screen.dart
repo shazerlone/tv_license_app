@@ -1,0 +1,171 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_theme.dart';
+import '../config.dart';
+import '../state/session.dart';
+import '../services/auth_api.dart';
+import '../services/api_client.dart';
+import '../services/image_picker_service.dart';
+import '../widgets/avatar.dart';
+
+/// Edit the signed-in user's profile (PATCH /me).
+class EditProfileScreen extends StatefulWidget {
+  const EditProfileScreen({super.key});
+
+  @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  final _name = TextEditingController();
+  final _market = TextEditingController();
+  final _platform = TextEditingController();
+  String? _photoUrl;
+  bool _saving = false;
+  bool _isCreator = false;
+  bool _init = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_init) return;
+    _init = true;
+    final u = SessionScope.of(context).user;
+    _name.text = u?.name ?? '';
+    _market.text = u?.market ?? '';
+    _platform.text = u?.platform ?? '';
+    _photoUrl = u?.photoUrl;
+    _isCreator = u?.isCreator ?? false;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _market.dispose();
+    _platform.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final url = await ImagePickerService.pickImageAsDataUrl();
+    if (url != null && mounted) setState(() => _photoUrl = url);
+  }
+
+  Future<void> _save() async {
+    final session = SessionScope.of(context);
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your name')));
+      return;
+    }
+    setState(() => _saving = true);
+
+    final fields = <String, dynamic>{
+      'name': name,
+      if (_photoUrl != null) 'photoUrl': _photoUrl,
+      if (_isCreator && _market.text.trim().isNotEmpty) 'market': _market.text.trim(),
+      if (_isCreator && _platform.text.trim().isNotEmpty) 'platform': _platform.text.trim(),
+    };
+
+    if (kUseBackend) {
+      try {
+        final updated = await AuthApi.updateMe(fields);
+        if (!mounted) return;
+        session.applyBackendSession(updated);
+        Navigator.pop(context);
+        return;
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+        return;
+      }
+    }
+
+    // Demo: update the local session.
+    final u = session.user;
+    if (u != null) session.applyBackendSession(u.copyWith(name: name, photoUrl: _photoUrl, market: _market.text.trim(), platform: _platform.text.trim()));
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Edit profile', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        children: [
+          Center(
+            child: GestureDetector(
+              onTap: _pickPhoto,
+              child: Stack(
+                children: [
+                  Avatar(name: _name.text.isEmpty ? '?' : _name.text, photoUrl: _photoUrl, size: 96),
+                  Positioned(
+                    right: 0, bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle, border: Border.all(color: AppColors.background, width: 2)),
+                      child: const Icon(Icons.camera_alt_rounded, size: 15, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          _Label('Full name'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.words,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(hintText: 'Your name'),
+            onChanged: (_) => setState(() {}),
+          ),
+          if (_isCreator) ...[
+            const SizedBox(height: 20),
+            _Label('Market'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _market,
+              style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+              decoration: const InputDecoration(hintText: 'e.g. Forex'),
+            ),
+            const SizedBox(height: 20),
+            _Label('Platform'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _platform,
+              style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+              decoration: const InputDecoration(hintText: 'e.g. MetaTrader 5'),
+            ),
+          ],
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Save changes'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Label extends StatelessWidget {
+  final String text;
+  const _Label(this.text);
+  @override
+  Widget build(BuildContext context) =>
+      Text(text, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary));
+}

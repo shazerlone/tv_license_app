@@ -16,6 +16,7 @@ import 'login_screen.dart';
 import 'accounts_screen.dart';
 import 'copied_trades_screen.dart';
 import 'support_chat_screen.dart';
+import 'edit_profile_screen.dart';
 
 /// One simple profile page: who you are, your copy performance, and clear
 /// buttons out to everything else. No tabs, no nested navigation.
@@ -88,7 +89,7 @@ class ProfileScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => _toast(context, 'Edit profile'),
+                onPressed: () => _push(context, const EditProfileScreen()),
                 icon: Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
                 label: Text('Edit profile', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.border)),
