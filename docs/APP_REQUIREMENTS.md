@@ -128,6 +128,24 @@ already calls these / is built for them — please implement:
 > `id`. The app persists it and uses it for the creator's own posts; without it
 > the creator home can't show their posts.
 
+## 5c. Copy engine & portfolio — milestone 4 ✅ WIRED
+| Method · Path | App expects | Status |
+| --- | --- | --- |
+| GET `/copy` | `[CopyConfig]` | ✅ |
+| POST `/copy/{traderId}/start` | `{ accountId, amount, risk?, autoCopy? }` → `CopyConfig` | ✅ |
+| POST `/copy/{traderId}/stop` | 200 | ✅ |
+| GET `/positions` | `[CopyPosition]` | ✅ Copied Trades |
+| GET `/portfolio/summary` | `PortfolioSummary` | ✅ Home card + Profile |
+| GET `/prices` | `{ "XAU/USD": 2015.3, … }` | 🟡 client ready (live overlay still demo) |
+| GET `/symbols` | `[string]` | 🟡 |
+| GET `/accounts` · DELETE `/accounts/{id}` | list / disconnect | ✅ (now loaded + real disconnect) |
+| GET `/notifications` · POST `/notifications/read` | `[Notification]` / read | ✅ notification center |
+| GET `/creator/stats` · `/creator/followers` | stats / `[User]` | 🟡 client ready, screens pending |
+
+> Still needs backend for full realtime: **WS `prices`/`portfolio` push** and the
+> **live events** in §6a (so positions/pnl update without a manual refresh), plus
+> **`POST /devices`** wiring on the client (needs Firebase — deliberate later step).
+
 ## 6. NEW things the app needs (please add to the contract, then build)
 
 These are **not yet in the backend** but the app is being built to use them. Flag

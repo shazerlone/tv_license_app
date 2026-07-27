@@ -75,14 +75,17 @@ class AppState extends ChangeNotifier {
   }
 
   void markNotificationsRead() {
-    var changed = false;
+    final unreadIds = _notifications.where((n) => !n.read).map((n) => n.id).toList();
+    if (unreadIds.isEmpty) return;
     for (final n in _notifications) {
-      if (!n.read) {
-        n.read = true;
-        changed = true;
-      }
+      n.read = true;
     }
-    if (changed) notifyListeners();
+    notifyListeners();
+    if (kUseBackend) {
+      // Only sync server-originated ids (client-derived 'live_*' ids aren't real).
+      final serverIds = unreadIds.where((id) => !id.startsWith('live_')).toList();
+      if (serverIds.isNotEmpty) BackendApi.markNotificationsRead(serverIds).catchError((_) {});
+    }
   }
 
   /// Loads the real social graph (subscriptions) from the backend. Called once
