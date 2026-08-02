@@ -81,7 +81,8 @@ class StudioScreen extends StatelessWidget {
             _Row(icon: Icons.link_rounded, title: 'Connected accounts', sub: session.user?.platform ?? 'Add a trading account', onTap: () => _action(context, 'Accounts')),
             _Row(icon: Icons.bar_chart_rounded, title: 'Earnings & payouts', sub: 'Track your revenue', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EarningsScreen()))),
             _Row(icon: Icons.groups_rounded, title: 'Followers', sub: 'See who copies you', onTap: () => _action(context, 'Followers')),
-            _Row(icon: Icons.tune_rounded, title: 'Creator settings', sub: 'Fees, bio, visibility', onTap: () => _action(context, 'Settings'), last: true),
+            _Row(icon: Icons.percent_rounded, title: 'Commission', sub: 'Your fee on copiers\' profits', onTap: () => _setCommission(context)),
+            _Row(icon: Icons.tune_rounded, title: 'Creator settings', sub: 'Bio, visibility', onTap: () => _action(context, 'Settings'), last: true),
           ],
         ),
       ),
@@ -110,6 +111,38 @@ class StudioScreen extends StatelessWidget {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
+  }
+
+  Future<void> _setCommission(BuildContext context) async {
+    final controller = TextEditingController(text: '20');
+    final percent = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.background,
+        title: Text('Set commission', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          decoration: const InputDecoration(suffixText: '%', helperText: 'Your share of copiers\' profits (0–50%)'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, double.tryParse(controller.text.trim())), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (percent == null || percent < 0 || percent > 50) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final saved = await BackendApi.setCommission(percent);
+      messenger.showSnackBar(SnackBar(content: Text('Commission set to ${saved.toStringAsFixed(0)}%')));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
       messenger.showSnackBar(const SnackBar(content: Text('Could not reach the server')));
     }
   }

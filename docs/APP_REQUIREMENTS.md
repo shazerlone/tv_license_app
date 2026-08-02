@@ -170,6 +170,19 @@ Backend endpoints exist; the app's client methods are added. Status:
 - GET `/creator/earnings` → `{balance, currency, pending, history[]}` — Earnings screen. ✅
 - PATCH/DELETE `/posts/{id}` — client ready (edit/delete own post).
 
+## 5f. Money layer — milestone 6 ✅ WIRED
+| Method · Path | App expects | Status |
+| --- | --- | --- |
+| GET `/wallet` · `/wallet/ledger` | `{balance,currency}` / `[LedgerEntry]` | ✅ Wallet screen |
+| GET `/deposits/methods` · GET/POST `/deposits` | methods / `[Deposit]` / create | ✅ Add-funds sheet |
+| GET/POST `/creator/payouts` | `[Payout]` / request | ✅ Earnings → Request payout |
+| PATCH `/creator/commission` `{percent}` | `{commissionPercent}` | ✅ Studio → Commission |
+
+> Admin `/admin/metrics` + `/admin/payouts` are for the **admin dashboard**, not
+> the mobile app — intentionally not wired here.
+> Open Q: is there a **GET** for current commission? Only PATCH exists, so the
+> app can set but not display the current value (defaults the input to 20%).
+
 ## 6. NEW things the app needs (please add to the contract, then build)
 
 These are **not yet in the backend** but the app is being built to use them. Flag
