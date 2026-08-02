@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
@@ -8,6 +8,8 @@ import {
   ApplyCreatorDto,
   CreatorStatsDto,
   CreatorEarningsDto,
+  SetCommissionDto,
+  CommissionDto,
 } from './dto/creator.dto';
 import { UserDto } from '../users/dto/user.dto';
 
@@ -44,6 +46,16 @@ export class CreatorController {
   @ApiOkResponse({ type: CreatorEarningsDto })
   earnings(@CurrentUser() user: AuthUser): Promise<CreatorEarningsDto> {
     return this.creator.earnings(user.userId);
+  }
+
+  @Patch('commission')
+  @ApiOperation({ summary: 'Set my performance-fee % charged to copiers (1–30)' })
+  @ApiOkResponse({ type: CommissionDto })
+  setCommission(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SetCommissionDto,
+  ): Promise<CommissionDto> {
+    return this.creator.setCommission(user.userId, dto.percent);
   }
 
   @Post('apply')

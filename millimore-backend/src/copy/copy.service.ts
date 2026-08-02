@@ -2,11 +2,15 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
-import { CopyConfig, CopyPosition } from '@prisma/client';
+import { CopyConfig, CopyPosition, LedgerType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricesService } from '../market/prices.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WalletService } from '../wallet/wallet.service';
+import { SettlementService } from '../wallet/settlement.service';
+import { MT_BRIDGE, MtBridge } from '../mt/mt.types';
 import { genId } from '../common/ids';
 import { round } from '../common/rng';
 import {
@@ -29,6 +33,9 @@ export class CopyService {
     private readonly prisma: PrismaService,
     private readonly prices: PricesService,
     private readonly notifications: NotificationsService,
+    private readonly wallet: WalletService,
+    private readonly settlement: SettlementService,
+    @Inject(MT_BRIDGE) private readonly bridge: MtBridge,
   ) {}
 
   // ── live P/L helpers ────────────────────────────────────────────────
@@ -81,18 +88,40 @@ export class CopyService {
     const trader = await this.prisma.trader.findUnique({ where: { id: traderId } });
     if (!trader) throw new NotFoundException({ code: 'trader_not_found', message: 'Trader not found' });
 
-    const account = await this.prisma.tradingAccount.findFirst({
-      where: { id: dto.accountId, userId },
-      select: { id: true },
+    // accountId is an optional broker hint now — funding is the in-app wallet.
+    if (dto.accountId) {
+      const account = await this.prisma.tradingAccount.findFirst({
+        where: { id: dto.accountId, userId },
+        select: { id: true },
+      });
+      if (!account) {
+        throw new BadRequestException({ code: 'account_invalid', message: 'Unknown or unowned account' });
+      }
+    }
+    const accountId = dto.accountId ?? 'wallet';
+
+    // Only allocate wallet capital on a fresh copy (or a re-start after stop),
+    // not when merely updating an already-active config's settings.
+    const existing = await this.prisma.copyConfig.findUnique({
+      where: { userId_traderId: { userId, traderId } },
     });
-    if (!account) {
-      throw new BadRequestException({ code: 'account_invalid', message: 'Unknown or unowned account' });
+    const isNewAllocation = !existing || !existing.active;
+    if (isNewAllocation) {
+      // Debits the wallet — throws insufficient_balance if the user hasn't
+      // deposited enough. This is the "deposit first" flow.
+      await this.wallet.post({
+        userId,
+        type: LedgerType.copy_allocate,
+        amount: -dto.amount,
+        refId: existing?.id,
+        note: `Copy ${trader.name}`,
+      });
     }
 
     const config = await this.prisma.copyConfig.upsert({
       where: { userId_traderId: { userId, traderId } },
       update: {
-        accountId: dto.accountId,
+        accountId,
         amount: dto.amount,
         risk: dto.risk ?? 1.0,
         autoCopy: dto.autoCopy ?? true,
@@ -103,15 +132,20 @@ export class CopyService {
         id: genId('cc'),
         userId,
         traderId,
-        accountId: dto.accountId,
+        accountId,
         amount: dto.amount,
         risk: dto.risk ?? 1.0,
         autoCopy: dto.autoCopy ?? true,
       },
     });
 
-    // Open a few positions mirroring the trader (synthetic until the MT bridge).
-    await this.openInitialPositions(userId, trader.id, trader.name, dto.accountId, dto.amount, dto.risk ?? 1);
+    // Open a few positions mirroring the trader (synthetic until the broker
+    // bridge is live) and route the net exposure to the corporate broker
+    // account via the bridge (best-effort — never blocks the copy).
+    await this.openInitialPositions(userId, trader.id, trader.name, accountId, dto.amount, dto.risk ?? 1);
+    void this.bridge
+      .placeOrder({ accountRef: `corp:${trader.id}`, symbol: trader.category, side: 'buy', volume: dto.amount })
+      .catch(() => undefined);
     return this.toConfigDto(config);
   }
 
@@ -160,6 +194,15 @@ export class CopyService {
   }
 
   async stop(userId: string, traderId: string): Promise<void> {
+    const trader = await this.prisma.trader.findUnique({
+      where: { id: traderId },
+      select: { id: true, userId: true, commissionPercent: true },
+    });
+    const config = await this.prisma.copyConfig.findUnique({
+      where: { userId_traderId: { userId, traderId } },
+    });
+    const wasActive = !!config?.active;
+
     await this.prisma.copyConfig.updateMany({
       where: { userId, traderId },
       data: { active: false, stoppedAt: new Date() },
@@ -168,9 +211,11 @@ export class CopyService {
     const open = await this.prisma.copyPosition.findMany({
       where: { userId, traderId, status: 'active' },
     });
+    let realizedPnl = 0;
     for (const p of open) {
       const cur = this.prices.price(p.pair) ?? p.entryPrice;
       const { pnlAmount, pnlPercent } = this.pnlAt(p, cur);
+      realizedPnl += pnlAmount;
       await this.prisma.copyPosition.update({
         where: { id: p.id },
         data: { status: 'closed', exitPrice: cur, pnlAmount, pnlPercent, closedAt: new Date() },
@@ -178,6 +223,22 @@ export class CopyService {
       // Live event: position closed with booked P/L (contract §6a).
       await this.notifications.pushEvent(userId, 'trade.closed', `${p.pair} closed ${pnlPercent}%`, {
         data: { traderId, pair: p.pair, pnlPercent, pnlAmount },
+      });
+    }
+
+    // Settle the wallet: return principal, book P/L, split the performance fee
+    // (copier keeps the profit, trader earns commission, Millimore its share).
+    if (wasActive && config && trader) {
+      const result = await this.settlement.settle({
+        copierUserId: userId,
+        trader: { id: trader.id, userId: trader.userId, commissionPercent: trader.commissionPercent },
+        principal: config.amount,
+        realizedPnl: round(realizedPnl, 2),
+        refId: config.id,
+      });
+      await this.notifications.pushEvent(userId, 'copy.settled', 'Copy stopped & settled', {
+        body: `You received $${result.netToCopier.toFixed(2)} back to your wallet.`,
+        data: { traderId, netToCopier: result.netToCopier, fee: result.fee },
       });
     }
   }

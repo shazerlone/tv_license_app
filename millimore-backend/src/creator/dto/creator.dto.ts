@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsString, ValidateNested } from 'class-validator';
+import { IsInt, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { VerificationDto } from '../../auth/dto/register.dto';
 
 /** GET /creator/status response (contract §4.2). */
@@ -22,12 +22,31 @@ export class CreatorStatsDto {
   earnings: number;
 }
 
-/** GET /creator/earnings (contract §5b). Real payouts land in milestone 6. */
+/** GET /creator/earnings (contract §5b) — real wallet-backed earnings. */
 export class CreatorEarningsDto {
-  @ApiProperty({ example: 0 }) balance: number;
+  @ApiProperty({ example: 320.5, description: 'Withdrawable wallet balance.' })
+  balance: number;
   @ApiProperty({ example: 'USD' }) currency: string;
-  @ApiProperty({ example: 0 }) pending: number;
-  @ApiProperty({ type: [Object], example: [] }) history: unknown[];
+  @ApiProperty({ example: 50, description: 'In open withdrawal requests.' })
+  pending: number;
+  @ApiProperty({ example: 1240.75, description: 'Lifetime commission earned.' })
+  lifetimeEarned: number;
+  @ApiProperty({ type: [Object], example: [], description: 'Recent withdrawals.' })
+  history: unknown[];
+}
+
+/** PATCH /creator/commission body — the trader's performance fee (1–30%). */
+export class SetCommissionDto {
+  @ApiProperty({ example: 20, minimum: 1, maximum: 30 })
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  percent: number;
+}
+
+/** PATCH /creator/commission response. */
+export class CommissionDto {
+  @ApiProperty({ example: 20 }) commissionPercent: number;
 }
 
 /** POST /creator/apply body (contract §4.2). */

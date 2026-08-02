@@ -71,6 +71,9 @@ model User {
   googleSubject String? @unique
 
   banned    Boolean  @default(false)
+  // Throttled activity timestamp (updated at most every ~10 min by the JWT
+  // strategy) — powers real DAU/MAU in admin metrics without an events table.
+  lastSeenAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -88,9 +91,115 @@ model User {
   copyPositions CopyPosition[]
   broadcasts    Broadcast[]
   uploads       Upload[]
+  payouts       Payout[]
+  wallet        Wallet?
+  deposits      Deposit[]
 
   @@index([role])
   @@index([creatorStatus])
+}
+
+enum PayoutStatus {
+  pending
+  approved
+  rejected
+  paid
+}
+
+/// A creator withdrawal request against accrued earnings (contract §5b, §6).
+/// Earnings themselves are computed live from active copy configs (a performance
+/// fee on copier AUM); this table records money movements only. Amounts are in
+/// `currency` (USD). Admin approves/rejects; `approved` funds are considered
+/// deducted from the withdrawable balance, `paid` marks the transfer done.
+model Payout {
+  id         String       @id // "po_..."
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     Float
+  currency   String       @default("USD")
+  status     PayoutStatus @default(pending)
+  method     String? // e.g. "bank", "usdt" — free-form for now
+  note       String? // creator's note on request
+  decisionBy String? // admin user id who approved/rejected
+  reason     String? // admin note / rejection reason
+  createdAt  DateTime     @default(now())
+  decidedAt  DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+/// A user's in-app money balance (the Millimore wallet). Funded by deposits
+/// (crypto now), drawn down by copy allocations, credited by trade P/L and (for
+/// traders) commission. One row per user. `balance` is the source of truth;
+/// every change is mirrored by a LedgerEntry for auditability.
+model Wallet {
+  id        String   @id // "w_..."
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Float    @default(0)
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum LedgerType {
+  deposit
+  withdrawal_hold // funds reserved when a withdrawal is requested
+  withdrawal_refund // reserved funds returned when a withdrawal is rejected
+  copy_allocate // capital moved into a copy position
+  copy_return // principal returned when a copy is stopped
+  trade_pnl // realized profit/loss booked to the copier
+  commission // performance fee taken from a copier's profit (negative)
+  commission_earned // trader's share of a performance fee (positive)
+  platform_fee // Millimore's share of a performance fee (recorded on platform)
+  adjustment // manual admin correction
+}
+
+/// Append-only money ledger. Every wallet change writes one row here so the
+/// books are auditable (a lightweight double-entry: `amount` is signed, and
+/// `balanceAfter` snapshots the wallet after applying it). Never updated/deleted.
+model LedgerEntry {
+  id          String     @id // "led_..."
+  userId      String
+  type        LedgerType
+  amount      Float // signed: credits positive, debits negative
+  balanceAfter Float
+  currency    String     @default("USD")
+  refId       String? // deposit id, payout id, copyConfig id, position id, etc.
+  note        String?
+  createdAt   DateTime   @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+enum DepositStatus {
+  pending
+  confirmed
+  failed
+}
+
+/// A user deposit into their wallet (contract wallet model). Crypto is live now;
+/// other methods are surfaced as "coming soon". In test mode deposits
+/// auto-confirm; in production a payment/crypto webhook flips `confirmed` and the
+/// wallet is credited exactly once.
+model Deposit {
+  id          String        @id // "dep_..."
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String        @default("USD")
+  method      String        @default("crypto") // "crypto" (live), others soon
+  asset       String? // e.g. "USDT", "BTC" for crypto
+  address     String? // deposit address shown to the user (crypto)
+  txRef       String? // on-chain tx / provider reference
+  status      DepositStatus @default(pending)
+  createdAt   DateTime      @default(now())
+  confirmedAt DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
 }
 
 enum BroadcastPhase {
@@ -244,6 +353,10 @@ model Trader {
   photoUrl   String?
   isVerified Boolean @default(false)
   isLive     Boolean @default(false)
+
+  // Performance fee the trader charges on a copier's PROFIT (1–30%, trader-set;
+  // contract §6/wallet model). Millimore keeps a share of this (PLATFORM_FEE_SHARE).
+  commissionPercent Int @default(20)
 
   returnPercent Float @default(0)
   returnDays    Int   @default(30)

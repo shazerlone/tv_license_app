@@ -103,6 +103,40 @@ export interface EquityPoint {
   value: number;
 }
 
+/** GET /admin/metrics (contract §6). */
+export interface AdminMetrics {
+  dau: number;
+  mau: number;
+  liveNow: number;
+  streamsToday: number;
+  totalUsers: number;
+  creators: number;
+  gmv: number;
+  copyVolume: number;
+  depositsTotal: number;
+  walletLiabilities: number;
+  platformRevenue: number;
+  pendingPayouts: number;
+  pendingPayoutAmount: number;
+  errors24h: number;
+  uptime: number;
+}
+
+/** A withdrawal request row from GET /admin/payouts. */
+export interface AdminPayout {
+  id: string;
+  userId: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'approved' | 'rejected' | 'paid';
+  method: string | null;
+  note: string | null;
+  reason: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  requester: { id: string; name: string; username: string; email?: string | null };
+}
+
 /** Error carrying the contract's { code, message }. */
 export class ApiError extends Error {
   code: string;

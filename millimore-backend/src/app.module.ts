@@ -21,6 +21,9 @@ import { RealtimeBusModule } from './realtime/realtime.bus';
 import { RedisModule } from './redis/redis.service';
 import { UploadsModule } from './uploads/uploads.module';
 import { BroadcastsModule } from './broadcasts/broadcasts.module';
+import { MtModule } from './mt/mt.module';
+import { WalletModule } from './wallet/wallet.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -56,6 +59,9 @@ const staticModules = existsSync(ADMIN_DIR)
     SubscriptionsModule,
     NotificationsModule,
     MarketModule,
+    MtModule,
+    WalletModule,
+    PayoutsModule,
     CopyModule,
     RealtimeModule,
     UploadsModule,

@@ -156,3 +156,39 @@ If you need a field/endpoint that isn't in `BACKEND_CONTRACT.md`, **add it to th
 contract first** and flag it — the backend session implements against that file.
 Don't invent client-only endpoints. The two sessions only stay in sync through
 these docs.
+
+---
+
+## 6. Wallet & money model (milestone 6) — NEW, live
+
+The trading model is **in-app wallet → corporate broker account** (not per-user
+MT logins). Users deposit into a Millimore wallet; copying draws from it; profit,
+trader commission, and Millimore's fee are settled to wallets. All live now
+against the AWS backend.
+
+**Screens to wire:**
+- **Wallet** — `GET /wallet` → `{ balance, currency }`; `GET /wallet/ledger` →
+  money-movement list. Show balance on the portfolio/home header.
+- **Deposit** — `GET /deposits/methods` (render **Crypto** active; MetaTrader /
+  card / bank as **"Coming soon"** chips). `POST /deposits { amount, asset? }`
+  returns a `Deposit` (address + status). In test mode it auto-confirms and the
+  wallet is credited immediately; refresh `GET /wallet` after.
+- **Copy** — `POST /copy/{traderId}/start { amount }` now **spends wallet balance**
+  (`accountId` is optional). If the wallet is short it returns
+  `error.code = "insufficient_balance"` — prompt the user to deposit.
+  `POST /copy/{traderId}/stop` returns principal + profit to the wallet minus the
+  performance fee; the user gets a `copy.settled` user event.
+- **Trader commission** — a trader sets their performance fee (1–30%) via
+  `PATCH /creator/commission { percent }`. Show `commissionPercent` on trader
+  profiles (it's on the Trader object).
+- **Earnings (creator studio)** — `GET /creator/earnings` is now real:
+  `{ balance, currency, pending, lifetimeEarned, history[] }`.
+- **Withdraw** — `POST /creator/payouts { amount, method?, note? }` (holds funds);
+  `GET /creator/payouts` for history. Admin approves/rejects in the dashboard.
+
+> Fees: the trader's performance fee is split — the trader keeps most, Millimore
+> keeps a configurable share (`PLATFORM_FEE_SHARE`, default 30%). The copier only
+> ever sees one fee deducted from profit. Losing trades incur no fee.
+
+**Contract details:** `BACKEND_CONTRACT.md` §11 "Wallet, deposits, copy
+settlement & payouts (milestone 6)".

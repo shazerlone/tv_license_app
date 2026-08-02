@@ -503,3 +503,51 @@ unchanged; this section only pins down details the prose left open.
 - **Uploads** (§5b): `POST /uploads { contentType, data(base64) }` → `{ id, url }`;
   served at `GET /uploads/{id}`. Dev stores bytes in Postgres; set `STORAGE_*` for
   S3+CloudFront in production. Retires base64 photoUrls.
+
+### Wallet, deposits, copy settlement & payouts (milestone 6)
+The trading model is **corporate-account / liquidity-provider**, not per-user MT
+logins. Users fund an **in-app wallet**; Millimore routes net exposure to its
+corporate broker account (Century Financial et al.) via the broker bridge. All
+money movement is an **internal, audited ledger** (real crypto/broker rails plug
+in above it later). MetaAPI is intentionally parked behind the same bridge seam.
+
+- **Wallet**
+  - `GET /wallet` → `{ balance, currency }` — the user's spendable balance.
+  - `GET /wallet/ledger?limit=` → `[{ id, type, amount(signed), balanceAfter,
+    currency, refId, note, createdAt }]`. Every balance change writes one row.
+    `type` ∈ `deposit | withdrawal_hold | withdrawal_refund | copy_allocate |
+    copy_return | trade_pnl | commission | commission_earned | platform_fee |
+    adjustment`.
+- **Deposits** (crypto live; others "coming soon")
+  - `GET /deposits/methods` → `[{ id, label, active, comingSoon?, assets? }]`
+    (crypto active; metatrader/card/bank `comingSoon`).
+  - `POST /deposits { amount, asset?, method? }` → `Deposit`. In test mode
+    (`DEPOSIT_AUTO_CONFIRM=true`) it confirms and credits the wallet immediately;
+    in prod a crypto webhook calls confirm exactly once.
+  - `GET /deposits` → my deposits.
+- **Copy funding & settlement** — `POST /copy/{traderId}/start` now debits the
+  wallet by `amount` (`copy_allocate`; throws `insufficient_balance` if unfunded —
+  the "deposit first" flow). `accountId` is now optional (a broker hint).
+  `POST /copy/{traderId}/stop` returns principal + realized P/L and splits the
+  performance fee: **copier keeps the profit**, **trader earns commission**,
+  **Millimore keeps a share** (`PLATFORM_FEE_SHARE`, default 0.30). Losses are
+  capped at the allocated principal.
+- **Trader commission** — `Trader.commissionPercent` (1–30%, trader-set) is the
+  performance fee charged on a copier's profit. `PATCH /creator/commission
+  { percent }` → `{ commissionPercent }`.
+- **Creator earnings** — `GET /creator/earnings` is now real: `{ balance,
+  currency, pending, lifetimeEarned, history[] }` (wallet-backed). `GET
+  /creator/stats.earnings` = lifetime commission earned.
+- **Withdrawals** — `POST /creator/payouts { amount, method?, note? }` holds funds
+  immediately (debits wallet); `GET /creator/payouts` lists mine. Admin: `GET
+  /admin/payouts?status=&cursor=`, `POST /admin/payouts/{id}/approve`,
+  `POST /admin/payouts/{id}/reject` (refunds the held funds).
+- **Admin metrics** — `GET /admin/metrics` is now real live aggregates:
+  `{ dau, mau, liveNow, streamsToday, totalUsers, creators, gmv, copyVolume,
+  depositsTotal, walletLiabilities, platformRevenue, pendingPayouts,
+  pendingPayoutAmount, errors24h, uptime }`. DAU/MAU come from a throttled
+  `User.lastSeenAt` (updated by the JWT strategy). `platformRevenue` is the sum of
+  `platform_fee` ledger rows.
+- **Broker bridge** — `BROKER_BRIDGE_URL` (+ `BROKER_BRIDGE_TOKEN`) switches order
+  routing / account info / investor-password checks from synthetic to a live
+  MT4/MT5 gateway. Unset ⇒ deterministic synthetic values (same shapes).

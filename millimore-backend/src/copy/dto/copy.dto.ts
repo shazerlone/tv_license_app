@@ -13,9 +13,13 @@ export class CopyConfigDto {
 
 /** POST /copy/{traderId}/start body (contract §4.7). */
 export class StartCopyDto {
-  @ApiProperty({ example: 'acc_1' })
+  @ApiPropertyOptional({
+    example: 'acc_1',
+    description: 'Optional broker account hint. Funding comes from the wallet.',
+  })
+  @IsOptional()
   @IsString()
-  accountId: string;
+  accountId?: string;
 
   @ApiProperty({ example: 500 })
   @IsNumber()

@@ -614,6 +614,43 @@
         ]
       }
     },
+    "/v1/creator/commission": {
+      "patch": {
+        "operationId": "CreatorController_setCommission",
+        "summary": "Set my performance-fee % charged to copiers (1–30)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCommissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommissionDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/creator/apply": {
       "post": {
         "operationId": "CreatorController_apply",
@@ -643,6 +680,194 @@
         },
         "tags": [
           "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/wallet": {
+      "get": {
+        "operationId": "WalletController_me",
+        "summary": "My wallet balance (contract §wallet)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/wallet/ledger": {
+      "get": {
+        "operationId": "WalletController_ledger",
+        "summary": "My wallet ledger — recent money movements",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LedgerEntryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/deposits/methods": {
+      "get": {
+        "operationId": "DepositsController_methods",
+        "summary": "Deposit methods (crypto live; others coming soon)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepositMethodDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/deposits": {
+      "get": {
+        "operationId": "DepositsController_listMine",
+        "summary": "My deposits, newest first",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepositDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "DepositsController_create",
+        "summary": "Start a deposit (crypto). Auto-confirms in test mode.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepositDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/metrics": {
+      "get": {
+        "operationId": "AdminController_metrics",
+        "summary": "Live platform metrics (contract §6)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMetricsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
         ],
         "security": [
           {
@@ -874,6 +1099,150 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApplicationDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/payouts": {
+      "get": {
+        "operationId": "AdminController_adminPayouts",
+        "summary": "Withdrawal requests, paginated + filterable (contract §6)",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "paid"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/payouts/{id}/approve": {
+      "post": {
+        "operationId": "AdminController_approvePayout",
+        "summary": "Approve a withdrawal (contract §6)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPayoutDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/payouts/{id}/reject": {
+      "post": {
+        "operationId": "AdminController_rejectPayout",
+        "summary": "Reject a withdrawal — refunds the held funds (contract §6)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPayoutDto"
                 }
               }
             }
@@ -1213,6 +1582,71 @@
         },
         "tags": [
           "notifications"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/creator/payouts": {
+      "get": {
+        "operationId": "PayoutsController_listMine",
+        "summary": "My payout requests, newest first (contract §5b)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayoutDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "PayoutsController_request",
+        "summary": "Request a withdrawal against available balance (contract §5b)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
         ],
         "security": [
           {
@@ -3026,7 +3460,8 @@
         "properties": {
           "balance": {
             "type": "number",
-            "example": 0
+            "example": 320.5,
+            "description": "Withdrawable wallet balance."
           },
           "currency": {
             "type": "string",
@@ -3034,10 +3469,17 @@
           },
           "pending": {
             "type": "number",
-            "example": 0
+            "example": 50,
+            "description": "In open withdrawal requests."
+          },
+          "lifetimeEarned": {
+            "type": "number",
+            "example": 1240.75,
+            "description": "Lifetime commission earned."
           },
           "history": {
             "example": [],
+            "description": "Recent withdrawals.",
             "type": "array",
             "items": {
               "type": "object"
@@ -3048,7 +3490,34 @@
           "balance",
           "currency",
           "pending",
+          "lifetimeEarned",
           "history"
+        ]
+      },
+      "SetCommissionDto": {
+        "type": "object",
+        "properties": {
+          "percent": {
+            "type": "number",
+            "example": 20,
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "percent"
+        ]
+      },
+      "CommissionDto": {
+        "type": "object",
+        "properties": {
+          "commissionPercent": {
+            "type": "number",
+            "example": 20
+          }
+        },
+        "required": [
+          "commissionPercent"
         ]
       },
       "ApplyCreatorDto": {
@@ -3070,6 +3539,277 @@
           "market",
           "platform",
           "verification"
+        ]
+      },
+      "WalletDto": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "number",
+            "example": 1250.75
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          }
+        },
+        "required": [
+          "balance",
+          "currency"
+        ]
+      },
+      "LedgerEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "led_ab12cd34"
+          },
+          "type": {
+            "type": "string",
+            "example": "deposit",
+            "description": "deposit | withdrawal_hold | withdrawal_refund | copy_allocate | copy_return | trade_pnl | commission | commission_earned | platform_fee | adjustment"
+          },
+          "amount": {
+            "type": "number",
+            "example": 250,
+            "description": "Signed: credits positive, debits negative."
+          },
+          "balanceAfter": {
+            "type": "number",
+            "example": 1250.75
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "refId": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-02T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "amount",
+          "balanceAfter",
+          "currency",
+          "createdAt"
+        ]
+      },
+      "DepositMethodDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "crypto"
+          },
+          "label": {
+            "type": "string",
+            "example": "Crypto (USDT / BTC)"
+          },
+          "active": {
+            "type": "boolean",
+            "example": true
+          },
+          "comingSoon": {
+            "type": "boolean",
+            "example": false
+          },
+          "assets": {
+            "example": [
+              "USDT",
+              "BTC",
+              "ETH"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "active"
+        ]
+      },
+      "DepositDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "dep_ab12cd34"
+          },
+          "amount": {
+            "type": "number",
+            "example": 250
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "method": {
+            "type": "string",
+            "example": "crypto"
+          },
+          "asset": {
+            "type": "object",
+            "nullable": true,
+            "example": "USDT"
+          },
+          "address": {
+            "type": "object",
+            "nullable": true,
+            "example": "TXyz…addr"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "failed"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-02T12:00:00.000Z"
+          },
+          "confirmedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "currency",
+          "method",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CreateDepositDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 250,
+            "description": "Amount to deposit in USD terms."
+          },
+          "method": {
+            "type": "string",
+            "example": "crypto",
+            "description": "Only \"crypto\" is active now."
+          },
+          "asset": {
+            "type": "string",
+            "example": "USDT"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "AdminMetricsDto": {
+        "type": "object",
+        "properties": {
+          "dau": {
+            "type": "number",
+            "example": 128,
+            "description": "Distinct users active in the last 24h."
+          },
+          "mau": {
+            "type": "number",
+            "example": 940,
+            "description": "Distinct users active in the last 30d."
+          },
+          "liveNow": {
+            "type": "number",
+            "example": 3,
+            "description": "Broadcasts currently live."
+          },
+          "streamsToday": {
+            "type": "number",
+            "example": 12,
+            "description": "Broadcasts started today (UTC)."
+          },
+          "totalUsers": {
+            "type": "number",
+            "example": 1543
+          },
+          "creators": {
+            "type": "number",
+            "example": 87,
+            "description": "Approved creators."
+          },
+          "gmv": {
+            "type": "number",
+            "example": 250000,
+            "description": "All-time copy allocation volume."
+          },
+          "copyVolume": {
+            "type": "number",
+            "example": 82000,
+            "description": "Currently active copy volume."
+          },
+          "depositsTotal": {
+            "type": "number",
+            "example": 310000,
+            "description": "Total confirmed deposits."
+          },
+          "walletLiabilities": {
+            "type": "number",
+            "example": 74000,
+            "description": "Sum of all user wallet balances (liabilities)."
+          },
+          "platformRevenue": {
+            "type": "number",
+            "example": 5820,
+            "description": "Millimore's booked revenue (fee share)."
+          },
+          "pendingPayouts": {
+            "type": "number",
+            "example": 4
+          },
+          "pendingPayoutAmount": {
+            "type": "number",
+            "example": 1250.5
+          },
+          "errors24h": {
+            "type": "number",
+            "example": 0
+          },
+          "uptime": {
+            "type": "number",
+            "example": 86400,
+            "description": "Process uptime in seconds."
+          }
+        },
+        "required": [
+          "dau",
+          "mau",
+          "liveNow",
+          "streamsToday",
+          "totalUsers",
+          "creators",
+          "gmv",
+          "copyVolume",
+          "depositsTotal",
+          "walletLiabilities",
+          "platformRevenue",
+          "pendingPayouts",
+          "pendingPayoutAmount",
+          "errors24h",
+          "uptime"
         ]
       },
       "AdminUserDto": {
@@ -3341,6 +4081,83 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "PayoutDecisionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "Verified, sent via bank transfer."
+          }
+        }
+      },
+      "AdminPayoutDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "po_ab12cd34"
+          },
+          "userId": {
+            "type": "string",
+            "example": "u_123"
+          },
+          "amount": {
+            "type": "number",
+            "example": 250.5
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "paid"
+            ]
+          },
+          "method": {
+            "type": "object",
+            "nullable": true,
+            "example": "bank"
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "reason": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-02T12:00:00.000Z"
+          },
+          "decidedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "requester": {
+            "type": "object",
+            "example": {
+              "id": "u_123",
+              "name": "Marcus",
+              "username": "marcus"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "amount",
+          "currency",
+          "status",
+          "createdAt",
+          "requester"
         ]
       },
       "TraderDto": {
@@ -3617,6 +4434,86 @@
           "token"
         ]
       },
+      "PayoutDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "po_ab12cd34"
+          },
+          "userId": {
+            "type": "string",
+            "example": "u_123"
+          },
+          "amount": {
+            "type": "number",
+            "example": 250.5
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "paid"
+            ]
+          },
+          "method": {
+            "type": "object",
+            "nullable": true,
+            "example": "bank"
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "reason": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-02T12:00:00.000Z"
+          },
+          "decidedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "amount",
+          "currency",
+          "status",
+          "createdAt"
+        ]
+      },
+      "RequestPayoutDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 250.5,
+            "description": "Amount to withdraw, ≤ available balance."
+          },
+          "method": {
+            "type": "string",
+            "example": "bank"
+          },
+          "note": {
+            "type": "string",
+            "example": "Monthly withdrawal"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
       "CreatePostDto": {
         "type": "object",
         "properties": {
@@ -3849,7 +4746,8 @@
         "properties": {
           "accountId": {
             "type": "string",
-            "example": "acc_1"
+            "example": "acc_1",
+            "description": "Optional broker account hint. Funding comes from the wallet."
           },
           "amount": {
             "type": "number",
@@ -3867,7 +4765,6 @@
           }
         },
         "required": [
-          "accountId",
           "amount"
         ]
       },

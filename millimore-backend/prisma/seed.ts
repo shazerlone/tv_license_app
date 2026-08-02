@@ -353,6 +353,56 @@ async function main() {
     });
   }
 
+  // ── Wallets: fund demo users so deposit → copy → settle works end-to-end ──
+  const walletSeeds = [
+    { userId: 'u_priya', balance: 10000 },
+    { userId: 'u_marcus', balance: 2000 },
+    { userId: 'u_admin', balance: 0 },
+    { userId: 'u_aisha', balance: 0 },
+  ];
+  for (const w of walletSeeds) {
+    await prisma.wallet.upsert({
+      where: { userId: w.userId },
+      update: { balance: w.balance },
+      create: {
+        id: `w_${w.userId.replace(/^u_/, '')}`,
+        userId: w.userId,
+        balance: w.balance,
+        currency: 'USD',
+      },
+    });
+  }
+  // A confirmed deposit + matching ledger row for Priya (populates /deposits
+  // and /wallet/ledger with realistic data).
+  await prisma.deposit.upsert({
+    where: { id: 'dep_seed_priya' },
+    update: {},
+    create: {
+      id: 'dep_seed_priya',
+      userId: 'u_priya',
+      amount: 10000,
+      currency: 'USD',
+      method: 'crypto',
+      asset: 'USDT',
+      status: 'confirmed',
+      confirmedAt: new Date(),
+    },
+  });
+  await prisma.ledgerEntry.upsert({
+    where: { id: 'led_seed_priya' },
+    update: {},
+    create: {
+      id: 'led_seed_priya',
+      userId: 'u_priya',
+      type: 'deposit',
+      amount: 10000,
+      balanceAfter: 10000,
+      currency: 'USD',
+      refId: 'dep_seed_priya',
+      note: 'Seed deposit',
+    },
+  });
+
   // eslint-disable-next-line no-console
   console.log('Seed complete:');
   console.log('  admin@millimore.app  / password   (admin)');
