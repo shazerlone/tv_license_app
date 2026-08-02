@@ -1,15 +1,14 @@
-# Render Blueprint — deploys Millimore as a SINGLE service on the free tier:
-# one web service serves BOTH the admin UI (at /) and the API (at /v1) from the
-# same origin. Render reads this file from the repo root when you create a
-# "New > Blueprint" from this GitHub repo.
+# Render Blueprint — the WHOLE stack in one click: API + admin UI + Postgres +
+# Redis. Render reads this file from the repo root ("New > Blueprint"), builds
+# it, and re-deploys automatically on every git push. No servers/VPC/load
+# balancers to configure — this is the simplest path.
 #
-# Free-tier notes:
-#  - The service sleeps after ~15 min idle and cold-starts on the next request
-#    (~30-60s). The keep-warm GitHub Action mitigates this.
-#  - Free Postgres is time-limited by Render (expires ~30 days after creation);
-#    upgrade the database plan before then to keep data.
-#  - Redis is NOT provisioned yet — it gets added when the realtime milestones
-#    (prices/portfolio/chat) land.
+# ─── To go "production" (no cold start, data kept), change 3 words ───
+#  1. web service   plan: free  →  plan: starter     (~$7/mo, always on, no sleep)
+#  2. database      plan: free  →  plan: basic-256mb (~$6/mo, kept beyond 30 days)
+#  3. redis (below) plan: free  →  plan: starter     (optional, bigger/persisted)
+# Leave them on `free` to run at $0 (the web service just sleeps ~15 min idle;
+# the keep-warm GitHub Action softens that).
 services:
   - type: web
     name: millimore-backend
@@ -43,6 +42,14 @@ services:
         fromDatabase:
           name: millimore-db
           property: connectionString
+      # Redis connection injected from the managed Key Value store below. With
+      # this set, realtime (prices/portfolio/events) fans out across instances —
+      # so scaling to >1 instance later "just works".
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: millimore-redis
+          property: connectionString
       # Secrets Render generates once and keeps stable across deploys.
       - key: JWT_SECRET
         generateValue: true
@@ -67,6 +74,13 @@ services:
       # to real web origins later if you add browser clients.
       - key: CORS_ORIGINS
         value: '*'
+
+  # Managed Redis (Render Key Value) — powers realtime fan-out at scale.
+  - type: keyvalue
+    name: millimore-redis
+    plan: free
+    ipAllowList: [] # [] = reachable only from your Render services (private)
+    maxmemoryPolicy: noeviction
 
 databases:
   - name: millimore-db
