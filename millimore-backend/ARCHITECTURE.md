@@ -42,9 +42,12 @@ plan and where we already stand:
    to any Postgres, so this is a connection-string change. (Add a connection
    pooler like PgBouncer/RDS Proxy when copies get numerous.)
 3. **Caching** — Redis/ElastiCache in front of hot reads. Wired in as milestones 4/5 need it.
-4. **Realtime that scales across copies** — WebSockets (prices, live chat,
-   portfolio) will use **Redis pub/sub** so any API copy can push to any user.
-   Designed in from the start of milestone 4/5.
+4. **Realtime that scales across copies** — ✅ **implemented.** WebSockets
+   (prices, portfolio, live events, chat) use **Redis pub/sub** so any API copy
+   can push to any user; the price feed elects a single Redis leader so all
+   copies show identical prices. Set `REDIS_URL` to turn it on (ElastiCache);
+   unset = single instance. Verified with a 2-instance cross-node test. Full
+   AWS runbook: `AWS_DEPLOY.md`.
 5. **Background workers + queues** — heavy/slow work (copy-trade execution,
    YouTube chat polling, payouts) runs off the request path via a job queue
    (BullMQ on Redis now → **Amazon SQS**). Keeps the app snappy under load.

@@ -36,6 +36,10 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // Clean shutdown on SIGTERM (ECS/Fargate rolling deploys, K8s) so Prisma and
+  // Redis disconnect and in-flight requests drain.
+  app.enableShutdownHooks();
+
   // Swagger / OpenAPI generated from the same decorators the routes use.
   const document = SwaggerModule.createDocument(app, buildOpenApiConfig().build());
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document);

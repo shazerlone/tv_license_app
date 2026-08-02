@@ -18,6 +18,7 @@ import { MarketModule } from './market/market.module';
 import { CopyModule } from './copy/copy.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RealtimeBusModule } from './realtime/realtime.bus';
+import { RedisModule } from './redis/redis.service';
 import { UploadsModule } from './uploads/uploads.module';
 import { BroadcastsModule } from './broadcasts/broadcasts.module';
 import { HealthController } from './health.controller';
@@ -41,6 +42,7 @@ const staticModules = existsSync(ADMIN_DIR)
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
     RealtimeBusModule,
     PrismaModule,
     AuthModule,
