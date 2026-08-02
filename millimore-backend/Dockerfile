@@ -39,22 +39,23 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Production dependencies only
+# Full deps: the container migrates + seeds itself on startup, which needs the
+# Prisma CLI and ts-node (dev deps). Simpler than a separate migration task.
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Compiled app, generated Prisma client/engine, schema, and the admin build
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/admin/out ./admin/out
+RUN npm ci && npm cache clean --force
 COPY prisma ./prisma
+RUN npx prisma generate
 
-# Run as the built-in non-root user
-USER node
+# Compiled app, the admin build, and tsconfig (ts-node reads it for the seed)
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/admin/out ./admin/out
+COPY tsconfig.json ./
 
 EXPOSE 3000
 # Container-native healthcheck hits the same endpoint your load balancer will.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "dist/main.js"]
+# On start: create/upgrade the DB tables (advisory-locked, safe on many tasks),
+# seed the demo/admin accounts (idempotent), then run the API.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run db:seed && node dist/main.js"]
