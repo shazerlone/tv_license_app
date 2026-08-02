@@ -60,15 +60,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
     setState(() => _saving = true);
 
-    final fields = <String, dynamic>{
-      'name': name,
-      if (_photoUrl != null) 'photoUrl': _photoUrl,
-      if (_isCreator && _market.text.trim().isNotEmpty) 'market': _market.text.trim(),
-      if (_isCreator && _platform.text.trim().isNotEmpty) 'platform': _platform.text.trim(),
-    };
-
     if (kUseBackend) {
       try {
+        // Upload a freshly-picked photo (data URL) to get a hosted URL.
+        var photo = _photoUrl;
+        if (photo != null && photo.startsWith('data:')) {
+          final comma = photo.indexOf(',');
+          final header = photo.substring(5, comma); // e.g. image/png;base64
+          final contentType = header.split(';').first;
+          final data = photo.substring(comma + 1);
+          photo = await BackendApi.uploadMedia(contentType: contentType, data: data, kind: 'avatar');
+        }
+        final fields = <String, dynamic>{
+          'name': name,
+          if (photo != null) 'photoUrl': photo,
+          if (_isCreator && _market.text.trim().isNotEmpty) 'market': _market.text.trim(),
+          if (_isCreator && _platform.text.trim().isNotEmpty) 'platform': _platform.text.trim(),
+        };
         final updated = await AuthApi.updateMe(fields);
         if (!mounted) return;
         session.applyBackendSession(updated);

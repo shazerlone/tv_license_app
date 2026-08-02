@@ -7,6 +7,7 @@ import '../services/backend_api.dart';
 import '../services/api_client.dart';
 import 'go_live_screen.dart';
 import 'compose_post_screen.dart';
+import 'earnings_screen.dart';
 
 class StudioScreen extends StatelessWidget {
   const StudioScreen({super.key});
@@ -78,7 +79,7 @@ class StudioScreen extends StatelessWidget {
             Text('Manage', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const SizedBox(height: 12),
             _Row(icon: Icons.link_rounded, title: 'Connected accounts', sub: session.user?.platform ?? 'Add a trading account', onTap: () => _action(context, 'Accounts')),
-            _Row(icon: Icons.bar_chart_rounded, title: 'Earnings & payouts', sub: 'Track your revenue', onTap: () => _action(context, 'Earnings')),
+            _Row(icon: Icons.bar_chart_rounded, title: 'Earnings & payouts', sub: 'Track your revenue', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EarningsScreen()))),
             _Row(icon: Icons.groups_rounded, title: 'Followers', sub: 'See who copies you', onTap: () => _action(context, 'Followers')),
             _Row(icon: Icons.tune_rounded, title: 'Creator settings', sub: 'Fees, bio, visibility', onTap: () => _action(context, 'Settings'), last: true),
           ],

@@ -240,5 +240,63 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null).map(ApiTrader.fromJson).toList();
   }
 
+  // ── Media uploads (§5b) ───────────────────────────────────────────────────
+  /// Uploads a data URL / base64 payload and returns the hosted URL.
+  static Future<String> uploadMedia({required String contentType, required String data, String? kind}) async {
+    final res = await _api.post('/uploads', {'contentType': contentType, 'data': data, if (kind != null) 'kind': kind});
+    return ((res as Map)['url']).toString();
+  }
+
+  // ── Creator earnings (§5b) ────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> creatorEarnings() async {
+    final res = await _api.get('/creator/earnings');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  // ── Posts edit/delete ─────────────────────────────────────────────────────
+  static Future<void> updatePost(String id, Map<String, dynamic> fields) => _api.patch('/posts/$id', fields);
+  static Future<void> deletePost(String id) => _api.delete('/posts/$id');
+
+  // ── Broadcasts / live streaming (milestone 5) ─────────────────────────────
+  static Future<Map<String, dynamic>> createBroadcast(String title) async {
+    final res = await _api.post('/broadcasts', {'title': title});
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<Map<String, dynamic>> startBroadcast(String id) async {
+    final res = await _api.post('/broadcasts/$id/start');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> endBroadcast(String id) async {
+    final res = await _api.post('/broadcasts/$id/end');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> getBroadcast(String id) async {
+    final res = await _api.get('/broadcasts/$id');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<List<Map<String, dynamic>>> liveBroadcasts() async {
+    final res = await _api.get('/broadcasts/live');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<List<Map<String, dynamic>>> broadcastChat(String id) async {
+    final res = await _api.get('/broadcasts/$id/chat');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<void> sendBroadcastChat(String id, String text) => _api.post('/broadcasts/$id/chat', {'text': text});
+  static Future<void> reactBroadcast(String id) => _api.post('/broadcasts/$id/react');
+  static Future<Map<String, dynamic>> connectYouTube(String id, Map<String, dynamic> body) async {
+    final res = await _api.post('/broadcasts/$id/destinations/youtube/connect', body);
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  static Future<void> disconnectDestination(String id, String platform) =>
+      _api.post('/broadcasts/$id/destinations/$platform/disconnect');
+
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }
