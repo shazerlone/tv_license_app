@@ -10,6 +10,7 @@ import 'state/theme_controller.dart';
 import 'services/api_client.dart';
 import 'services/auth_api.dart';
 import 'services/auth_store.dart';
+import 'services/app_config.dart';
 import 'config.dart';
 import 'screens/login_screen.dart';
 
@@ -104,6 +105,7 @@ class _MillimoreAppState extends State<MillimoreApp> {
   /// the home screen (no splash/onboarding animations on return visits).
   Future<void> _restore() async {
     await _theme.load();
+    if (kUseBackend) AppConfig.instance.load(); // fetch leverage caps / limits (no auth)
     final data = await AuthStore.load();
     if (data.token != null) ApiClient.instance.setToken(data.token);
     if (data.user != null) {

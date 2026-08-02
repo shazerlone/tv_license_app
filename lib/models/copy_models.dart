@@ -58,6 +58,9 @@ class CopyConfig {
 class PortfolioSummary {
   final double netPnl, openPnl, bookedProfit, bookedLoss, invested;
   final int copyingCount, activeCount, closedCount;
+  // Milestone 7 — margin
+  final double freeMargin, usedMargin, equity;
+  final double? marginLevel;
   const PortfolioSummary({
     required this.netPnl,
     required this.openPnl,
@@ -67,6 +70,10 @@ class PortfolioSummary {
     required this.copyingCount,
     required this.activeCount,
     required this.closedCount,
+    this.freeMargin = 0,
+    this.usedMargin = 0,
+    this.equity = 0,
+    this.marginLevel,
   });
   factory PortfolioSummary.fromJson(Map<String, dynamic> j) {
     double d(k) => (j[k] as num?)?.toDouble() ?? 0;
@@ -80,6 +87,10 @@ class PortfolioSummary {
       copyingCount: i('copyingCount'),
       activeCount: i('activeCount'),
       closedCount: i('closedCount'),
+      freeMargin: d('freeMargin'),
+      usedMargin: d('usedMargin'),
+      equity: d('equity'),
+      marginLevel: (j['marginLevel'] as num?)?.toDouble(),
     );
   }
 }

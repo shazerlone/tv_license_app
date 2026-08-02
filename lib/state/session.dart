@@ -28,6 +28,12 @@ class UserProfile {
   final String? residenceIso; // e.g. 'IN'
   final String? residenceCountry; // e.g. 'India'
   final CreatorStatus creatorStatus;
+  // Milestone 7 — leverage & compliance
+  final double leverage; // 1..maxLeverage
+  final String kycStatus; // none|pending|verified|rejected
+  final String? addressLine;
+  final String? city;
+  final String? postalCode;
 
   const UserProfile({
     this.id,
@@ -39,7 +45,14 @@ class UserProfile {
     this.residenceIso,
     this.residenceCountry,
     this.creatorStatus = CreatorStatus.none,
+    this.leverage = 1,
+    this.kycStatus = 'none',
+    this.addressLine,
+    this.city,
+    this.postalCode,
   });
+
+  bool get kycVerified => kycStatus == 'verified';
 
   bool get isCreator => role == UserRole.creator;
 
@@ -66,6 +79,11 @@ class UserProfile {
         'residenceIso': residenceIso,
         'residenceCountry': residenceCountry,
         'creatorStatus': _statusStr(creatorStatus),
+        'leverage': leverage,
+        'kycStatus': kycStatus,
+        'addressLine': addressLine,
+        'city': city,
+        'postalCode': postalCode,
       };
 
   /// Maps a backend `User` (docs/BACKEND_CONTRACT.md §3) to a UserProfile.
@@ -80,6 +98,11 @@ class UserProfile {
       residenceIso: j['residenceIso'] as String?,
       residenceCountry: j['residenceCountry'] as String?,
       creatorStatus: _statusFrom(j['creatorStatus'] as String?),
+      leverage: (j['leverage'] as num?)?.toDouble() ?? 1,
+      kycStatus: (j['kycStatus'] ?? 'none').toString(),
+      addressLine: j['addressLine'] as String?,
+      city: j['city'] as String?,
+      postalCode: j['postalCode'] as String?,
     );
   }
 
@@ -93,6 +116,11 @@ class UserProfile {
     String? residenceIso,
     String? residenceCountry,
     CreatorStatus? creatorStatus,
+    double? leverage,
+    String? kycStatus,
+    String? addressLine,
+    String? city,
+    String? postalCode,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -104,6 +132,11 @@ class UserProfile {
       residenceIso: residenceIso ?? this.residenceIso,
       residenceCountry: residenceCountry ?? this.residenceCountry,
       creatorStatus: creatorStatus ?? this.creatorStatus,
+      leverage: leverage ?? this.leverage,
+      kycStatus: kycStatus ?? this.kycStatus,
+      addressLine: addressLine ?? this.addressLine,
+      city: city ?? this.city,
+      postalCode: postalCode ?? this.postalCode,
     );
   }
 }

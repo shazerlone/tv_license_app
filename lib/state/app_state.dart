@@ -286,7 +286,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void startCopy(Trader trader, {required String accountId, required double amount, required double risk, required bool autoCopy}) {
+  void startCopy(Trader trader, {required String accountId, required double amount, required double risk, required bool autoCopy, double? leverage}) {
     _copying[trader.id] = CopyConfig(
       traderId: trader.id,
       accountId: accountId,
@@ -296,13 +296,27 @@ class AppState extends ChangeNotifier {
       startedAt: DateTime.now(),
     );
     if (kUseBackend) {
-      BackendApi.startCopy(trader.id, accountId: accountId, amount: amount, risk: risk, autoCopy: autoCopy)
+      BackendApi.startCopy(trader.id, accountId: accountId, amount: amount, risk: risk, autoCopy: autoCopy, leverage: leverage)
           .then((_) => loadCopyEngine())
           .catchError((_) {});
     } else {
       _seedPositions(trader, accountId, amount);
     }
     notifyListeners();
+  }
+
+  /// Awaitable copy-start that surfaces errors (e.g. `insufficient_balance`) to
+  /// the caller. Prefer this from the copy UI so the user can be prompted to
+  /// deposit. Returns true on success.
+  Future<void> startCopyAsync(Trader trader, {String? accountId, required double amount, double? leverage, double risk = 1, bool autoCopy = true}) async {
+    if (kUseBackend) {
+      await BackendApi.startCopy(trader.id, accountId: accountId, amount: amount, leverage: leverage, risk: risk, autoCopy: autoCopy);
+      await loadCopyEngine();
+    } else {
+      _copying[trader.id] = CopyConfig(traderId: trader.id, accountId: accountId ?? '', amount: amount, risk: risk, autoCopy: autoCopy, startedAt: DateTime.now());
+      _seedPositions(trader, accountId ?? '', amount);
+      notifyListeners();
+    }
   }
 
   void stopCopy(String traderId) {

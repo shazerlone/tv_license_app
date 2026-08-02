@@ -190,10 +190,11 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null).map(CopyConfig.fromJson).toList();
   }
 
-  static Future<CopyConfig> startCopy(String traderId, {required String accountId, required double amount, double? risk, bool? autoCopy}) async {
+  static Future<CopyConfig> startCopy(String traderId, {String? accountId, required double amount, double? leverage, double? risk, bool? autoCopy}) async {
     final res = await _api.post('/copy/$traderId/start', {
-      'accountId': accountId,
       'amount': amount,
+      if (accountId != null) 'accountId': accountId,
+      if (leverage != null) 'leverage': leverage,
       if (risk != null) 'risk': risk,
       if (autoCopy != null) 'autoCopy': autoCopy,
     });
@@ -337,6 +338,34 @@ class BackendApi {
   static Future<double> setCommission(double percent) async {
     final res = await _api.patch('/creator/commission', {'percent': percent});
     return ((res as Map)['commissionPercent'] as num?)?.toDouble() ?? percent;
+  }
+
+  // ── Milestone 7: leverage, KYC, payout methods, transactions ──────────────
+  static Future<List<Map<String, dynamic>>> walletTransactions() async {
+    final res = await _api.get('/wallet/transactions');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<List<Map<String, dynamic>>> payoutMethods() async {
+    final res = await _api.get('/wallet/payout-methods');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> addPayoutMethod(Map<String, dynamic> body) async {
+    final res = await _api.post('/wallet/payout-methods', body);
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<void> deletePayoutMethod(String id) => _api.delete('/wallet/payout-methods/$id');
+
+  static Future<Map<String, dynamic>> kycStatus() async {
+    final res = await _api.get('/kyc');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> startKyc() async {
+    final res = await _api.post('/kyc/start');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
   }
 
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
