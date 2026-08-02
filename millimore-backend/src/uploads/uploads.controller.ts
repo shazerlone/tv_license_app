@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { genId } from '../common/ids';
+import { StorageService } from './storage.service';
 
 class UploadDto {
   @ApiProperty({ example: 'image/jpeg' })
@@ -47,7 +48,10 @@ class UploadResultDto {
 @ApiTags('uploads')
 @Controller('uploads')
 export class UploadsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -72,7 +76,16 @@ export class UploadsController {
     }
 
     const id = genId('up');
-    // TODO(prod): if STORAGE_BUCKET is set, PUT to S3 and store `url` instead of `data`.
+
+    // S3 when configured (stores only the URL); Postgres bytes otherwise.
+    if (this.storage.enabled) {
+      const { url } = await this.storage.put(id, dto.contentType, buf);
+      await this.prisma.upload.create({
+        data: { id, userId: user.userId, contentType: dto.contentType, url },
+      });
+      return { id, url };
+    }
+
     await this.prisma.upload.create({
       data: { id, userId: user.userId, contentType: dto.contentType, data: buf },
     });

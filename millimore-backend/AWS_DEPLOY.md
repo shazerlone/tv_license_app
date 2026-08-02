@@ -39,10 +39,12 @@ limited. Fargate is also the natural autoscaling target.
   task B was delivered to a WebSocket client on task A.)
 - ✅ **Graceful shutdown** — `SIGTERM` drains cleanly for rolling deploys.
 
-## The only optional upgrade
-- **Uploads** currently store bytes in Postgres (works across instances). For
-  scale/cost, set `STORAGE_*` and switch to **S3 + CloudFront** — a small change
-  in `uploads.controller.ts` (marked with a TODO). Not a blocker.
+## Uploads → S3 (implemented, env-gated)
+- Set `STORAGE_BUCKET` + `STORAGE_REGION` and uploads go to **S3** (served via
+  `STORAGE_PUBLIC_BASE_URL`/CloudFront, or the S3 URL). Unset = Postgres bytes
+  (fine for dev/one node). No code change — just env + a bucket + IAM permission.
+- On Fargate, **leave the S3 access keys blank** and attach an IAM task role with
+  `s3:PutObject` on the bucket; the SDK uses the role automatically (best practice).
 
 ---
 
@@ -65,6 +67,11 @@ Copilot builds the VPC + ALB + ECS + autoscaling + logs from one manifest.
   copilot secret init --name JWT_SECRET                # openssl rand -hex 32
   copilot secret init --name CREDENTIAL_ENCRYPTION_KEY # openssl rand -base64 32  (KEEP STABLE)
   ```
+- **S3 for uploads (optional but recommended):** create a bucket
+  (`aws s3 mb s3://millimore-uploads-prod`), allow public read (or front it with
+  CloudFront), then add to the Copilot manifest `variables:`
+  `STORAGE_BUCKET: millimore-uploads-prod`, `STORAGE_REGION: <region>`, and grant
+  the task role `s3:PutObject`. Leave the access-key env vars unset (IAM role).
 
 **2. Initialize + deploy the service:**
 ```bash
