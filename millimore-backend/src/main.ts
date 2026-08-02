@@ -8,7 +8,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RealtimeGateway } from './realtime/realtime.gateway';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  // rawBody:true captures the unparsed body so the KYC (Sumsub) webhook can
+  // verify the payload signature; JSON parsing still works as normal.
+  const app = await NestFactory.create(AppModule, { bufferLogs: false, rawBody: true });
   const config = app.get(ConfigService);
 
   const apiPrefix = config.get<string>('API_PREFIX', 'v1');

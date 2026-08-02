@@ -15,6 +15,12 @@ export class UserDto {
   @ApiPropertyOptional({ example: 'India', nullable: true }) residenceCountry: string | null;
   @ApiPropertyOptional({ example: 'Forex', nullable: true }) market: string | null;
   @ApiPropertyOptional({ example: 'MetaTrader 5', nullable: true }) platform: string | null;
+  @ApiPropertyOptional({ nullable: true }) addressLine?: string | null;
+  @ApiPropertyOptional({ nullable: true }) city?: string | null;
+  @ApiPropertyOptional({ nullable: true }) postalCode?: string | null;
+  @ApiProperty({ example: 100, description: 'Default leverage.' }) leverage: number;
+  @ApiProperty({ enum: ['none', 'pending', 'verified', 'rejected'], description: 'KYC status.' })
+  kycStatus: string;
   @ApiProperty({ example: '2026-01-01T00:00:00Z' }) createdAt: string;
 }
 

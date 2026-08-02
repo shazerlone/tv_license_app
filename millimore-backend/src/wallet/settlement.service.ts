@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { LedgerType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from './wallet.service';
+import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -37,16 +37,18 @@ export interface SettleResult {
 @Injectable()
 export class SettlementService {
   private readonly log = new Logger('Settlement');
-  /** Millimore's share of the trader's performance fee (default 30%). */
-  private readonly platformShare: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
-    config: ConfigService,
-  ) {
-    const raw = Number(config.get<string>('PLATFORM_FEE_SHARE'));
-    this.platformShare = Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.3;
+    private readonly settings: SettingsService,
+  ) {}
+
+  /** Millimore's share of the trader's performance fee (admin-editable). */
+  private async platformFeeShare(): Promise<number> {
+    const s = await this.settings.get();
+    const v = s.platformFeeShare;
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 0.3;
   }
 
   private async recordPlatformFee(
@@ -84,8 +86,9 @@ export class SettlementService {
     let traderCut = 0;
     let platformCut = 0;
     if (effectivePnl > 0 && commissionPct > 0) {
+      const share = await this.platformFeeShare();
       fee = round2((effectivePnl * commissionPct) / 100);
-      platformCut = round2(fee * this.platformShare);
+      platformCut = round2(fee * share);
       traderCut = round2(fee - platformCut);
     }
 

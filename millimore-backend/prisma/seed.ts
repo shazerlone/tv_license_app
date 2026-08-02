@@ -403,6 +403,20 @@ async function main() {
     },
   });
 
+  // ── Platform settings singleton (admin-editable; env are the defaults) ──
+  await prisma.platformSettings.upsert({
+    where: { id: 'platform' },
+    update: {},
+    create: { id: 'platform' },
+  });
+
+  // KYC-verify the demo users + set a default leverage so the full deposit →
+  // copy → withdraw flow works out of the box in test mode.
+  await prisma.user.updateMany({
+    where: { id: { in: ['u_priya', 'u_marcus'] } },
+    data: { kycStatus: 'verified', kycProvider: 'manual', leverage: 100 },
+  });
+
   // eslint-disable-next-line no-console
   console.log('Seed complete:');
   console.log('  admin@millimore.app  / password   (admin)');

@@ -12,7 +12,10 @@ const NAV = [
   { href: '/traders', label: 'Traders', icon: Icons.spark },
   { href: '/users', label: 'Users', icon: Icons.users },
   { href: '/creators', label: 'Creator queue', icon: Icons.queue },
+  { href: '/transactions', label: 'Transactions', icon: Icons.spark },
   { href: '/payouts', label: 'Payouts', icon: Icons.approved },
+  { href: '/kyc', label: 'KYC', icon: Icons.approved },
+  { href: '/settings', label: 'Settings', icon: Icons.users },
 ];
 
 const TITLES: Record<string, string> = {
@@ -20,7 +23,10 @@ const TITLES: Record<string, string> = {
   '/traders': 'Traders',
   '/users': 'Users',
   '/creators': 'Creator verification',
+  '/transactions': 'Transactions',
   '/payouts': 'Payouts',
+  '/kyc': 'KYC',
+  '/settings': 'Settings',
 };
 
 export default function Shell({ children }: { children: ReactNode }) {

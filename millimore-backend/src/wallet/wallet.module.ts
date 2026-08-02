@@ -1,18 +1,36 @@
 import { Module } from '@nestjs/common';
+import { CryptoModule } from '../common/crypto/crypto.module';
 import { WalletService } from './wallet.service';
 import { SettlementService } from './settlement.service';
 import { DepositsService } from './deposits.service';
+import { PayoutMethodsService } from './payout-methods.service';
+import { TransactionsService } from './transactions.service';
 import { WalletController } from './wallet.controller';
 import { DepositsController } from './deposits.controller';
+import { PayoutMethodsController } from './payout-methods.controller';
 
 /**
- * The money layer: wallet ledger, deposits, and copy settlement. PrismaModule
- * and ConfigModule are global, so nothing else is imported here. Exports the
- * services other modules settle/read through (copy, creator, admin, payouts).
+ * The money layer: wallet ledger, deposits, saved payout methods, transaction
+ * history, and copy settlement. PrismaModule, ConfigModule and SettingsModule
+ * are global. Exports the services other modules settle/read through (copy,
+ * creator, admin, payouts).
  */
 @Module({
-  providers: [WalletService, SettlementService, DepositsService],
-  controllers: [WalletController, DepositsController],
-  exports: [WalletService, SettlementService],
+  imports: [CryptoModule],
+  providers: [
+    WalletService,
+    SettlementService,
+    DepositsService,
+    PayoutMethodsService,
+    TransactionsService,
+  ],
+  controllers: [WalletController, DepositsController, PayoutMethodsController],
+  exports: [
+    WalletService,
+    SettlementService,
+    DepositsService,
+    PayoutMethodsService,
+    TransactionsService,
+  ],
 })
 export class WalletModule {}

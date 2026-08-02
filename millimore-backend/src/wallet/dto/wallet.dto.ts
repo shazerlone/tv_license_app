@@ -1,9 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-/** GET /wallet — the user's spendable balance. */
+/** GET /wallet — the user's spendable balance (margin) + default leverage. */
 export class WalletDto {
-  @ApiProperty({ example: 1250.75 }) balance: number;
+  @ApiProperty({ example: 1250.75, description: 'Spendable balance = free margin.' })
+  balance: number;
   @ApiProperty({ example: 'USD' }) currency: string;
+  @ApiProperty({ example: 100, description: 'Default leverage (1..maxLeverage).' })
+  leverage: number;
 }
 
 /** A single money movement (GET /wallet/ledger). */

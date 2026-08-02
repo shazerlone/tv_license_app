@@ -37,6 +37,11 @@ export class RequestPayoutDto {
   @IsPositive()
   amount: number;
 
+  @ApiProperty({ example: 'pm_ab12cd34', description: 'Saved payout method id to send to.' })
+  @IsString()
+  @MaxLength(40)
+  methodId: string;
+
   @ApiPropertyOptional({ example: 'bank' })
   @IsOptional()
   @IsString()

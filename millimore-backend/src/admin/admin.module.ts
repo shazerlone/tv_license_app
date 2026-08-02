@@ -6,9 +6,10 @@ import { TradersModule } from '../traders/traders.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { PayoutsModule } from '../payouts/payouts.module';
+import { KycModule } from '../kyc/kyc.module';
 
 @Module({
-  imports: [UsersModule, TradersModule, NotificationsModule, WalletModule, PayoutsModule],
+  imports: [UsersModule, TradersModule, NotificationsModule, WalletModule, PayoutsModule, KycModule],
   providers: [AdminService],
   controllers: [AdminController],
 })

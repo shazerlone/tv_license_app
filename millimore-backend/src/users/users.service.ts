@@ -28,6 +28,11 @@ export class UsersService {
       residenceCountry: u.residenceCountry ?? countryNameFromIso(u.residenceIso),
       market: u.market,
       platform: u.platform,
+      addressLine: u.addressLine,
+      city: u.city,
+      postalCode: u.postalCode,
+      leverage: u.leverage,
+      kycStatus: u.kycStatus,
       createdAt: u.createdAt.toISOString(),
     };
   }
@@ -59,6 +64,12 @@ export class UsersService {
       username: dto.username,
       market: dto.market,
       platform: dto.platform,
+      addressLine: dto.addressLine,
+      city: dto.city,
+      postalCode: dto.postalCode,
+      // Leverage is clamped to the platform max at copy time; store as given
+      // (1..500 by DTO), the copy engine enforces the live ceiling.
+      leverage: dto.leverage,
     };
     return this.prisma.user.update({ where: { id }, data });
   }

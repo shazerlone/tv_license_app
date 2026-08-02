@@ -551,3 +551,50 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
 - **Broker bridge** — `BROKER_BRIDGE_URL` (+ `BROKER_BRIDGE_TOKEN`) switches order
   routing / account info / investor-password checks from synthetic to a live
   MT4/MT5 gateway. Unset ⇒ deterministic synthetic values (same shapes).
+
+### Financial operations, leverage & compliance (milestone 7)
+Adds the controls a real fintech needs: admin-editable settings, leverage/margin,
+full transaction history with verify/flag/approve, saved payout methods, profile
+address, KYC (Sumsub-ready), and an admin audit trail.
+
+- **Public config** — `GET /config` (no auth) → `{ maxLeverage, defaultLeverage,
+  minDeposit, minWithdrawal, maxWithdrawalPerTx, maxWithdrawalPerDay,
+  kycRequiredForWithdrawal, depositMethods[], maintenanceMode }`. The app reads
+  this to render limits, leverage cap and deposit methods.
+- **Admin settings** — `GET /admin/settings`, `PATCH /admin/settings`
+  (`platformFeeShare`, `maxLeverage`, `defaultLeverage`, `minDeposit`,
+  `minWithdrawal`, `maxWithdrawalPerTx`, `maxWithdrawalPerDay`,
+  `depositAutoConfirm`, `kycRequiredForWithdrawal`, `cryptoEnabled`,
+  `cardEnabled`, `bankEnabled`, `maintenanceMode`). The Millimore fee lives here
+  now (env is only the first-run default). Cached ~15s.
+- **Leverage & margin** — wallet balance is the **margin**; a copy's exposure is
+  `amount × leverage`. `User.leverage` is the default; `POST /copy/{id}/start`
+  accepts an optional `leverage`, clamped to `maxLeverage`. `PATCH /me` accepts
+  `leverage` (+ `addressLine`, `city`, `postalCode`). `GET /wallet` →
+  `{ balance, currency, leverage }`. `GET /portfolio/summary` now also returns
+  `freeMargin`, `usedMargin`, `equity`, `marginLevel`.
+- **Transactions** — user: `GET /wallet/transactions` (unified timeline:
+  deposits, trades, fees, commissions, withdrawals). Admin: `GET
+  /admin/transactions?kind=&status=&flagged=&cursor=` (deposits + withdrawals),
+  with `POST /admin/deposits/{id}/approve|reject|flag` and
+  `POST /admin/payouts/{id}/flag` (approve/reject already exist).
+- **Payout methods** — `GET/POST/DELETE /wallet/payout-methods`. Crypto address
+  or bank details are AES-256-GCM encrypted (write-only); responses expose only
+  `masked` + `label`. A withdrawal must reference a saved method (`methodId`).
+- **Withdrawal gating** — `POST /creator/payouts` now enforces: amount ≥
+  `minWithdrawal`, ≤ `maxWithdrawalPerTx`, running 24h total ≤
+  `maxWithdrawalPerDay`, **KYC verified** (when `kycRequiredForWithdrawal`), and a
+  valid saved `methodId` — plus the existing admin approve/reject. Error codes:
+  `below_min_withdrawal`, `above_max_withdrawal`, `daily_limit_exceeded`,
+  `kyc_required`, `invalid_payout_method`.
+- **KYC (Sumsub-ready)** — `POST /kyc/start` → `{ provider, applicantId,
+  accessToken, manual? }` (SDK token; `manual:true` when no provider configured).
+  `GET /kyc` → `{ kycStatus, provider, reason }`. `POST /kyc/webhook` (provider
+  callback, signature-checked). Admin: `GET /admin/kyc?status=`,
+  `POST /admin/kyc/{userId}/verify|reject`. Enable Sumsub with `SUMSUB_APP_TOKEN`
+  + `SUMSUB_SECRET_KEY` (+ `SUMSUB_LEVEL_NAME`); otherwise manual admin review.
+  `User.kycStatus` ∈ `none|pending|verified|rejected` (on `GET /me`).
+- **Audit log** — every admin decision writes an `AdminAuditLog` row;
+  `GET /admin/audit?targetType=&cursor=`.
+- **New env** — `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_LEVEL_NAME`,
+  `MAX_LEVERAGE`, `DEFAULT_LEVERAGE` (all optional; settings row overrides).

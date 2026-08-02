@@ -192,3 +192,36 @@ against the AWS backend.
 
 **Contract details:** `BACKEND_CONTRACT.md` §11 "Wallet, deposits, copy
 settlement & payouts (milestone 6)".
+
+---
+
+## 7. Financial ops, leverage & KYC (milestone 7) — NEW, live
+
+- **App config** — call `GET /config` (no auth) on launch to get `maxLeverage`,
+  limits, and which deposit methods are active. Render leverage sliders/caps and
+  deposit method chips from this.
+- **Leverage** — wallet balance = **margin**; exposure = `amount × leverage`.
+  - User default: `PATCH /me { leverage }` (1..maxLeverage). Shows on `GET /me`
+    and `GET /wallet` (`leverage`).
+  - Per-copy: `POST /copy/{traderId}/start { amount, leverage? }` — pass a
+    leverage slider value (max from `/config`); server clamps it.
+  - `GET /portfolio/summary` now returns `freeMargin`, `usedMargin`, `equity`,
+    `marginLevel` — build the MT-style margin header from these.
+- **Transactions screen** — `GET /wallet/transactions` (unified: deposits,
+  trades, fees, commissions, withdrawals). `GET /wallet/ledger` is the raw
+  ledger if you need it.
+- **Profile/address** — `PATCH /me { addressLine, city, postalCode, name, … }`.
+- **Payout methods** — `GET/POST/DELETE /wallet/payout-methods`
+  (`{ type:'crypto'|'bank', label, address?/asset? | bankName?/accountNumber?/iban? }`).
+  Responses are masked. A withdrawal **requires** a saved method.
+- **Withdraw** — `POST /creator/payouts { amount, methodId, note? }`. Handle these
+  error codes with clear UI: `kyc_required`, `invalid_payout_method`,
+  `below_min_withdrawal`, `above_max_withdrawal`, `daily_limit_exceeded`,
+  `insufficient_balance`.
+- **KYC** — `POST /kyc/start` → launch the Sumsub SDK with `accessToken` (if
+  `manual:true`, just show “submitted — pending review”). `GET /kyc` for status;
+  also on `GET /me` as `kycStatus`. Gate the withdraw screen on
+  `kycStatus === 'verified'` when `/config.kycRequiredForWithdrawal` is true.
+
+**Contract details:** `BACKEND_CONTRACT.md` → "Financial operations, leverage &
+compliance (milestone 7)".

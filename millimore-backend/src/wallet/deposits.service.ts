@@ -1,42 +1,33 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Deposit, DepositStatus, LedgerType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from './wallet.service';
+import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
 import { CreateDepositDto, DepositDto, DepositMethodDto } from './dto/deposit.dto';
 
 /**
- * Deposits into the Millimore wallet. Crypto is the only live method now; others
- * are advertised as "coming soon". In test mode (DEPOSIT_AUTO_CONFIRM=true)
+ * Deposits into the Millimore wallet. Method availability, the minimum amount,
+ * and auto-confirm all come from admin-editable PlatformSettings. In test mode
  * deposits confirm and credit the wallet immediately; in production a crypto
- * webhook calls `confirm()` exactly once when funds actually arrive.
+ * webhook (or admin approval) calls `confirm()` exactly once when funds arrive.
  */
 @Injectable()
 export class DepositsService {
-  private readonly autoConfirm: boolean;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
-    config: ConfigService,
-  ) {
-    // Default ON for now (test mode). Set DEPOSIT_AUTO_CONFIRM=false for prod.
-    this.autoConfirm = config.get<string>('DEPOSIT_AUTO_CONFIRM', 'true') !== 'false';
-  }
+    private readonly settings: SettingsService,
+  ) {}
 
-  methods(): DepositMethodDto[] {
+  async methods(): Promise<DepositMethodDto[]> {
+    const s = await this.settings.get();
     return [
-      {
-        id: 'crypto',
-        label: 'Crypto (USDT / BTC)',
-        active: true,
-        assets: ['USDT', 'BTC', 'ETH'],
-      },
+      { id: 'crypto', label: 'Crypto (USDT / BTC)', active: s.cryptoEnabled, comingSoon: !s.cryptoEnabled, assets: ['USDT', 'BTC', 'ETH'] },
       { id: 'metatrader', label: 'MetaTrader transfer', active: false, comingSoon: true },
-      { id: 'card', label: 'Debit / Credit card', active: false, comingSoon: true },
-      { id: 'bank', label: 'Bank transfer', active: false, comingSoon: true },
+      { id: 'card', label: 'Debit / Credit card', active: s.cardEnabled, comingSoon: !s.cardEnabled },
+      { id: 'bank', label: 'Bank transfer', active: s.bankEnabled, comingSoon: !s.bankEnabled },
     ];
   }
 
@@ -61,11 +52,19 @@ export class DepositsService {
   }
 
   async create(userId: string, dto: CreateDepositDto): Promise<DepositDto> {
+    const s = await this.settings.get();
     const method = dto.method ?? 'crypto';
-    if (method !== 'crypto') {
+    if (method !== 'crypto' || !s.cryptoEnabled) {
       throw new BadRequestException({
         code: 'method_unavailable',
         message: 'Only crypto deposits are available right now. Other methods are coming soon.',
+      });
+    }
+    const amount = Math.round(dto.amount * 100) / 100;
+    if (amount < s.minDeposit) {
+      throw new BadRequestException({
+        code: 'below_min_deposit',
+        message: `Minimum deposit is $${s.minDeposit.toFixed(2)}.`,
       });
     }
     const asset = dto.asset ?? 'USDT';
@@ -73,7 +72,7 @@ export class DepositsService {
       data: {
         id: genId('dep'),
         userId,
-        amount: Math.round(dto.amount * 100) / 100,
+        amount,
         currency: 'USD',
         method,
         asset,
@@ -82,7 +81,7 @@ export class DepositsService {
       },
     });
 
-    if (this.autoConfirm) {
+    if (s.depositAutoConfirm) {
       return this.confirm(deposit.id, `test-${deposit.id}`);
     }
     return this.toDto(deposit);
@@ -124,5 +123,42 @@ export class DepositsService {
       take: 100,
     });
     return rows.map((d) => this.toDto(d));
+  }
+
+  // ── admin ops (manual-confirm mode + risk review) ──────────────────────
+  /** Admin approves a pending deposit → credits the wallet (idempotent). */
+  async adminApprove(id: string, adminId: string): Promise<DepositDto> {
+    const d = await this.getOrThrow(id);
+    if (d.status !== DepositStatus.pending) {
+      throw new BadRequestException({ code: 'not_pending', message: `Deposit is already ${d.status}.` });
+    }
+    return this.confirm(id, `admin:${adminId}`);
+  }
+
+  async adminReject(id: string, adminId: string, reason: string): Promise<DepositDto> {
+    const d = await this.getOrThrow(id);
+    if (d.status === DepositStatus.confirmed) {
+      throw new BadRequestException({ code: 'already_confirmed', message: 'Deposit already credited.' });
+    }
+    const updated = await this.prisma.deposit.update({
+      where: { id },
+      data: { status: DepositStatus.failed, decisionBy: adminId, reason },
+    });
+    return this.toDto(updated);
+  }
+
+  async setFlag(id: string, flagged: boolean, reason?: string): Promise<DepositDto> {
+    await this.getOrThrow(id);
+    const updated = await this.prisma.deposit.update({
+      where: { id },
+      data: { flagged, flagReason: flagged ? reason ?? 'Flagged for review' : null },
+    });
+    return this.toDto(updated);
+  }
+
+  private async getOrThrow(id: string): Promise<Deposit> {
+    const d = await this.prisma.deposit.findUnique({ where: { id } });
+    if (!d) throw new NotFoundException({ code: 'deposit_not_found', message: 'Deposit not found' });
+    return d;
   }
 }

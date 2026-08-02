@@ -61,6 +61,22 @@ model User {
   market           String? // e.g. "Forex"
   platform         String? // e.g. "MetaTrader 5"
 
+  // Profile / billing address (contract §12).
+  addressLine String?
+  city        String?
+  postalCode  String?
+
+  // Default trading leverage (1..PlatformSettings.maxLeverage). Per-copy can
+  // override this. Wallet balance is the margin; exposure = margin × leverage.
+  leverage Int @default(100)
+
+  // KYC (identity verification) — status mirrors the provider (Sumsub) or an
+  // admin manual decision. Applicant id links to the provider's record.
+  kycStatus     KycStatus @default(none)
+  kycProvider   String? // "sumsub" | "manual"
+  kycApplicantId String?
+  kycReason     String?
+
   // Onboarding extras (follower)
   experience String?
   interests  String[] @default([])
@@ -94,6 +110,7 @@ model User {
   payouts       Payout[]
   wallet        Wallet?
   deposits      Deposit[]
+  payoutMethods PayoutMethod[]
 
   @@index([role])
   @@index([creatorStatus])
@@ -119,9 +136,12 @@ model Payout {
   currency   String       @default("USD")
   status     PayoutStatus @default(pending)
   method     String? // e.g. "bank", "usdt" — free-form for now
+  methodId   String? // saved PayoutMethod used, if any
   note       String? // creator's note on request
   decisionBy String? // admin user id who approved/rejected
   reason     String? // admin note / rejection reason
+  flagged    Boolean      @default(false) // risk/fraud review flag
+  flagReason String?
   createdAt  DateTime     @default(now())
   decidedAt  DateTime?
 
@@ -195,11 +215,74 @@ model Deposit {
   address     String? // deposit address shown to the user (crypto)
   txRef       String? // on-chain tx / provider reference
   status      DepositStatus @default(pending)
+  decisionBy  String? // admin who approved/rejected (manual mode)
+  reason      String? // admin note / rejection reason
+  flagged     Boolean       @default(false) // risk/fraud review flag
+  flagReason  String?
   createdAt   DateTime      @default(now())
   confirmedAt DateTime?
 
   @@index([userId, createdAt])
   @@index([status])
+}
+
+enum KycStatus {
+  none
+  pending
+  verified
+  rejected
+}
+
+/// Admin-editable platform settings (a single row, id="platform"). The Millimore
+/// fee, leverage cap, deposit/withdrawal limits and method toggles live here so
+/// ops can change them without a redeploy. Env vars remain the fallback defaults.
+model PlatformSettings {
+  id                       String   @id @default("platform")
+  platformFeeShare         Float    @default(0.30) // Millimore's share of the trader fee
+  maxLeverage              Int      @default(500)
+  defaultLeverage          Int      @default(100)
+  minDeposit               Float    @default(10)
+  minWithdrawal            Float    @default(10)
+  maxWithdrawalPerTx       Float    @default(25000)
+  maxWithdrawalPerDay      Float    @default(50000)
+  depositAutoConfirm       Boolean  @default(true)
+  kycRequiredForWithdrawal Boolean  @default(true)
+  cryptoEnabled            Boolean  @default(true)
+  cardEnabled              Boolean  @default(false)
+  bankEnabled              Boolean  @default(false)
+  maintenanceMode          Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+/// A user's saved withdrawal destination (crypto address or bank). Sensitive
+/// details are AES-256-GCM encrypted (write-only, like broker credentials);
+/// responses expose only `masked` + `label`.
+model PayoutMethod {
+  id         String   @id // "pm_..."
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String // "crypto" | "bank"
+  label      String
+  detailsEnc String // encrypted JSON (address / bank account)
+  masked     String // display-safe, e.g. "USDT ••••a1b2"
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Append-only audit trail of admin actions (approvals, rejections, flags,
+/// settings changes, KYC decisions) — what a regulated fintech must keep.
+model AdminAuditLog {
+  id         String   @id // "aud_..."
+  adminId    String
+  action     String // "deposit.approve", "payout.reject", "settings.update", …
+  targetType String // "deposit" | "payout" | "user" | "settings" | "kyc"
+  targetId   String
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
 }
 
 enum BroadcastPhase {
@@ -273,7 +356,8 @@ model CopyConfig {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   traderId  String
   accountId String
-  amount    Float
+  amount    Float // margin allocated from the wallet
+  leverage  Int      @default(100) // exposure = amount × leverage
   risk      Float    @default(1.0)
   autoCopy  Boolean  @default(true)
   active    Boolean  @default(true)

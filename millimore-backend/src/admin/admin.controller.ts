@@ -15,8 +15,14 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { KycStatus } from '@prisma/client';
 import { AdminService } from './admin.service';
 import { PayoutsService } from '../payouts/payouts.service';
+import { DepositsService } from '../wallet/deposits.service';
+import { TransactionsService } from '../wallet/transactions.service';
+import { SettingsService } from '../settings/settings.service';
+import { KycService } from '../kyc/kyc.service';
+import { AuditService } from '../audit/audit.service';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import {
   AdminUserDto,
@@ -26,6 +32,7 @@ import {
 } from './dto/admin-user.dto';
 import { ApplicationDto, ApproveDto, RejectDto } from './dto/application.dto';
 import { AdminMetricsDto } from './dto/metrics.dto';
+import { UpdateSettingsDto, ReasonDto } from './dto/settings.dto';
 import {
   AdminPayoutDto,
   AdminPayoutsQueryDto,
@@ -42,6 +49,11 @@ export class AdminController {
   constructor(
     private readonly admin: AdminService,
     private readonly payouts: PayoutsService,
+    private readonly deposits: DepositsService,
+    private readonly transactions: TransactionsService,
+    private readonly settings: SettingsService,
+    private readonly kyc: KycService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get('metrics')
@@ -120,5 +132,118 @@ export class AdminController {
     @CurrentUser() user: AuthUser,
   ): Promise<AdminPayoutDto> {
     return this.payouts.reject(id, user.userId, dto.reason ?? 'Rejected');
+  }
+
+  @Post('payouts/:id/flag')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Flag / unflag a withdrawal for risk review' })
+  async flagPayout(
+    @Param('id') id: string,
+    @Body() dto: { flagged?: boolean; reason?: string },
+    @CurrentUser() user: AuthUser,
+  ): Promise<AdminPayoutDto> {
+    const flagged = dto.flagged !== false;
+    const res = await this.payouts.setFlag(id, flagged, dto.reason);
+    await this.audit.record(user.userId, flagged ? 'payout.flag' : 'payout.unflag', 'payout', id, { reason: dto.reason });
+    return res;
+  }
+
+  // ── settings (contract §12) ────────────────────────────────────────
+  @Get('settings')
+  @ApiOperation({ summary: 'Platform settings (fee, limits, leverage, methods)' })
+  getSettings() {
+    return this.settings.get();
+  }
+
+  @Patch('settings')
+  @ApiOperation({ summary: 'Update platform settings (contract §12)' })
+  async updateSettings(@Body() dto: UpdateSettingsDto, @CurrentUser() user: AuthUser) {
+    const res = await this.settings.update(dto);
+    await this.audit.record(user.userId, 'settings.update', 'settings', 'platform', { ...dto });
+    return res;
+  }
+
+  // ── transactions (deposits + withdrawals) ──────────────────────────
+  @Get('transactions')
+  @ApiOperation({ summary: 'Money-ops feed: deposits + withdrawals, filterable' })
+  adminTransactions(
+    @Query('kind') kind?: 'deposit' | 'withdrawal',
+    @Query('status') status?: string,
+    @Query('flagged') flagged?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.transactions.adminList({
+      kind,
+      status,
+      flagged: flagged === undefined ? undefined : flagged === 'true',
+      limit: limit ? Number(limit) : undefined,
+      cursor,
+    });
+  }
+
+  // ── deposits ops ───────────────────────────────────────────────────
+  @Post('deposits/:id/approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve a pending deposit → credit the wallet' })
+  async approveDeposit(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const res = await this.deposits.adminApprove(id, user.userId);
+    await this.audit.record(user.userId, 'deposit.approve', 'deposit', id);
+    return res;
+  }
+
+  @Post('deposits/:id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject a deposit' })
+  async rejectDeposit(@Param('id') id: string, @Body() dto: ReasonDto, @CurrentUser() user: AuthUser) {
+    const res = await this.deposits.adminReject(id, user.userId, dto.reason ?? 'Rejected');
+    await this.audit.record(user.userId, 'deposit.reject', 'deposit', id, { reason: dto.reason });
+    return res;
+  }
+
+  @Post('deposits/:id/flag')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Flag / unflag a deposit for risk review' })
+  async flagDeposit(
+    @Param('id') id: string,
+    @Body() dto: { flagged?: boolean; reason?: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const flagged = dto.flagged !== false;
+    const res = await this.deposits.setFlag(id, flagged, dto.reason);
+    await this.audit.record(user.userId, flagged ? 'deposit.flag' : 'deposit.unflag', 'deposit', id, { reason: dto.reason });
+    return res;
+  }
+
+  // ── KYC ────────────────────────────────────────────────────────────
+  @Get('kyc')
+  @ApiOperation({ summary: 'KYC submissions, filter by status' })
+  kycList(@Query('status') status?: string, @Query('limit') limit?: string, @Query('cursor') cursor?: string) {
+    return this.kyc.adminList({ status, limit: limit ? Number(limit) : undefined, cursor });
+  }
+
+  @Post('kyc/:userId/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manually mark a user KYC-verified' })
+  async verifyKyc(@Param('userId') userId: string, @CurrentUser() user: AuthUser) {
+    await this.kyc.setStatus(userId, KycStatus.verified);
+    await this.audit.record(user.userId, 'kyc.verify', 'kyc', userId);
+    return { ok: true };
+  }
+
+  @Post('kyc/:userId/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject a user KYC with a reason' })
+  async rejectKyc(@Param('userId') userId: string, @Body() dto: ReasonDto, @CurrentUser() user: AuthUser) {
+    await this.kyc.setStatus(userId, KycStatus.rejected, dto.reason ?? 'Rejected');
+    await this.audit.record(user.userId, 'kyc.reject', 'kyc', userId, { reason: dto.reason });
+    return { ok: true };
+  }
+
+  // ── audit trail ────────────────────────────────────────────────────
+  @Get('audit')
+  @ApiOperation({ summary: 'Admin action audit log (contract §12)' })
+  auditLog(@Query('targetType') targetType?: string, @Query('limit') limit?: string, @Query('cursor') cursor?: string) {
+    return this.audit.list({ targetType, limit: limit ? Number(limit) : undefined, cursor });
   }
 }

@@ -5,7 +5,8 @@ import { IsBoolean, IsNumber, IsOptional, IsString, Min } from 'class-validator'
 export class CopyConfigDto {
   @ApiProperty({ example: 't_1' }) traderId: string;
   @ApiProperty({ example: 'acc_1' }) accountId: string;
-  @ApiProperty({ example: 500 }) amount: number;
+  @ApiProperty({ example: 500, description: 'Margin allocated from the wallet.' }) amount: number;
+  @ApiProperty({ example: 100, description: 'Leverage; exposure = amount × leverage.' }) leverage: number;
   @ApiProperty({ example: 1.0 }) risk: number;
   @ApiProperty({ example: true }) autoCopy: boolean;
   @ApiProperty() startedAt: string;
@@ -21,10 +22,16 @@ export class StartCopyDto {
   @IsString()
   accountId?: string;
 
-  @ApiProperty({ example: 500 })
+  @ApiProperty({ example: 500, description: 'Margin to allocate from the wallet.' })
   @IsNumber()
   @Min(1)
   amount: number;
+
+  @ApiPropertyOptional({ example: 100, description: 'Leverage (1..maxLeverage). Defaults to your setting.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  leverage?: number;
 
   @ApiPropertyOptional({ example: 1.0, default: 1.0 })
   @IsOptional()
@@ -56,7 +63,7 @@ export class CopyPositionDto {
   @ApiProperty({ example: 'acc_1' }) accountId: string;
 }
 
-/** GET /portfolio/summary (contract §4.7). */
+/** GET /portfolio/summary (contract §4.7) — includes the margin view. */
 export class PortfolioSummaryDto {
   @ApiProperty() netPnl: number;
   @ApiProperty() openPnl: number;
@@ -65,5 +72,9 @@ export class PortfolioSummaryDto {
   @ApiProperty() copyingCount: number;
   @ApiProperty() activeCount: number;
   @ApiProperty() closedCount: number;
-  @ApiProperty() invested: number;
+  @ApiProperty({ description: 'Margin currently allocated to open copies.' }) invested: number;
+  @ApiProperty({ example: 1200, description: 'Free margin = spendable wallet balance.' }) freeMargin: number;
+  @ApiProperty({ example: 500, description: 'Used margin = sum of active allocations.' }) usedMargin: number;
+  @ApiProperty({ example: 1712.4, description: 'Equity = free + used margin + open P/L.' }) equity: number;
+  @ApiProperty({ nullable: true, example: 342.5, description: 'Margin level % (equity/used×100); null if no used margin.' }) marginLevel: number | null;
 }

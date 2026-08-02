@@ -15,7 +15,7 @@ export class DepositsController {
   @Get('methods')
   @ApiOperation({ summary: 'Deposit methods (crypto live; others coming soon)' })
   @ApiOkResponse({ type: [DepositMethodDto] })
-  methods(): DepositMethodDto[] {
+  methods(): Promise<DepositMethodDto[]> {
     return this.deposits.methods();
   }
 

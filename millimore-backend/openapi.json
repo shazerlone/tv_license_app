@@ -691,7 +691,7 @@
     "/v1/wallet": {
       "get": {
         "operationId": "WalletController_me",
-        "summary": "My wallet balance (contract §wallet)",
+        "summary": "My wallet balance + default leverage (contract §wallet)",
         "parameters": [],
         "responses": {
           "200": {
@@ -742,6 +742,35 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/wallet/transactions": {
+      "get": {
+        "operationId": "WalletController_transactions_",
+        "summary": "My unified transaction timeline (deposits, trades, fees, withdrawals)",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
         "tags": [
@@ -837,6 +866,100 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/wallet/payout-methods": {
+      "get": {
+        "operationId": "PayoutMethodsController_list",
+        "summary": "My saved withdrawal methods (masked)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayoutMethodDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "PayoutMethodsController_create",
+        "summary": "Add a withdrawal method (crypto / bank; encrypted)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePayoutMethodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutMethodDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/wallet/payout-methods/{id}": {
+      "delete": {
+        "operationId": "PayoutMethodsController_remove",
+        "summary": "Remove a withdrawal method",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
         "tags": [
@@ -1258,6 +1381,399 @@
         ]
       }
     },
+    "/v1/admin/payouts/{id}/flag": {
+      "post": {
+        "operationId": "AdminController_flagPayout",
+        "summary": "Flag / unflag a withdrawal for risk review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings": {
+      "get": {
+        "operationId": "AdminController_getSettings",
+        "summary": "Platform settings (fee, limits, leverage, methods)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "AdminController_updateSettings",
+        "summary": "Update platform settings (contract §12)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/transactions": {
+      "get": {
+        "operationId": "AdminController_adminTransactions",
+        "summary": "Money-ops feed: deposits + withdrawals, filterable",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagged",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/deposits/{id}/approve": {
+      "post": {
+        "operationId": "AdminController_approveDeposit",
+        "summary": "Approve a pending deposit → credit the wallet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/deposits/{id}/reject": {
+      "post": {
+        "operationId": "AdminController_rejectDeposit",
+        "summary": "Reject a deposit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/deposits/{id}/flag": {
+      "post": {
+        "operationId": "AdminController_flagDeposit",
+        "summary": "Flag / unflag a deposit for risk review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/kyc": {
+      "get": {
+        "operationId": "AdminController_kycList",
+        "summary": "KYC submissions, filter by status",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/kyc/{userId}/verify": {
+      "post": {
+        "operationId": "AdminController_verifyKyc",
+        "summary": "Manually mark a user KYC-verified",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/kyc/{userId}/reject": {
+      "post": {
+        "operationId": "AdminController_rejectKyc",
+        "summary": "Reject a user KYC with a reason",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/audit": {
+      "get": {
+        "operationId": "AdminController_auditLog",
+        "summary": "Admin action audit log (contract §12)",
+        "parameters": [
+          {
+            "name": "targetType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/traders": {
       "get": {
         "operationId": "TradersController_list",
@@ -1647,6 +2163,46 @@
         },
         "tags": [
           "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/kyc/start": {
+      "post": {
+        "operationId": "KycController_start",
+        "summary": "Begin identity verification (returns SDK token)",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "kyc"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/kyc": {
+      "get": {
+        "operationId": "KycController_status",
+        "summary": "My KYC status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "kyc"
         ],
         "security": [
           {
@@ -2295,6 +2851,21 @@
           {
             "bearer": []
           }
+        ]
+      }
+    },
+    "/v1/config": {
+      "get": {
+        "operationId": "ConfigController_get",
+        "summary": "Public platform config (leverage cap, limits, deposit methods)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "config"
         ]
       }
     },
@@ -3043,6 +3614,33 @@
             "example": "MetaTrader 5",
             "nullable": true
           },
+          "addressLine": {
+            "type": "object",
+            "nullable": true
+          },
+          "city": {
+            "type": "object",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Default leverage."
+          },
+          "kycStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "verified",
+              "rejected"
+            ],
+            "description": "KYC status."
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-01-01T00:00:00Z"
@@ -3054,6 +3652,8 @@
           "username",
           "role",
           "creatorStatus",
+          "leverage",
+          "kycStatus",
           "createdAt"
         ]
       },
@@ -3254,6 +3854,20 @@
           },
           "platform": {
             "type": "string"
+          },
+          "addressLine": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "postalCode": {
+            "type": "string"
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Default leverage (1..maxLeverage)."
           }
         }
       },
@@ -3546,16 +4160,23 @@
         "properties": {
           "balance": {
             "type": "number",
-            "example": 1250.75
+            "example": 1250.75,
+            "description": "Spendable balance = free margin."
           },
           "currency": {
             "type": "string",
             "example": "USD"
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Default leverage (1..maxLeverage)."
           }
         },
         "required": [
           "balance",
-          "currency"
+          "currency",
+          "leverage"
         ]
       },
       "LedgerEntryDto": {
@@ -3719,6 +4340,81 @@
           "amount"
         ]
       },
+      "PayoutMethodDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pm_ab12cd34"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "crypto",
+              "bank"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "example": "My USDT wallet"
+          },
+          "masked": {
+            "type": "string",
+            "example": "USDT ••••a1b2"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-02T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "masked",
+          "createdAt"
+        ]
+      },
+      "CreatePayoutMethodDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "crypto",
+              "bank"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "example": "My USDT wallet"
+          },
+          "asset": {
+            "type": "string",
+            "example": "USDT"
+          },
+          "address": {
+            "type": "string",
+            "example": "TXyz…addr"
+          },
+          "bankName": {
+            "type": "string",
+            "example": "Emirates NBD"
+          },
+          "accountNumber": {
+            "type": "string",
+            "example": "00012345678"
+          },
+          "iban": {
+            "type": "string",
+            "example": "AE070331234567890123456"
+          }
+        },
+        "required": [
+          "type",
+          "label"
+        ]
+      },
       "AdminMetricsDto": {
         "type": "object",
         "properties": {
@@ -3879,6 +4575,33 @@
             "example": "MetaTrader 5",
             "nullable": true
           },
+          "addressLine": {
+            "type": "object",
+            "nullable": true
+          },
+          "city": {
+            "type": "object",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Default leverage."
+          },
+          "kycStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "verified",
+              "rejected"
+            ],
+            "description": "KYC status."
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-01-01T00:00:00Z"
@@ -3894,6 +4617,8 @@
           "username",
           "role",
           "creatorStatus",
+          "leverage",
+          "kycStatus",
           "createdAt",
           "banned"
         ]
@@ -4159,6 +4884,73 @@
           "createdAt",
           "requester"
         ]
+      },
+      "UpdateSettingsDto": {
+        "type": "object",
+        "properties": {
+          "platformFeeShare": {
+            "type": "number",
+            "example": 0.3,
+            "description": "Millimore's share of the trader fee (0..1)."
+          },
+          "maxLeverage": {
+            "type": "number",
+            "example": 500
+          },
+          "defaultLeverage": {
+            "type": "number",
+            "example": 100
+          },
+          "minDeposit": {
+            "type": "number",
+            "example": 10
+          },
+          "minWithdrawal": {
+            "type": "number",
+            "example": 10
+          },
+          "maxWithdrawalPerTx": {
+            "type": "number",
+            "example": 25000
+          },
+          "maxWithdrawalPerDay": {
+            "type": "number",
+            "example": 50000
+          },
+          "depositAutoConfirm": {
+            "type": "boolean",
+            "example": true
+          },
+          "kycRequiredForWithdrawal": {
+            "type": "boolean",
+            "example": true
+          },
+          "cryptoEnabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "cardEnabled": {
+            "type": "boolean",
+            "example": false
+          },
+          "bankEnabled": {
+            "type": "boolean",
+            "example": false
+          },
+          "maintenanceMode": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "ReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "Suspicious pattern"
+          }
+        }
       },
       "TraderDto": {
         "type": "object",
@@ -4501,6 +5293,11 @@
             "example": 250.5,
             "description": "Amount to withdraw, ≤ available balance."
           },
+          "methodId": {
+            "type": "string",
+            "example": "pm_ab12cd34",
+            "description": "Saved payout method id to send to."
+          },
           "method": {
             "type": "string",
             "example": "bank"
@@ -4511,7 +5308,8 @@
           }
         },
         "required": [
-          "amount"
+          "amount",
+          "methodId"
         ]
       },
       "CreatePostDto": {
@@ -4751,7 +5549,13 @@
           },
           "amount": {
             "type": "number",
-            "example": 500
+            "example": 500,
+            "description": "Margin to allocate from the wallet."
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Leverage (1..maxLeverage). Defaults to your setting."
           },
           "risk": {
             "type": "number",
@@ -4781,7 +5585,13 @@
           },
           "amount": {
             "type": "number",
-            "example": 500
+            "example": 500,
+            "description": "Margin allocated from the wallet."
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Leverage; exposure = amount × leverage."
           },
           "risk": {
             "type": "number",
@@ -4799,6 +5609,7 @@
           "traderId",
           "accountId",
           "amount",
+          "leverage",
           "risk",
           "autoCopy",
           "startedAt"
@@ -4905,7 +5716,29 @@
             "type": "number"
           },
           "invested": {
-            "type": "number"
+            "type": "number",
+            "description": "Margin currently allocated to open copies."
+          },
+          "freeMargin": {
+            "type": "number",
+            "example": 1200,
+            "description": "Free margin = spendable wallet balance."
+          },
+          "usedMargin": {
+            "type": "number",
+            "example": 500,
+            "description": "Used margin = sum of active allocations."
+          },
+          "equity": {
+            "type": "number",
+            "example": 1712.4,
+            "description": "Equity = free + used margin + open P/L."
+          },
+          "marginLevel": {
+            "type": "object",
+            "nullable": true,
+            "example": 342.5,
+            "description": "Margin level % (equity/used×100); null if no used margin."
           }
         },
         "required": [
@@ -4916,7 +5749,11 @@
           "copyingCount",
           "activeCount",
           "closedCount",
-          "invested"
+          "invested",
+          "freeMargin",
+          "usedMargin",
+          "equity",
+          "marginLevel"
         ]
       },
       "UploadDto": {

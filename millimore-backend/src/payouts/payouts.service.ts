@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { LedgerType, Payout, PayoutStatus, Prisma, User } from '@prisma/client';
+import { KycStatus, LedgerType, Payout, PayoutStatus, Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WalletService } from '../wallet/wallet.service';
+import { PayoutMethodsService } from '../wallet/payout-methods.service';
+import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
 import { encodeCursor, decodeCursor, Paginated } from '../common/dto/pagination.dto';
 import {
@@ -24,6 +26,8 @@ export class PayoutsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly wallet: WalletService,
+    private readonly methods: PayoutMethodsService,
+    private readonly settings: SettingsService,
   ) {}
 
   private toDto(p: Payout): PayoutDto {
@@ -44,6 +48,43 @@ export class PayoutsService {
   /** POST /creator/payouts — request a withdrawal; holds funds immediately. */
   async request(userId: string, dto: RequestPayoutDto): Promise<PayoutDto> {
     const amount = Math.round(dto.amount * 100) / 100;
+    const s = await this.settings.get();
+
+    // Gate 1: amount within min / per-transaction max.
+    if (amount < s.minWithdrawal) {
+      throw new BadRequestException({ code: 'below_min_withdrawal', message: `Minimum withdrawal is $${s.minWithdrawal.toFixed(2)}.` });
+    }
+    if (amount > s.maxWithdrawalPerTx) {
+      throw new BadRequestException({ code: 'above_max_withdrawal', message: `Maximum per withdrawal is $${s.maxWithdrawalPerTx.toFixed(2)}.` });
+    }
+
+    // Gate 2: daily cap (pending + approved + paid in the last 24h).
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const todayAgg = await this.prisma.payout.aggregate({
+      where: {
+        userId,
+        createdAt: { gte: dayAgo },
+        status: { in: [PayoutStatus.pending, PayoutStatus.approved, PayoutStatus.paid] },
+      },
+      _sum: { amount: true },
+    });
+    if ((todayAgg._sum.amount ?? 0) + amount > s.maxWithdrawalPerDay) {
+      throw new BadRequestException({ code: 'daily_limit_exceeded', message: `Daily withdrawal limit is $${s.maxWithdrawalPerDay.toFixed(2)}.` });
+    }
+
+    // Gate 3: KYC verified (when required).
+    if (s.kycRequiredForWithdrawal) {
+      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { kycStatus: true } });
+      if (u?.kycStatus !== KycStatus.verified) {
+        throw new BadRequestException({ code: 'kyc_required', message: 'Complete identity verification (KYC) before withdrawing.' });
+      }
+    }
+
+    // Gate 4: a saved payout method the user owns.
+    if (!(await this.methods.ownsMethod(userId, dto.methodId))) {
+      throw new BadRequestException({ code: 'invalid_payout_method', message: 'Select a saved withdrawal method.' });
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const payout = await tx.payout.create({
         data: {
@@ -53,6 +94,7 @@ export class PayoutsService {
           currency: 'USD',
           status: PayoutStatus.pending,
           method: dto.method ?? null,
+          methodId: dto.methodId,
           note: dto.note ?? null,
         },
       });
@@ -160,6 +202,18 @@ export class PayoutsService {
     await this.notifications.pushEvent(updated.userId, 'payout.status', 'Payout update', {
       body: reason,
       data: { status: 'rejected', reason },
+    });
+    return this.toAdminDto(updated);
+  }
+
+  /** Flag/unflag a withdrawal for risk review. */
+  async setFlag(id: string, flagged: boolean, reason?: string): Promise<AdminPayoutDto> {
+    const p = await this.prisma.payout.findUnique({ where: { id } });
+    if (!p) throw new NotFoundException({ code: 'payout_not_found', message: 'Payout not found' });
+    const updated = await this.prisma.payout.update({
+      where: { id },
+      data: { flagged, flagReason: flagged ? reason ?? 'Flagged for review' : null },
+      include: { user: true },
     });
     return this.toAdminDto(updated);
   }

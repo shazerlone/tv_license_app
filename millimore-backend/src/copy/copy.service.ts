@@ -10,6 +10,7 @@ import { PricesService } from '../market/prices.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WalletService } from '../wallet/wallet.service';
 import { SettlementService } from '../wallet/settlement.service';
+import { SettingsService } from '../settings/settings.service';
 import { MT_BRIDGE, MtBridge } from '../mt/mt.types';
 import { genId } from '../common/ids';
 import { round } from '../common/rng';
@@ -35,6 +36,7 @@ export class CopyService {
     private readonly notifications: NotificationsService,
     private readonly wallet: WalletService,
     private readonly settlement: SettlementService,
+    private readonly settings: SettingsService,
     @Inject(MT_BRIDGE) private readonly bridge: MtBridge,
   ) {}
 
@@ -77,6 +79,7 @@ export class CopyService {
       traderId: c.traderId,
       accountId: c.accountId,
       amount: c.amount,
+      leverage: c.leverage,
       risk: c.risk,
       autoCopy: c.autoCopy,
       startedAt: c.startedAt.toISOString(),
@@ -99,6 +102,16 @@ export class CopyService {
       }
     }
     const accountId = dto.accountId ?? 'wallet';
+
+    // Resolve leverage: requested → user default → platform default, clamped to
+    // the platform max (contract §12; wallet balance is the margin).
+    const settings = await this.settings.get();
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { leverage: true },
+    });
+    const requested = dto.leverage ?? user?.leverage ?? settings.defaultLeverage;
+    const leverage = Math.min(settings.maxLeverage, Math.max(1, Math.round(requested)));
 
     // Only allocate wallet capital on a fresh copy (or a re-start after stop),
     // not when merely updating an already-active config's settings.
@@ -123,6 +136,7 @@ export class CopyService {
       update: {
         accountId,
         amount: dto.amount,
+        leverage,
         risk: dto.risk ?? 1.0,
         autoCopy: dto.autoCopy ?? true,
         active: true,
@@ -134,6 +148,7 @@ export class CopyService {
         traderId,
         accountId,
         amount: dto.amount,
+        leverage,
         risk: dto.risk ?? 1.0,
         autoCopy: dto.autoCopy ?? true,
       },
@@ -141,10 +156,11 @@ export class CopyService {
 
     // Open a few positions mirroring the trader (synthetic until the broker
     // bridge is live) and route the net exposure to the corporate broker
-    // account via the bridge (best-effort — never blocks the copy).
-    await this.openInitialPositions(userId, trader.id, trader.name, accountId, dto.amount, dto.risk ?? 1);
+    // account via the bridge (best-effort — never blocks the copy). Exposure is
+    // margin × leverage.
+    await this.openInitialPositions(userId, trader.id, trader.name, accountId, dto.amount, dto.risk ?? 1, leverage);
     void this.bridge
-      .placeOrder({ accountRef: `corp:${trader.id}`, symbol: trader.category, side: 'buy', volume: dto.amount })
+      .placeOrder({ accountRef: `corp:${trader.id}`, symbol: trader.category, side: 'buy', volume: dto.amount * leverage })
       .catch(() => undefined);
     return this.toConfigDto(config);
   }
@@ -156,6 +172,7 @@ export class CopyService {
     accountId: string,
     amount: number,
     risk: number,
+    leverage = 100,
   ) {
     // Don't duplicate if positions already open for this trader.
     const existing = await this.prisma.copyPosition.count({
@@ -166,7 +183,9 @@ export class CopyService {
     const trader = await this.prisma.trader.findUnique({ where: { id: traderId }, select: { category: true } });
     const pairs = PAIRS[trader?.category ?? 'Forex'] ?? PAIRS.Forex;
     const count = 2 + Math.floor(Math.random() * 2); // 2–3 positions
-    const lotBase = round(Math.max(0.01, (amount / 5000) * risk), 2);
+    // Exposure = margin × leverage. At leverage 100 this matches the prior
+    // amount/5000 sizing, and scales linearly with leverage.
+    const lotBase = round(Math.max(0.01, ((amount * leverage) / 500000) * risk), 2);
 
     for (let i = 0; i < count; i++) {
       const pair = pairs[Math.floor(Math.random() * pairs.length)];
@@ -290,6 +309,13 @@ export class CopyService {
     }
     const invested = configs.reduce((s, c) => s + c.amount, 0);
 
+    // Margin view: the wallet balance is the free margin; active copy
+    // allocations are used margin; equity folds in open P/L.
+    const freeMargin = await this.wallet.balance(userId);
+    const usedMargin = round(invested, 2);
+    const equity = round(freeMargin + usedMargin + openPnl, 2);
+    const marginLevel = usedMargin > 0 ? round((equity / usedMargin) * 100, 2) : null;
+
     return {
       netPnl: round(openPnl + bookedProfit + bookedLoss, 2),
       openPnl: round(openPnl, 2),
@@ -298,7 +324,11 @@ export class CopyService {
       copyingCount: configs.length,
       activeCount,
       closedCount,
-      invested: round(invested, 2),
+      invested: usedMargin,
+      freeMargin: round(freeMargin, 2),
+      usedMargin,
+      equity,
+      marginLevel,
     };
   }
 }
