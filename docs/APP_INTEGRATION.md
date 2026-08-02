@@ -17,10 +17,14 @@ changing the UI.
 
 ## 0. The backend
 
-- **Base URL (production):** `https://millimore-backend.onrender.com/v1`
-  - Same host serves the admin UI at `/` — you only ever call `/v1/...`.
-  - Free tier: the first request after ~15 min idle cold-starts (~30–60s). Add a
-    generous HTTP timeout and a retry on the first call.
+- **Base URL (production — AWS):**
+  `https://mi-41bae9db1d7c40e2846cc32d8ac9f51f.ecs.us-west-2.on.aws/v1`
+  - This is the live AWS (ECS) backend. Set `kApiBaseUrl` in `lib/config.dart`
+    to this (or pass `--dart-define=API_BASE_URL=…`). WebSocket base is the same
+    host with `wss://` and `/v1/ws`.
+  - (Old Render URL `https://millimore-backend.onrender.com/v1` still works as a
+    fallback but AWS is now primary.)
+  - Same host serves the admin UI at `/` — the app only ever calls `/v1/...`.
 - **Base URL (local backend):** `http://localhost:3000/v1`
 - **Auth:** `Authorization: Bearer <JWT>` on every authenticated call.
 - **Content-Type:** `application/json`
