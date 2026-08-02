@@ -40,9 +40,11 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Full deps: the container migrates + seeds itself on startup, which needs the
-# Prisma CLI and ts-node (dev deps). Simpler than a separate migration task.
+# Prisma CLI and ts-node (dev deps). --include=dev is REQUIRED because
+# NODE_ENV=production makes npm skip devDependencies otherwise — without it the
+# seed step fails at runtime with "ts-node: not found".
 COPY package*.json ./
-RUN npm ci && npm cache clean --force
+RUN npm ci --include=dev && npm cache clean --force
 COPY prisma ./prisma
 RUN npx prisma generate
 
