@@ -1,0 +1,51 @@
+# Builds the Millimore backend Docker image and pushes it to Amazon ECR — so you
+# never need Docker or the AWS CLI on your machine. Runs on every push (and via
+# the manual "Run workflow" button). Paste the resulting image URI into ECS
+# Express Mode.
+#
+# ONE-TIME SETUP (see the chat steps):
+#   1. Create an ECR repository named `millimore-backend` in us-west-2.
+#   2. Create an IAM user with "AmazonEC2ContainerRegistryPowerUser", make an
+#      access key.
+#   3. In GitHub → repo Settings → Secrets and variables → Actions → add:
+#        AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+name: build-and-push-ecr
+
+on:
+  push:
+    branches: [claude/millimore-backend-admin-yl2ffz, main]
+    paths: ['millimore-backend/**', '.github/workflows/build-and-push-ecr.yml']
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: millimore-backend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}"
+          docker build -t "$IMAGE:latest" -t "$IMAGE:${GITHUB_SHA}" millimore-backend
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${GITHUB_SHA}"
+          echo "## Image pushed to ECR" >> "$GITHUB_STEP_SUMMARY"
+          echo "Paste this into ECS Express Mode → Image URI:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$IMAGE:latest" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
