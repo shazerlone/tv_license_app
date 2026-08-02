@@ -298,5 +298,46 @@ class BackendApi {
   static Future<void> disconnectDestination(String id, String platform) =>
       _api.post('/broadcasts/$id/destinations/$platform/disconnect');
 
+  // ── Wallet / deposits / payouts (milestone 6) ─────────────────────────────
+  static Future<Map<String, dynamic>> wallet() async {
+    final res = await _api.get('/wallet');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<List<Map<String, dynamic>>> walletLedger() async {
+    final res = await _api.get('/wallet/ledger');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<List<Map<String, dynamic>>> depositMethods() async {
+    final res = await _api.get('/deposits/methods');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<List<Map<String, dynamic>>> deposits() async {
+    final res = await _api.get('/deposits');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> createDeposit({required double amount, String? method, String? asset}) async {
+    final res = await _api.post('/deposits', {'amount': amount, if (method != null) 'method': method, if (asset != null) 'asset': asset});
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<List<Map<String, dynamic>>> creatorPayouts() async {
+    final res = await _api.get('/creator/payouts');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> requestPayout({required double amount, String? method, String? note}) async {
+    final res = await _api.post('/creator/payouts', {'amount': amount, if (method != null) 'method': method, if (note != null) 'note': note});
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<double> setCommission(double percent) async {
+    final res = await _api.patch('/creator/commission', {'percent': percent});
+    return ((res as Map)['commissionPercent'] as num?)?.toDouble() ?? percent;
+  }
+
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }

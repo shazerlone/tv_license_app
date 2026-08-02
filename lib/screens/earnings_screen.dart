@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../services/backend_api.dart';
+import '../services/api_client.dart';
 
 /// Creator earnings & payouts (GET /creator/earnings).
 class EarningsScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
   double _balance = 0, _pending = 0;
   String _currency = 'USD';
   List<Map<String, dynamic>> _history = const [];
+  List<Map<String, dynamic>> _payouts = const [];
   bool _loading = true;
   bool _failed = false;
 
@@ -36,6 +38,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
     });
     try {
       final e = await BackendApi.creatorEarnings();
+      List<Map<String, dynamic>> payouts = const [];
+      try {
+        payouts = await BackendApi.creatorPayouts();
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _balance = (e['balance'] as num?)?.toDouble() ?? 0;
@@ -44,6 +50,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         _history = ((e['history'] as List?) ?? const [])
             .map((x) => (x as Map).cast<String, dynamic>())
             .toList();
+        _payouts = payouts;
         _loading = false;
       });
     } catch (_) {
@@ -56,6 +63,82 @@ class _EarningsScreenState extends State<EarningsScreen> {
   }
 
   String _money(double v) => '\$${v.toStringAsFixed(2)}';
+
+  Future<void> _requestPayout() async {
+    final controller = TextEditingController(text: _balance.toStringAsFixed(2));
+    final amount = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.background,
+        title: Text('Request payout', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          decoration: InputDecoration(prefixText: '\$ ', helperText: 'Available: ${_money(_balance)}'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, double.tryParse(controller.text.trim())), child: const Text('Request')),
+        ],
+      ),
+    );
+    if (amount == null || amount <= 0) return;
+    if (amount > _balance) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Amount exceeds your balance')));
+      return;
+    }
+    try {
+      await BackendApi.requestPayout(amount: amount);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payout requested — pending approval')));
+      _load();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
+  }
+
+  Widget _payoutRow(Map<String, dynamic> p) {
+    final amount = (p['amount'] as num?)?.toDouble() ?? 0;
+    final status = (p['status'] ?? 'pending').toString();
+    final when = (p['createdAt'] ?? '').toString();
+    final colors = {
+      'pending': AppColors.slate,
+      'approved': AppColors.primary,
+      'paid': AppColors.green,
+      'rejected': AppColors.red,
+    };
+    final c = colors[status] ?? AppColors.slate;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_money(amount), style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                if (when.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(when.length > 10 ? when.substring(0, 10) : when, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                ],
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+            child: Text(status[0].toUpperCase() + status.substring(1), style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: c)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,14 +177,18 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _balance > 0
-                          ? () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payouts open once you link a method — coming soon')))
-                          : null,
-                      child: const Text('Withdraw'),
+                      onPressed: _balance > 0 ? _requestPayout : null,
+                      child: const Text('Request payout'),
                     ),
                   ),
+                  if (_payouts.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text('Payouts', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    const SizedBox(height: 8),
+                    ..._payouts.map(_payoutRow),
+                  ],
                   const SizedBox(height: 24),
-                  Text('History', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  Text('Earnings history', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                   const SizedBox(height: 8),
                   if (_failed)
                     _empty(Icons.wifi_off_rounded, 'Couldn\'t load earnings', 'Pull to retry.')

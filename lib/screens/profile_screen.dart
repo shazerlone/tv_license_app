@@ -17,6 +17,7 @@ import 'accounts_screen.dart';
 import 'copied_trades_screen.dart';
 import 'support_chat_screen.dart';
 import 'edit_profile_screen.dart';
+import 'wallet_screen.dart';
 
 /// One simple profile page: who you are, your copy performance, and clear
 /// buttons out to everything else. No tabs, no nested navigation.
@@ -105,6 +106,8 @@ class ProfileScreen extends StatelessWidget {
             Text('Your activity', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
             const SizedBox(height: 10),
             _MenuCard(children: [
+              _MenuTile(icon: Icons.account_balance_wallet_rounded, color: AppColors.green, label: 'Wallet',
+                  onTap: () => _push(context, const WalletScreen())),
               _MenuTile(icon: Icons.swap_vert_rounded, color: AppColors.primary, label: 'Copied trades', trailing: '${store.copyingCount}',
                   onTap: () => _push(context, const CopiedTradesScreen())),
               _MenuTile(icon: Icons.account_balance_wallet_outlined, color: AppColors.green, label: 'Trading accounts',
