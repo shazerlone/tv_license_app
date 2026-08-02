@@ -146,6 +146,30 @@ already calls these / is built for them — please implement:
 > **live events** in §6a (so positions/pnl update without a manual refresh), plus
 > **`POST /devices`** wiring on the client (needs Firebase — deliberate later step).
 
+## 5d. Live streaming — milestone 5 (backend ✅, app wiring in progress)
+Backend endpoints exist; the app's client methods are added. Status:
+
+| Method · Path | Purpose | App status |
+| --- | --- | --- |
+| POST `/broadcasts` `{title}` → BroadcastDto | create (returns `ingestUrl`,`streamKey`,`hlsUrl`,`phase`) | 🟡 client ready |
+| POST `/broadcasts/{id}/start` · `/end` | go live / end (`end`→ summary) | 🟡 client ready |
+| GET `/broadcasts/live` · `/broadcasts/{id}` | live list / detail (`viewers`,`hlsUrl`) | 🟡 client ready |
+| GET·POST `/broadcasts/{id}/chat` | live chat (poll + send) | 🟡 client ready |
+| POST `/broadcasts/{id}/react` | hearts | 🟡 client ready |
+| POST `/broadcasts/{id}/destinations/youtube/connect` | simulcast to YouTube | 🟡 client ready |
+
+> **App-side blocker for real video** (not a backend issue): publishing the
+> camera to `ingestUrl` needs a native **RTMP publisher** (`apivideo_live_stream`)
+> and playing `hlsUrl` needs a **video player** (`video_player`/`better_player`).
+> These are native deps that must be added and build-verified deliberately.
+> Until then the app can wire the **broadcast lifecycle + real shared
+> chat/reactions/viewer-count** (no video), which is the next step.
+
+## 5e. Uploads & earnings — ✅ WIRED
+- POST `/uploads` `{contentType, data, kind?}` → `{url,id}` — used for profile photos. ✅
+- GET `/creator/earnings` → `{balance, currency, pending, history[]}` — Earnings screen. ✅
+- PATCH/DELETE `/posts/{id}` — client ready (edit/delete own post).
+
 ## 6. NEW things the app needs (please add to the contract, then build)
 
 These are **not yet in the backend** but the app is being built to use them. Flag
