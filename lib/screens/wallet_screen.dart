@@ -17,6 +17,7 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   double _balance = 0;
+  double _leverage = 1;
   String _currency = 'USD';
   List<Map<String, dynamic>> _ledger = const [];
   bool _loading = true;
@@ -46,6 +47,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (!mounted) return;
       setState(() {
         _balance = (w['balance'] as num?)?.toDouble() ?? 0;
+        _leverage = (w['leverage'] as num?)?.toDouble() ?? 1;
         _currency = (w['currency'] ?? 'USD').toString();
         _ledger = l;
         _loading = false;
@@ -83,8 +85,20 @@ class _WalletScreenState extends State<WalletScreen> {
                         Text('Wallet balance', style: GoogleFonts.inter(fontSize: 13, color: Colors.white.withOpacity(0.65))),
                         const SizedBox(height: 8),
                         Text(_money(_balance), style: GoogleFonts.inter(fontSize: 36, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -1)),
-                        const SizedBox(height: 4),
-                        Text(_currency, style: GoogleFonts.inter(fontSize: 12.5, color: Colors.white.withOpacity(0.55))),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(_currency, style: GoogleFonts.inter(fontSize: 12.5, color: Colors.white.withOpacity(0.55))),
+                            if (_leverage > 1) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+                                child: Text('${_leverage.toStringAsFixed(0)}x leverage', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.85))),
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                   ),

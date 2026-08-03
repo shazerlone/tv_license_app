@@ -73,6 +73,21 @@ class ProfileScreen extends StatelessWidget {
                       Row(
                         children: [
                           _Chip(label: isCreator ? 'Creator' : 'Follower', color: isCreator ? AppColors.primary : AppColors.green),
+                          if (user != null && user.kycStatus != 'none') ...[
+                            const SizedBox(width: 8),
+                            _Chip(
+                              label: user.kycStatus == 'verified'
+                                  ? 'Verified'
+                                  : user.kycStatus == 'pending'
+                                      ? 'ID review'
+                                      : 'ID rejected',
+                              color: user.kycStatus == 'verified'
+                                  ? AppColors.green
+                                  : user.kycStatus == 'pending'
+                                      ? AppColors.primary
+                                      : AppColors.red,
+                            ),
+                          ],
                           if (user?.residenceCountry != null) ...[
                             const SizedBox(width: 8),
                             Icon(Icons.place_outlined, size: 14, color: AppColors.textMuted),

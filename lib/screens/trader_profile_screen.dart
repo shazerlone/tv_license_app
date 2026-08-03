@@ -29,6 +29,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
 
   List<Trade> _trades = const [];
   List<Post> _posts = const [];
+  List<double> _equity = const [];
   bool _loading = false;
 
   @override
@@ -51,10 +52,16 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
       final posts = await BackendApi.traderPosts(id);
       final active = await BackendApi.traderTrades(id, status: 'active');
       final closed = await BackendApi.traderTrades(id, status: 'closed');
+      List<double> equity = const [];
+      try {
+        final pts = await BackendApi.traderEquity(id);
+        equity = pts.map((e) => e.value).toList();
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _posts = posts.map(Post.fromApi).toList();
         _trades = [...active, ...closed].map(Trade.fromApi).toList();
+        _equity = equity;
         _loading = false;
       });
     } catch (_) {
@@ -162,7 +169,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
                     Wrap(spacing: 8, runSpacing: 8, children: trader.tags.map((t) => _TagChip(label: t)).toList()),
                   ],
                   const SizedBox(height: 18),
-                  _EquityCard(trader: trader),
+                  _EquityCard(trader: trader, points: _equity),
                   const SizedBox(height: 14),
                   _StatsRow(trader: trader),
                   const SizedBox(height: 14),
@@ -268,7 +275,8 @@ class _SubscribeButton extends StatelessWidget {
 
 class _EquityCard extends StatelessWidget {
   final Trader trader;
-  const _EquityCard({required this.trader});
+  final List<double> points;
+  const _EquityCard({required this.trader, this.points = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +309,7 @@ class _EquityCard extends StatelessWidget {
           SizedBox(
             height: 90,
             width: double.infinity,
-            child: CustomPaint(painter: _EquityPainter(seed: trader.id.hashCode, positive: positive)),
+            child: CustomPaint(painter: _EquityPainter(seed: trader.id.hashCode, positive: positive, points: points)),
           ),
         ],
       ),
@@ -312,20 +320,35 @@ class _EquityCard extends StatelessWidget {
 class _EquityPainter extends CustomPainter {
   final int seed;
   final bool positive;
-  _EquityPainter({required this.seed, required this.positive});
+  final List<double> points;
+  _EquityPainter({required this.seed, required this.positive, this.points = const []});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rng = math.Random(seed);
-    const n = 24;
     final color = positive ? AppColors.green : AppColors.red;
-    double v = size.height * 0.7;
     final pts = <Offset>[];
-    for (int i = 0; i < n; i++) {
-      final drift = positive ? -size.height * 0.018 : size.height * 0.012;
-      v += drift + (rng.nextDouble() - 0.5) * size.height * 0.10;
-      v = v.clamp(size.height * 0.12, size.height * 0.92);
-      pts.add(Offset(size.width * i / (n - 1), v));
+
+    if (points.length >= 2) {
+      // Real equity curve from GET /traders/{id}/equity.
+      final lo = points.reduce(math.min);
+      final hi = points.reduce(math.max);
+      final span = (hi - lo).abs() < 1e-9 ? 1.0 : (hi - lo);
+      for (int i = 0; i < points.length; i++) {
+        final x = size.width * i / (points.length - 1);
+        final norm = (points[i] - lo) / span; // 0..1
+        final y = size.height * (0.9 - norm * 0.8); // higher value → higher on chart
+        pts.add(Offset(x, y));
+      }
+    } else {
+      final rng = math.Random(seed);
+      const n = 24;
+      double v = size.height * 0.7;
+      for (int i = 0; i < n; i++) {
+        final drift = positive ? -size.height * 0.018 : size.height * 0.012;
+        v += drift + (rng.nextDouble() - 0.5) * size.height * 0.10;
+        v = v.clamp(size.height * 0.12, size.height * 0.92);
+        pts.add(Offset(size.width * i / (n - 1), v));
+      }
     }
 
     final path = Path()..moveTo(pts.first.dx, pts.first.dy);
@@ -345,7 +368,7 @@ class _EquityPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_EquityPainter old) => false;
+  bool shouldRepaint(_EquityPainter old) => old.points.length != points.length;
 }
 
 // ── Tabs content ──────────────────────────────────────────────────────────────
