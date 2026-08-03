@@ -100,6 +100,9 @@ model User {
   // (a softer control than a full ban). Standard broker back-office capability.
   frozen    Boolean  @default(false)
   adminNote String? // internal ops note, admin-only (never returned to the app)
+  // Back-office permission group when role=admin: superadmin | finance |
+  // compliance | support | analyst. null (legacy admin) is treated as superadmin.
+  adminRole String?
   // Throttled activity timestamp (updated at most every ~10 min by the JWT
   // strategy) — powers real DAU/MAU in admin metrics without an events table.
   lastSeenAt DateTime?

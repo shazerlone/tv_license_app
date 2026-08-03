@@ -9,18 +9,19 @@ import { Avatar, Icons } from './ui';
 
 const NAV = [
   { href: '/', label: 'Overview', icon: Icons.overview },
-  { href: '/analytics', label: 'Analytics', icon: Icons.spark },
-  { href: '/traders', label: 'Traders', icon: Icons.spark },
-  { href: '/users', label: 'Users', icon: Icons.users },
-  { href: '/creators', label: 'Creator queue', icon: Icons.queue },
-  { href: '/transactions', label: 'Transactions', icon: Icons.spark },
-  { href: '/payouts', label: 'Payouts', icon: Icons.approved },
-  { href: '/kyc', label: 'KYC', icon: Icons.approved },
-  { href: '/referrals', label: 'Referrals', icon: Icons.spark },
-  { href: '/support', label: 'Support', icon: Icons.queue },
-  { href: '/announcements', label: 'Announcements', icon: Icons.spark },
-  { href: '/audit', label: 'Audit log', icon: Icons.queue },
-  { href: '/settings', label: 'Settings', icon: Icons.users },
+  { href: '/analytics', label: 'Analytics', icon: Icons.spark, perm: 'analytics.read' },
+  { href: '/traders', label: 'Traders', icon: Icons.spark, perm: 'traders.read' },
+  { href: '/users', label: 'Users', icon: Icons.users, perm: 'users.read' },
+  { href: '/creators', label: 'Creator queue', icon: Icons.queue, perm: 'creators.approve' },
+  { href: '/transactions', label: 'Transactions', icon: Icons.spark, perm: 'payouts.approve' },
+  { href: '/payouts', label: 'Payouts', icon: Icons.approved, perm: 'payouts.approve' },
+  { href: '/kyc', label: 'KYC', icon: Icons.approved, perm: 'kyc.decide' },
+  { href: '/referrals', label: 'Referrals', icon: Icons.spark, perm: 'referrals.read' },
+  { href: '/support', label: 'Support', icon: Icons.queue, perm: 'support.write' },
+  { href: '/announcements', label: 'Announcements', icon: Icons.spark, perm: 'announcements.write' },
+  { href: '/team', label: 'Team', icon: Icons.users, perm: 'admins.manage' },
+  { href: '/audit', label: 'Audit log', icon: Icons.queue, perm: 'audit.read' },
+  { href: '/settings', label: 'Settings', icon: Icons.users, perm: 'settings.write' },
 ];
 
 const TITLES: Record<string, string> = {
@@ -35,6 +36,7 @@ const TITLES: Record<string, string> = {
   '/referrals': 'Referrals',
   '/support': 'Support',
   '/announcements': 'Announcements',
+  '/team': 'Team',
   '/audit': 'Audit log',
   '/settings': 'Settings',
 };
@@ -44,6 +46,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState<number | null>(null);
+  const [perms, setPerms] = useState<string[] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const user = getStoredUser();
 
@@ -53,10 +56,16 @@ export default function Shell({ children }: { children: ReactNode }) {
       return;
     }
     setReady(true);
+    apiFetch<{ permissions: string[] }>('/admin/me/permissions')
+      .then((r) => setPerms(r.permissions))
+      .catch(() => setPerms([]));
     apiFetch<any[]>('/admin/creators/pending')
       .then((rows) => setPending(rows.length))
       .catch(() => setPending(null));
   }, [router]);
+
+  // Show a nav item only if the admin holds its permission (Overview: always).
+  const canSee = (perm?: string) => !perm || perms === null || perms.includes(perm);
 
   // Close the drawer whenever the route changes.
   useEffect(() => setMenuOpen(false), [pathname]);
@@ -69,7 +78,7 @@ export default function Shell({ children }: { children: ReactNode }) {
         milli<b>more</b>
       </div>
       <div className="nav-label">Platform</div>
-      {NAV.map((n) => {
+      {NAV.filter((n) => canSee((n as any).perm)).map((n) => {
         const active = n.href === '/' ? pathname === '/' : pathname.startsWith(n.href);
         const Icon = n.icon;
         return (

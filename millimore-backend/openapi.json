@@ -1007,6 +1007,75 @@
         ]
       }
     },
+    "/v1/admin/me/permissions": {
+      "get": {
+        "operationId": "AdminController_myPermissions",
+        "summary": "The signed-in admin’s role + permission set",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/team": {
+      "get": {
+        "operationId": "AdminController_team",
+        "summary": "Back-office team (admins) + their roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/team/{id}/role": {
+      "post": {
+        "operationId": "AdminController_setRole",
+        "summary": "Assign an admin role (superadmin|finance|compliance|support|analyst)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/referrals": {
       "get": {
         "operationId": "AdminController_topReferrers",
@@ -5497,6 +5566,11 @@
           "adminNote": {
             "type": "object",
             "nullable": true
+          },
+          "adminRole": {
+            "type": "object",
+            "nullable": true,
+            "description": "Back-office role when role=admin."
           }
         },
         "required": [

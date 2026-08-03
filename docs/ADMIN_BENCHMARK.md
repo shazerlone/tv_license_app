@@ -51,3 +51,8 @@ add-ons that are natural follow-on milestones.
   realtime reply push).
 - **Announcements / notification center** — ✅ (audience targeting, required-read
   acknowledgement, bell feed).
+
+## Update (M11)
+- **Granular admin roles / permissions (RBAC)** — ✅ (superadmin/finance/
+  compliance/support/analyst; per-endpoint permission gating; Team management +
+  permission-scoped nav).

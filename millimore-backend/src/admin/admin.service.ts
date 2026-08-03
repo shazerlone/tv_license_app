@@ -104,7 +104,7 @@ export class AdminService {
 
   // ── users ──────────────────────────────────────────────────────────
   private toAdminUserDto(u: User): AdminUserDto {
-    return { ...this.users.toDto(u), banned: u.banned, frozen: u.frozen, adminNote: u.adminNote };
+    return { ...this.users.toDto(u), banned: u.banned, frozen: u.frozen, adminNote: u.adminNote, adminRole: u.adminRole };
   }
 
   async listUsers(q: AdminUsersQueryDto): Promise<Paginated<AdminUserDto>> {
@@ -148,6 +148,30 @@ export class AdminService {
       },
     });
     return this.toAdminUserDto(user);
+  }
+
+  // ── team / admin roles (milestone 11) ──────────────────────────────
+  async getAdminRole(id: string): Promise<string | null> {
+    const u = await this.prisma.user.findUnique({ where: { id }, select: { adminRole: true } });
+    return u?.adminRole ?? null;
+  }
+
+  async listAdmins() {
+    const rows = await this.prisma.user.findMany({
+      where: { role: 'admin' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, username: true, email: true, adminRole: true, createdAt: true },
+    });
+    return rows.map((u) => ({ ...u, adminRole: u.adminRole ?? 'superadmin', createdAt: u.createdAt.toISOString() }));
+  }
+
+  async setAdminRole(id: string, adminRole: string | null) {
+    const user = await this.getUserOrThrow(id);
+    if (user.role !== 'admin') {
+      throw new NotFoundException({ code: 'not_an_admin', message: 'User is not an admin' });
+    }
+    await this.prisma.user.update({ where: { id }, data: { adminRole } });
+    return { id, adminRole: adminRole ?? 'superadmin' };
   }
 
   // ── user 360 + balance ops (milestone 8) ───────────────────────────

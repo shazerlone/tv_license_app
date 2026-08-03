@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AnalyticsService } from './analytics.service';
 import { AdminController } from './admin.controller';
+import { PermissionsGuard } from '../common/rbac/permissions.guard';
 import { UsersModule } from '../users/users.module';
 import { TradersModule } from '../traders/traders.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -12,7 +13,7 @@ import { SupportModule } from '../support/support.module';
 
 @Module({
   imports: [UsersModule, TradersModule, NotificationsModule, WalletModule, PayoutsModule, KycModule, SupportModule],
-  providers: [AdminService, AnalyticsService],
+  providers: [AdminService, AnalyticsService, PermissionsGuard],
   controllers: [AdminController],
 })
 export class AdminModule {}

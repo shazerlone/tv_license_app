@@ -718,3 +718,19 @@ tickets, internal notes, required-read announcements) and adds realtime delivery
   /admin/announcements/{id}`.
 - Admin UI adds **Support** (ticket console w/ thread, internal notes, status/
   priority) and **Announcements** (compose + audience + required-read) pages.
+
+### Back-office roles & permissions — RBAC (milestone 11)
+Admin-only. Researched against B2Core's back-office user groups; staff are scoped
+by role. Roles: `superadmin` (all), `finance` (deposits/withdrawals/balances/
+analytics), `compliance` (KYC/audit/withdrawal review), `support` (tickets/
+announcements), `analyst` (read-only analytics/reports). A legacy admin with no
+`adminRole` is treated as superadmin.
+- Every sensitive `/admin/*` endpoint is gated by a permission (e.g.
+  `wallet.adjust`, `kyc.decide`, `payouts.approve`, `settings.write`,
+  `announcements.write`, `admins.manage`). Insufficient role →
+  `403 { error.code: "insufficient_permission" }`.
+- `GET /admin/me/permissions` → `{ adminRole, permissions[] }` — the admin UI
+  hides nav/actions the signed-in admin can't use.
+- `GET /admin/team` + `POST /admin/team/{id}/role { adminRole }` (require
+  `admins.manage`) manage staff roles. `AdminUserDto` now includes `adminRole`.
+- Admin UI adds a **Team** page (assign roles) and a permission-filtered sidebar.

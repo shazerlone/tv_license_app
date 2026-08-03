@@ -13,6 +13,8 @@ export class AdminUserDto extends UserDto {
   @ApiProperty({ example: false }) banned: boolean;
   @ApiProperty({ example: false }) frozen: boolean;
   @ApiPropertyOptional({ nullable: true }) adminNote?: string | null;
+  @ApiPropertyOptional({ nullable: true, description: 'Back-office role when role=admin.' })
+  adminRole?: string | null;
 }
 
 /** GET /admin/users/{id} — the "user 360" detail view. */

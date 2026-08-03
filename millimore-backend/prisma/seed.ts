@@ -403,6 +403,9 @@ async function main() {
     },
   });
 
+  // Superadmin role for the main admin (null would also mean superadmin).
+  await prisma.user.update({ where: { id: 'u_admin' }, data: { adminRole: 'superadmin' } });
+
   // ── Platform settings singleton (admin-editable; env are the defaults) ──
   await prisma.platformSettings.upsert({
     where: { id: 'platform' },

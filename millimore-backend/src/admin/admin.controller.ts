@@ -16,6 +16,9 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { PermissionsGuard } from '../common/rbac/permissions.guard';
+import { RequirePermissions } from '../common/rbac/require-permissions.decorator';
+import { permissionsFor } from '../common/rbac/permissions';
 import { KycStatus } from '@prisma/client';
 import { AdminService } from './admin.service';
 import { AnalyticsService } from './analytics.service';
@@ -51,7 +54,7 @@ import { Paginated } from '../common/dto/pagination.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth('bearer')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles(Role.admin)
 @Controller('admin')
 export class AdminController {
@@ -69,7 +72,32 @@ export class AdminController {
     private readonly announcements: AnnouncementsService,
   ) {}
 
+  @Get('me/permissions')
+  @ApiOperation({ summary: 'The signed-in admin’s role + permission set' })
+  async myPermissions(@CurrentUser() user: AuthUser) {
+    const me = await this.admin.getAdminRole(user.userId);
+    return { adminRole: me ?? 'superadmin', permissions: permissionsFor(me) };
+  }
+
+  @Get('team')
+  @RequirePermissions('admins.manage')
+  @ApiOperation({ summary: 'Back-office team (admins) + their roles' })
+  team() {
+    return this.admin.listAdmins();
+  }
+
+  @Post('team/:id/role')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('admins.manage')
+  @ApiOperation({ summary: 'Assign an admin role (superadmin|finance|compliance|support|analyst)' })
+  async setRole(@Param('id') id: string, @Body() body: { adminRole: string | null }, @CurrentUser() user: AuthUser) {
+    const res = await this.admin.setAdminRole(id, body.adminRole || null);
+    await this.audit.record(user.userId, 'admin.role.set', 'user', id, { adminRole: body.adminRole });
+    return res;
+  }
+
   @Get('referrals')
+  @RequirePermissions('referrals.read')
   @ApiOperation({ summary: 'Top referrers by affiliate earnings' })
   topReferrers() {
     return this.referrals.adminTopReferrers();
@@ -78,12 +106,14 @@ export class AdminController {
   // ── support (helpdesk) ─────────────────────────────────────────────
   @Get('support/tickets')
   @ApiOperation({ summary: 'Support tickets, filter by status' })
+  @RequirePermissions('support.write')
   supportList(@Query('status') status?: string) {
     return this.support.adminList(status);
   }
 
   @Get('support/tickets/:id')
   @ApiOperation({ summary: 'Ticket thread incl. internal notes' })
+  @RequirePermissions('support.write')
   supportGet(@Param('id') id: string) {
     return this.support.adminGet(id);
   }
@@ -91,12 +121,14 @@ export class AdminController {
   @Post('support/tickets/:id/messages')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reply to a ticket (set internal:true for a private note)' })
+  @RequirePermissions('support.write')
   supportReply(@Param('id') id: string, @Body() dto: AdminReplyDto, @CurrentUser() user: AuthUser) {
     return this.support.adminReply(id, user.userId, dto);
   }
 
   @Patch('support/tickets/:id')
   @ApiOperation({ summary: 'Update ticket status / priority' })
+  @RequirePermissions('support.write')
   supportUpdate(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
     return this.support.adminUpdate(id, dto);
   }
@@ -110,6 +142,7 @@ export class AdminController {
 
   @Post('announcements')
   @ApiOperation({ summary: 'Create an announcement' })
+  @RequirePermissions('announcements.write')
   async announcementsCreate(@Body() dto: CreateAnnouncementDto, @CurrentUser() user: AuthUser) {
     const res = await this.announcements.create(dto, user.userId);
     await this.audit.record(user.userId, 'announcement.create', 'announcement', res.id, { title: dto.title });
@@ -118,12 +151,14 @@ export class AdminController {
 
   @Patch('announcements/:id')
   @ApiOperation({ summary: 'Update an announcement' })
+  @RequirePermissions('announcements.write')
   announcementsUpdate(@Param('id') id: string, @Body() dto: UpdateAnnouncementDto) {
     return this.announcements.update(id, dto);
   }
 
   @Delete('announcements/:id')
   @ApiOperation({ summary: 'Delete an announcement' })
+  @RequirePermissions('announcements.write')
   announcementsRemove(@Param('id') id: string) {
     return this.announcements.remove(id);
   }
@@ -137,12 +172,14 @@ export class AdminController {
 
   @Get('analytics')
   @ApiOperation({ summary: 'Business analytics — daily series, totals, top traders' })
+  @RequirePermissions('analytics.read')
   analyticsOverview(@Query('days') days?: string) {
     return this.analytics.overview(days ? Number(days) : 30);
   }
 
   @Get('users')
   @ApiOperation({ summary: 'List users, paginated + filtered (contract §6)' })
+  @RequirePermissions('users.read')
   @ApiOkResponse({ type: AdminUserPageDto })
   listUsers(@Query() q: AdminUsersQueryDto): Promise<AdminUserPageDto> {
     return this.admin.listUsers(q);
@@ -150,6 +187,7 @@ export class AdminController {
 
   @Get('users/:id')
   @ApiOperation({ summary: 'User 360 — profile, wallet, stats, recent ledger' })
+  @RequirePermissions('users.read')
   @ApiOkResponse({ type: AdminUserDetailDto })
   userDetail(@Param('id') id: string) {
     return this.admin.userDetail(id);
@@ -157,6 +195,7 @@ export class AdminController {
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update a user: role / banned / frozen / note / creatorStatus' })
+  @RequirePermissions('users.write')
   @ApiOkResponse({ type: AdminUserDto })
   async updateUser(
     @Param('id') id: string,
@@ -171,6 +210,7 @@ export class AdminController {
   @Post('users/:id/adjust')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually credit/debit a user wallet (audited)' })
+  @RequirePermissions('wallet.adjust')
   async adjustBalance(
     @Param('id') id: string,
     @Body() dto: AdjustBalanceDto,
@@ -191,6 +231,7 @@ export class AdminController {
   @Post('creators/:id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve a creator application (contract §6)' })
+  @RequirePermissions('creators.approve')
   @ApiOkResponse({ type: ApplicationDto })
   approve(@Param('id') id: string, @Body() dto: ApproveDto): Promise<ApplicationDto> {
     return this.admin.approveCreator(id, dto.note);
@@ -199,6 +240,7 @@ export class AdminController {
   @Post('creators/:id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a creator application (contract §6)' })
+  @RequirePermissions('creators.approve')
   @ApiOkResponse({ type: ApplicationDto })
   reject(@Param('id') id: string, @Body() dto: RejectDto): Promise<ApplicationDto> {
     return this.admin.rejectCreator(id, dto.reason);
@@ -214,6 +256,7 @@ export class AdminController {
   @Post('payouts/:id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve a withdrawal (contract §6)' })
+  @RequirePermissions('payouts.approve')
   @ApiOkResponse({ type: AdminPayoutDto })
   approvePayout(
     @Param('id') id: string,
@@ -226,6 +269,7 @@ export class AdminController {
   @Post('payouts/:id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a withdrawal — refunds the held funds (contract §6)' })
+  @RequirePermissions('payouts.approve')
   @ApiOkResponse({ type: AdminPayoutDto })
   rejectPayout(
     @Param('id') id: string,
@@ -238,6 +282,7 @@ export class AdminController {
   @Post('payouts/:id/flag')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Flag / unflag a withdrawal for risk review' })
+  @RequirePermissions('payouts.approve')
   async flagPayout(
     @Param('id') id: string,
     @Body() dto: { flagged?: boolean; reason?: string },
@@ -258,6 +303,7 @@ export class AdminController {
 
   @Patch('settings')
   @ApiOperation({ summary: 'Update platform settings (contract §12)' })
+  @RequirePermissions('settings.write')
   async updateSettings(@Body() dto: UpdateSettingsDto, @CurrentUser() user: AuthUser) {
     const res = await this.settings.update(dto);
     await this.audit.record(user.userId, 'settings.update', 'settings', 'platform', { ...dto });
@@ -287,6 +333,7 @@ export class AdminController {
   @Post('deposits/:id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve a pending deposit → credit the wallet' })
+  @RequirePermissions('payouts.approve')
   async approveDeposit(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     const res = await this.deposits.adminApprove(id, user.userId);
     await this.audit.record(user.userId, 'deposit.approve', 'deposit', id);
@@ -296,6 +343,7 @@ export class AdminController {
   @Post('deposits/:id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a deposit' })
+  @RequirePermissions('payouts.approve')
   async rejectDeposit(@Param('id') id: string, @Body() dto: ReasonDto, @CurrentUser() user: AuthUser) {
     const res = await this.deposits.adminReject(id, user.userId, dto.reason ?? 'Rejected');
     await this.audit.record(user.userId, 'deposit.reject', 'deposit', id, { reason: dto.reason });
@@ -305,6 +353,7 @@ export class AdminController {
   @Post('deposits/:id/flag')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Flag / unflag a deposit for risk review' })
+  @RequirePermissions('payouts.approve')
   async flagDeposit(
     @Param('id') id: string,
     @Body() dto: { flagged?: boolean; reason?: string },
@@ -319,6 +368,7 @@ export class AdminController {
   // ── KYC ────────────────────────────────────────────────────────────
   @Get('kyc')
   @ApiOperation({ summary: 'KYC submissions, filter by status' })
+  @RequirePermissions('kyc.decide')
   kycList(@Query('status') status?: string, @Query('limit') limit?: string, @Query('cursor') cursor?: string) {
     return this.kyc.adminList({ status, limit: limit ? Number(limit) : undefined, cursor });
   }
@@ -326,6 +376,7 @@ export class AdminController {
   @Post('kyc/:userId/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually mark a user KYC-verified' })
+  @RequirePermissions('kyc.decide')
   async verifyKyc(@Param('userId') userId: string, @CurrentUser() user: AuthUser) {
     await this.kyc.setStatus(userId, KycStatus.verified);
     await this.audit.record(user.userId, 'kyc.verify', 'kyc', userId);
@@ -335,6 +386,7 @@ export class AdminController {
   @Post('kyc/:userId/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a user KYC with a reason' })
+  @RequirePermissions('kyc.decide')
   async rejectKyc(@Param('userId') userId: string, @Body() dto: ReasonDto, @CurrentUser() user: AuthUser) {
     await this.kyc.setStatus(userId, KycStatus.rejected, dto.reason ?? 'Rejected');
     await this.audit.record(user.userId, 'kyc.reject', 'kyc', userId, { reason: dto.reason });
@@ -344,6 +396,7 @@ export class AdminController {
   // ── audit trail ────────────────────────────────────────────────────
   @Get('audit')
   @ApiOperation({ summary: 'Admin action audit log (contract §12)' })
+  @RequirePermissions('audit.read')
   auditLog(@Query('targetType') targetType?: string, @Query('limit') limit?: string, @Query('cursor') cursor?: string) {
     return this.audit.list({ targetType, limit: limit ? Number(limit) : undefined, cursor });
   }
