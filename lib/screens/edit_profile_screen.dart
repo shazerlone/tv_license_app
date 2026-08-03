@@ -20,6 +20,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _name = TextEditingController();
   final _market = TextEditingController();
   final _platform = TextEditingController();
+  final _address = TextEditingController();
+  final _city = TextEditingController();
+  final _postal = TextEditingController();
   String? _photoUrl;
   bool _saving = false;
   bool _isCreator = false;
@@ -34,6 +37,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _name.text = u?.name ?? '';
     _market.text = u?.market ?? '';
     _platform.text = u?.platform ?? '';
+    _address.text = u?.addressLine ?? '';
+    _city.text = u?.city ?? '';
+    _postal.text = u?.postalCode ?? '';
     _photoUrl = u?.photoUrl;
     _isCreator = u?.isCreator ?? false;
   }
@@ -43,6 +49,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _name.dispose();
     _market.dispose();
     _platform.dispose();
+    _address.dispose();
+    _city.dispose();
+    _postal.dispose();
     super.dispose();
   }
 
@@ -76,6 +85,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (photo != null) 'photoUrl': photo,
           if (_isCreator && _market.text.trim().isNotEmpty) 'market': _market.text.trim(),
           if (_isCreator && _platform.text.trim().isNotEmpty) 'platform': _platform.text.trim(),
+          if (_address.text.trim().isNotEmpty) 'addressLine': _address.text.trim(),
+          if (_city.text.trim().isNotEmpty) 'city': _city.text.trim(),
+          if (_postal.text.trim().isNotEmpty) 'postalCode': _postal.text.trim(),
         };
         final updated = await AuthApi.updateMe(fields);
         if (!mounted) return;
@@ -157,6 +169,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               decoration: const InputDecoration(hintText: 'e.g. MetaTrader 5'),
             ),
           ],
+          const SizedBox(height: 24),
+          Text('Address', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          Text('Required for withdrawals & verification.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+          const SizedBox(height: 12),
+          _Label('Address line'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _address,
+            textCapitalization: TextCapitalization.words,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(hintText: 'Street address'),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Label('City'),
+                    const SizedBox(height: 8),
+                    TextField(controller: _city, style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary), decoration: const InputDecoration(hintText: 'City')),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Label('Postal code'),
+                    const SizedBox(height: 8),
+                    TextField(controller: _postal, style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary), decoration: const InputDecoration(hintText: 'ZIP')),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: _saving ? null : _save,

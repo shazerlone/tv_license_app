@@ -109,6 +109,19 @@ class _SummaryCard extends StatelessWidget {
               _CountMetric(label: 'Invested', value: '\$${store.totalInvested.toStringAsFixed(0)}'),
             ],
           ),
+          if (store.hasMargin) ...[
+            const SizedBox(height: 14),
+            const Divider(color: Colors.white12, height: 1),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _CountMetric(label: 'Equity', value: '\$${store.equity.toStringAsFixed(0)}'),
+                _CountMetric(label: 'Free margin', value: '\$${store.freeMargin.toStringAsFixed(0)}'),
+                _CountMetric(label: 'Used', value: '\$${store.usedMargin.toStringAsFixed(0)}'),
+                _CountMetric(label: 'Margin lvl', value: store.marginLevel != null ? '${store.marginLevel!.toStringAsFixed(0)}%' : '—'),
+              ],
+            ),
+          ],
         ],
       ),
     );

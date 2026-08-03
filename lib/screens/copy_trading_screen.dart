@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/trader.dart';
 import '../models/copy_models.dart';
 import '../data/brokers.dart';
 import '../state/app_state.dart';
+import '../services/app_config.dart';
+import '../services/api_client.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/add_account_sheet.dart';
 import '../widgets/broker_logo.dart';
+import 'wallet_screen.dart';
 
 class CopyTradingScreen extends StatefulWidget {
   final Trader trader;
@@ -20,7 +24,9 @@ class CopyTradingScreen extends StatefulWidget {
 class _CopyTradingScreenState extends State<CopyTradingScreen> {
   double _copyAmount = 500;
   double _risk = 1.0;
+  double _leverage = 1.0;
   bool _autoCopy = true;
+  bool _starting = false;
   String? _accountId;
 
   @override
@@ -56,7 +62,26 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
             _TraderSummaryCard(trader: trader),
             const SizedBox(height: 24),
 
-            // Account section
+            // Funding section — wallet (backend) vs broker account (demo)
+            if (kUseBackend)
+              _SettingCard(
+                child: Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Funded from your wallet', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          Text('Profit, minus the trader\'s fee, settles back to your wallet.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
             Text('Trading account', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const SizedBox(height: 12),
             if (accounts.isEmpty)
@@ -68,6 +93,7 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
                 onSelect: (id) => setState(() => _accountId = id),
                 onAdd: () => _addAccount(store),
               ),
+            ],
 
             const SizedBox(height: 24),
             Text('Copy settings', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
@@ -120,6 +146,36 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
                 ],
               ),
             ),
+            if (kUseBackend && AppConfig.instance.maxLeverage > 1) ...[
+              const SizedBox(height: 12),
+              _SettingCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Text('Leverage', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                      const Spacer(),
+                      Text('Exposure \$${(_copyAmount * _leverage).toStringAsFixed(0)}', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                    ]),
+                    const SizedBox(height: 8),
+                    Text('${_leverage.toStringAsFixed(0)}x', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                    Slider(
+                      value: _leverage.clamp(1, AppConfig.instance.maxLeverage),
+                      min: 1,
+                      max: AppConfig.instance.maxLeverage,
+                      divisions: (AppConfig.instance.maxLeverage - 1).clamp(1, 500).toInt(),
+                      activeColor: AppColors.primary,
+                      inactiveColor: AppColors.border,
+                      onChanged: (v) => setState(() => _leverage = v),
+                    ),
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      Text('1x', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                      Text('${AppConfig.instance.maxLeverage.toStringAsFixed(0)}x', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                    ]),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 28),
             if (copying)
               OutlinedButton(
@@ -132,8 +188,10 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
               )
             else
               ElevatedButton(
-                onPressed: () => _startCopy(store, selected),
-                child: const Text('Start copying'),
+                onPressed: _starting ? null : () => _startCopy(store, selected),
+                child: _starting
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Start copying'),
               ),
             const SizedBox(height: 14),
             Center(
@@ -155,6 +213,31 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
   }
 
   Future<void> _startCopy(AppState store, TradingAccount? account) async {
+    // Backend model: copying draws from the wallet — no broker account needed.
+    if (kUseBackend) {
+      setState(() => _starting = true);
+      try {
+        await store.startCopyAsync(widget.trader, amount: _copyAmount, leverage: _leverage, risk: _risk, autoCopy: _autoCopy);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Now copying ${widget.trader.name}')));
+        Navigator.pop(context);
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _starting = false);
+        if (e.code == 'insufficient_balance') {
+          _promptDeposit();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        }
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _starting = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+      }
+      return;
+    }
+
+    // Demo: requires a connected account.
     var acc = account;
     if (acc == null) {
       acc = await AddAccountSheet.open(context);
@@ -165,6 +248,28 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Now copying ${widget.trader.name}')));
     Navigator.pop(context);
+  }
+
+  void _promptDeposit() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.background,
+        title: Text('Not enough balance', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Text('You need \$${_copyAmount.toStringAsFixed(0)} in your wallet to copy this trader. Add funds to continue.',
+            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
+            },
+            child: const Text('Add funds'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -265,6 +265,13 @@ class AppState extends ChangeNotifier {
   double get netPnl => _summary?.netPnl ?? (openPnl + bookedProfit + bookedLoss);
   double get totalInvested => _summary?.invested ?? _copying.values.fold(0, (s, c) => s + c.amount);
 
+  // Milestone 7 — margin (from portfolio summary; 0 until loaded)
+  double get freeMargin => _summary?.freeMargin ?? 0;
+  double get usedMargin => _summary?.usedMargin ?? 0;
+  double get equity => _summary?.equity ?? 0;
+  double? get marginLevel => _summary?.marginLevel;
+  bool get hasMargin => _summary != null && (_summary!.usedMargin > 0 || _summary!.equity > 0);
+
   /// Loads the real copy engine (milestone 4): who you copy, positions, and the
   /// portfolio summary. No-op in demo mode.
   Future<void> loadCopyEngine() async {

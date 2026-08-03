@@ -183,6 +183,27 @@ Backend endpoints exist; the app's client methods are added. Status:
 > Open Q: is there a **GET** for current commission? Only PATCH exists, so the
 > app can set but not display the current value (defaults the input to 20%).
 
+## 5g. Financial ops, leverage & compliance — milestone 7 ✅ WIRED
+| Area | Endpoint | Status |
+| --- | --- | --- |
+| App config | GET `/config` (no auth, on launch) | ✅ leverage cap, limits, kycRequired |
+| Leverage (default) | PATCH `/me {leverage}` | ✅ (via Edit profile — pending a slider; address wired) |
+| Leverage (per-copy) | POST `/copy/{id}/start {amount, leverage}` | ✅ slider (max from /config) |
+| Margin header | GET `/portfolio/summary` freeMargin/usedMargin/equity/marginLevel | ✅ Copied Trades |
+| Wallet-funded copy | insufficient_balance → deposit prompt | ✅ |
+| Transactions | GET `/wallet/transactions` | ✅ Wallet |
+| Payout methods | GET/POST/DELETE `/wallet/payout-methods` | ✅ |
+| Withdraw | POST `/creator/payouts {amount, methodId}` + error codes | ✅ WithdrawScreen |
+| KYC | GET `/kyc`, POST `/kyc/start` | ✅ (manual mode; Sumsub SDK hook noted) |
+| Address | PATCH `/me {addressLine,city,postalCode}` | ✅ Edit profile |
+
+> **App-side TODO (native):** the Sumsub KYC SDK isn't embedded — manual mode
+> works; SDK launch is stubbed where `accessToken` is returned. Same deliberate
+> native step as live-streaming video.
+> **Open Q for backend:** a GET for current commission and current default
+> leverage display; and confirm `/config` field names (app reads maxLeverage,
+> kycRequiredForWithdrawal, limits.minWithdrawal/maxWithdrawal, activeDepositMethods).
+
 ## 6. NEW things the app needs (please add to the contract, then build)
 
 These are **not yet in the backend** but the app is being built to use them. Flag
