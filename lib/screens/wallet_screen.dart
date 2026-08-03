@@ -4,6 +4,8 @@ import '../theme/app_theme.dart';
 import '../config.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
+import 'payout_methods_screen.dart';
+import 'kyc_screen.dart';
 
 /// Wallet: balance, transaction ledger, and add-funds (milestone 6).
 class WalletScreen extends StatefulWidget {
@@ -34,7 +36,13 @@ class _WalletScreenState extends State<WalletScreen> {
     setState(() => _loading = true);
     try {
       final w = await BackendApi.wallet();
-      final l = await BackendApi.walletLedger();
+      // Unified transactions (deposits, trades, fees, commissions, withdrawals).
+      List<Map<String, dynamic>> l;
+      try {
+        l = await BackendApi.walletTransactions();
+      } catch (_) {
+        l = await BackendApi.walletLedger();
+      }
       if (!mounted) return;
       setState(() {
         _balance = (w['balance'] as num?)?.toDouble() ?? 0;
@@ -92,6 +100,17 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+                  Container(
+                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+                    child: Column(
+                      children: [
+                        _walletRow(Icons.account_balance_rounded, 'Payout methods', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayoutMethodsScreen()))),
+                        const Divider(height: 1),
+                        _walletRow(Icons.verified_user_outlined, 'Identity verification', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycScreen())), last: true),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 26),
                   Text('Transactions', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                   const SizedBox(height: 10),
@@ -111,6 +130,23 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _walletRow(IconData icon, String label, VoidCallback onTap, {bool last = false}) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.textSecondary),
+            const SizedBox(width: 14),
+            Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+          ],
+        ),
+      ),
     );
   }
 
