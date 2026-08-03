@@ -11,6 +11,36 @@ import { PaginationQueryDto } from '../../common/dto/pagination.dto';
  */
 export class AdminUserDto extends UserDto {
   @ApiProperty({ example: false }) banned: boolean;
+  @ApiProperty({ example: false }) frozen: boolean;
+  @ApiPropertyOptional({ nullable: true }) adminNote?: string | null;
+}
+
+/** GET /admin/users/{id} — the "user 360" detail view. */
+export class AdminUserDetailDto {
+  @ApiProperty({ type: AdminUserDto }) user: AdminUserDto;
+  @ApiProperty({ example: { balance: 1250.5, currency: 'USD' } })
+  wallet: { balance: number; currency: string };
+  @ApiProperty({
+    example: {
+      deposits: 3, depositsTotal: 3000, withdrawals: 1, withdrawalsTotal: 500,
+      activeCopies: 2, lifetimeCommission: 240.5, payoutMethods: 1,
+    },
+  })
+  stats: {
+    deposits: number; depositsTotal: number; withdrawals: number; withdrawalsTotal: number;
+    activeCopies: number; lifetimeCommission: number; payoutMethods: number;
+  };
+  @ApiProperty({ type: [Object], description: 'Recent ledger movements.' })
+  ledger: unknown[];
+}
+
+/** POST /admin/users/{id}/adjust — manual balance credit/debit. */
+export class AdjustBalanceDto {
+  @ApiProperty({ example: 100, description: 'Positive credits, negative debits.' })
+  amount: number;
+  @ApiProperty({ example: 'Goodwill credit for support ticket #123' })
+  @IsString()
+  reason: string;
 }
 
 export class AdminUserPageDto {
@@ -48,4 +78,15 @@ export class UpdateAdminUserDto {
   @IsOptional()
   @IsEnum(CreatorStatus)
   creatorStatus?: CreatorStatus;
+
+  @ApiPropertyOptional({ description: 'Freeze: allow login but block withdrawals + new copies.' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  frozen?: boolean;
+
+  @ApiPropertyOptional({ description: 'Internal ops note (admin-only).' })
+  @IsOptional()
+  @IsString()
+  adminNote?: string;
 }

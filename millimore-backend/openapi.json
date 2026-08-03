@@ -1134,9 +1134,43 @@
       }
     },
     "/v1/admin/users/{id}": {
+      "get": {
+        "operationId": "AdminController_userDetail",
+        "summary": "User 360 — profile, wallet, stats, recent ledger",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
       "patch": {
         "operationId": "AdminController_updateUser",
-        "summary": "Update a user: role / banned / creatorStatus (contract §6)",
+        "summary": "Update a user: role / banned / frozen / note / creatorStatus",
         "parameters": [
           {
             "name": "id",
@@ -1167,6 +1201,45 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/users/{id}/adjust": {
+      "post": {
+        "operationId": "AdminController_adjustBalance",
+        "summary": "Manually credit/debit a user wallet (audited)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustBalanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
         "tags": [
@@ -4739,6 +4812,14 @@
           "banned": {
             "type": "boolean",
             "example": false
+          },
+          "frozen": {
+            "type": "boolean",
+            "example": false
+          },
+          "adminNote": {
+            "type": "object",
+            "nullable": true
           }
         },
         "required": [
@@ -4750,7 +4831,8 @@
           "leverage",
           "kycStatus",
           "createdAt",
-          "banned"
+          "banned",
+          "frozen"
         ]
       },
       "AdminUserPageDto": {
@@ -4769,6 +4851,46 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "AdminUserDetailDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AdminUserDto"
+          },
+          "wallet": {
+            "type": "object",
+            "example": {
+              "balance": 1250.5,
+              "currency": "USD"
+            }
+          },
+          "stats": {
+            "type": "object",
+            "example": {
+              "deposits": 3,
+              "depositsTotal": 3000,
+              "withdrawals": 1,
+              "withdrawalsTotal": 500,
+              "activeCopies": 2,
+              "lifetimeCommission": 240.5,
+              "payoutMethods": 1
+            }
+          },
+          "ledger": {
+            "description": "Recent ledger movements.",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "user",
+          "wallet",
+          "stats",
+          "ledger"
         ]
       },
       "UpdateAdminUserDto": {
@@ -4794,8 +4916,34 @@
               "rejected",
               "suspended"
             ]
+          },
+          "frozen": {
+            "type": "boolean",
+            "description": "Freeze: allow login but block withdrawals + new copies."
+          },
+          "adminNote": {
+            "type": "string",
+            "description": "Internal ops note (admin-only)."
           }
         }
+      },
+      "AdjustBalanceDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 100,
+            "description": "Positive credits, negative debits."
+          },
+          "reason": {
+            "type": "string",
+            "example": "Goodwill credit for support ticket #123"
+          }
+        },
+        "required": [
+          "amount",
+          "reason"
+        ]
       },
       "ApplicationUserDto": {
         "type": "object",

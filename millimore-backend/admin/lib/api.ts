@@ -26,6 +26,24 @@ export interface AdminUser {
   platform: string | null;
   createdAt: string;
   banned: boolean;
+  frozen?: boolean;
+  adminNote?: string | null;
+  leverage?: number;
+  kycStatus?: string;
+  addressLine?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
+}
+
+/** GET /admin/users/{id} — the user-360 detail. */
+export interface AdminUserDetail {
+  user: AdminUser;
+  wallet: { balance: number; currency: string };
+  stats: {
+    deposits: number; depositsTotal: number; withdrawals: number; withdrawalsTotal: number;
+    activeCopies: number; lifetimeCommission: number; payoutMethods: number; isTrader?: boolean;
+  };
+  ledger: { id: string; type: string; amount: number; balanceAfter: number; note: string | null; createdAt: string }[];
 }
 
 export function getToken(): string | null {

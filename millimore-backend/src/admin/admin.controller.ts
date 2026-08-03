@@ -30,6 +30,8 @@ import {
   AdminUserPageDto,
   AdminUsersQueryDto,
   UpdateAdminUserDto,
+  AdminUserDetailDto,
+  AdjustBalanceDto,
 } from './dto/admin-user.dto';
 import { ApplicationDto, ApproveDto, RejectDto } from './dto/application.dto';
 import { AdminMetricsDto } from './dto/metrics.dto';
@@ -78,14 +80,37 @@ export class AdminController {
     return this.admin.listUsers(q);
   }
 
+  @Get('users/:id')
+  @ApiOperation({ summary: 'User 360 — profile, wallet, stats, recent ledger' })
+  @ApiOkResponse({ type: AdminUserDetailDto })
+  userDetail(@Param('id') id: string) {
+    return this.admin.userDetail(id);
+  }
+
   @Patch('users/:id')
-  @ApiOperation({ summary: 'Update a user: role / banned / creatorStatus (contract §6)' })
+  @ApiOperation({ summary: 'Update a user: role / banned / frozen / note / creatorStatus' })
   @ApiOkResponse({ type: AdminUserDto })
-  updateUser(
+  async updateUser(
     @Param('id') id: string,
     @Body() dto: UpdateAdminUserDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<AdminUserDto> {
-    return this.admin.updateUser(id, dto);
+    const res = await this.admin.updateUser(id, dto);
+    await this.audit.record(user.userId, 'user.update', 'user', id, { ...dto });
+    return res;
+  }
+
+  @Post('users/:id/adjust')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manually credit/debit a user wallet (audited)' })
+  async adjustBalance(
+    @Param('id') id: string,
+    @Body() dto: AdjustBalanceDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const res = await this.admin.adjustBalance(id, dto.amount, dto.reason, user.userId);
+    await this.audit.record(user.userId, 'wallet.adjust', 'user', id, { amount: dto.amount, reason: dto.reason });
+    return res;
   }
 
   @Get('creators/pending')

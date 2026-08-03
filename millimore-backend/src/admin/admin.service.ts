@@ -8,11 +8,13 @@ import {
   PayoutStatus,
   BroadcastPhase,
 } from '@prisma/client';
+import { LedgerType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { TradersService } from '../traders/traders.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementService } from '../wallet/settlement.service';
+import { WalletService } from '../wallet/wallet.service';
 import { countryNameFromIso } from '../common/countries';
 import { encodeCursor, decodeCursor, Paginated } from '../common/dto/pagination.dto';
 import {
@@ -33,6 +35,7 @@ export class AdminService {
     private readonly traders: TradersService,
     private readonly notifications: NotificationsService,
     private readonly settlement: SettlementService,
+    private readonly wallet: WalletService,
   ) {}
 
   // ── metrics (contract §6) ──────────────────────────────────────────
@@ -101,7 +104,7 @@ export class AdminService {
 
   // ── users ──────────────────────────────────────────────────────────
   private toAdminUserDto(u: User): AdminUserDto {
-    return { ...this.users.toDto(u), banned: u.banned };
+    return { ...this.users.toDto(u), banned: u.banned, frozen: u.frozen, adminNote: u.adminNote };
   }
 
   async listUsers(q: AdminUsersQueryDto): Promise<Paginated<AdminUserDto>> {
@@ -140,10 +143,61 @@ export class AdminService {
         role: dto.role,
         banned: dto.banned,
         creatorStatus: dto.creatorStatus,
-        // Keep residenceCountry consistent if an admin ever changes residence.
+        frozen: dto.frozen,
+        adminNote: dto.adminNote,
       },
     });
     return this.toAdminUserDto(user);
+  }
+
+  // ── user 360 + balance ops (milestone 8) ───────────────────────────
+  /** Full detail view for one user: profile, wallet, stats, recent ledger. */
+  async userDetail(id: string) {
+    const user = await this.getUserOrThrow(id);
+    const trader = await this.prisma.trader.findUnique({ where: { userId: id }, select: { id: true } });
+    const [balance, ledger, depAgg, wdAgg, activeCopies, lifetimeCommission, payoutMethods] =
+      await Promise.all([
+        this.wallet.balance(id),
+        this.wallet.ledger(id, 30),
+        this.prisma.deposit.aggregate({ where: { userId: id, status: 'confirmed' }, _sum: { amount: true }, _count: true }),
+        this.prisma.payout.aggregate({ where: { userId: id, status: { in: ['approved', 'paid'] } }, _sum: { amount: true }, _count: true }),
+        this.prisma.copyConfig.count({ where: { userId: id, active: true } }),
+        this.wallet.lifetimeCommission(id),
+        this.prisma.payoutMethod.count({ where: { userId: id } }),
+      ]);
+    return {
+      user: this.toAdminUserDto(user),
+      wallet: { balance, currency: 'USD' },
+      stats: {
+        deposits: depAgg._count,
+        depositsTotal: Math.round((depAgg._sum.amount ?? 0) * 100) / 100,
+        withdrawals: wdAgg._count,
+        withdrawalsTotal: Math.round((wdAgg._sum.amount ?? 0) * 100) / 100,
+        activeCopies,
+        lifetimeCommission,
+        payoutMethods,
+        isTrader: !!trader,
+      },
+      ledger,
+    };
+  }
+
+  /** Manually credit (+) or debit (-) a user's wallet, audited via the ledger. */
+  async adjustBalance(id: string, amount: number, reason: string, adminId: string) {
+    await this.getUserOrThrow(id);
+    const rounded = Math.round(amount * 100) / 100;
+    const newBalance = await this.wallet.post({
+      userId: id,
+      type: LedgerType.adjustment,
+      amount: rounded,
+      note: `Admin adjustment: ${reason}`,
+      allowNegative: true, // ops can correct balances in either direction
+    });
+    await this.notifications.pushEvent(id, 'wallet.adjusted', 'Wallet updated', {
+      body: `${rounded >= 0 ? '+' : ''}$${rounded.toFixed(2)} — ${reason}`,
+      data: { amount: rounded, reason },
+    });
+    return { balance: newBalance, currency: 'USD' };
   }
 
   // ── creator verification queue ─────────────────────────────────────

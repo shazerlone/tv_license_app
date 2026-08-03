@@ -87,6 +87,10 @@ model User {
   googleSubject String? @unique
 
   banned    Boolean  @default(false)
+  // Frozen = can still log in, but withdrawals and new copies are blocked
+  // (a softer control than a full ban). Standard broker back-office capability.
+  frozen    Boolean  @default(false)
+  adminNote String? // internal ops note, admin-only (never returned to the app)
   // Throttled activity timestamp (updated at most every ~10 min by the JWT
   // strategy) — powers real DAU/MAU in admin metrics without an events table.
   lastSeenAt DateTime?

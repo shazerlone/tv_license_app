@@ -655,3 +655,18 @@ status, entryPrice, exitPrice, pnlAmount, pnlPercent, lots, openedAt, closedAt, 
 - Admin dashboard adds an **Analytics** page (signups line, deposits-vs-withdrawals
   bars, revenue line, top-traders table) and an **Audit log** page over
   `GET /admin/audit`. All charts are dependency-free SVG (CSP-safe).
+
+### Admin user management & balance ops (milestone 8)
+- `GET /admin/users/{id}` → user 360: `{ user (incl. banned, frozen, adminNote,
+  leverage, kycStatus, address), wallet:{balance,currency}, stats:{deposits,
+  depositsTotal, withdrawals, withdrawalsTotal, activeCopies, lifetimeCommission,
+  payoutMethods, isTrader}, ledger[] }`.
+- `POST /admin/users/{id}/adjust { amount, reason }` → manual wallet credit
+  (`amount > 0`) or debit (`amount < 0`), written to the ledger as `adjustment`
+  and to the audit log; notifies the user (`wallet.adjusted`).
+- `PATCH /admin/users/{id}` now also accepts `frozen` and `adminNote`.
+- **Frozen** accounts can still log in but are blocked from **withdrawals** and
+  **starting copies** (`error.code = "account_restricted"`). Banned blocks login.
+- Admin UI: the Users page detail drawer now shows wallet balance, deposit/
+  withdrawal/copy stats, recent transactions, a credit/debit form, freeze
+  toggle, and an internal note. Market gap analysis: `docs/ADMIN_BENCHMARK.md`.

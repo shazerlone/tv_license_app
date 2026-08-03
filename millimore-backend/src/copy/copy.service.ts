@@ -108,8 +108,11 @@ export class CopyService {
     const settings = await this.settings.get();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { leverage: true },
+      select: { leverage: true, frozen: true, banned: true },
     });
+    if (user?.frozen || user?.banned) {
+      throw new BadRequestException({ code: 'account_restricted', message: 'Trading is disabled on this account. Contact support.' });
+    }
     const requested = dto.leverage ?? user?.leverage ?? settings.defaultLeverage;
     const leverage = Math.min(settings.maxLeverage, Math.max(1, Math.round(requested)));
 

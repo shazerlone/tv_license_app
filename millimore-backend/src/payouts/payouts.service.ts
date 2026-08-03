@@ -50,6 +50,15 @@ export class PayoutsService {
     const amount = Math.round(dto.amount * 100) / 100;
     const s = await this.settings.get();
 
+    // Gate 0: account not frozen/banned.
+    const acct = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { frozen: true, banned: true },
+    });
+    if (acct?.frozen || acct?.banned) {
+      throw new BadRequestException({ code: 'account_restricted', message: 'Withdrawals are disabled on this account. Contact support.' });
+    }
+
     // Gate 1: amount within min / per-transaction max.
     if (amount < s.minWithdrawal) {
       throw new BadRequestException({ code: 'below_min_withdrawal', message: `Minimum withdrawal is $${s.minWithdrawal.toFixed(2)}.` });
