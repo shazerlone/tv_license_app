@@ -4,6 +4,30 @@ Millimore is a "YouTube meets copy trading" platform: a Flutter mobile app (this
 repo) plus a backend + admin dashboard (`millimore-backend/`, with the admin in
 `millimore-backend/admin/`).
 
+## Compete with the giants — RESEARCH FIRST, ALWAYS
+
+We are building to compete with market leaders (B2Core/B2Broker, Syntellicore,
+Leverate, Brokeret, cTrader, eToro, Binance-tier exchange back-offices), **not** a
+toy. Before creating ANY new feature, endpoint, page, or module:
+
+1. **Research the giants first.** Look up how the leading platforms do this exact
+   thing — what pages they have, what fields/states/actions, what a real
+   production flow includes, what edge cases they handle. Use `WebSearch` when the
+   answer isn't already obvious from prior research.
+2. **Match their capability set, then exceed it.** Ours must cover at least what
+   they cover, then add clear improvements — better UX, smarter defaults, fewer
+   steps, a cleaner design. Never ship a "silly"/half version that's obviously
+   behind the standard.
+3. **Write down the benchmark.** Keep `docs/ADMIN_BENCHMARK.md` (and add
+   equivalents for app-side areas when relevant) updated: what leaders have, what
+   we have, what's still missing. Mark each capability ✅ / ⚠️ / ❌ honestly.
+4. **State the research in the plan.** When proposing/building a feature, briefly
+   say what the giants do and how ours matches-or-beats it — so the founder
+   (non-technical) can trust we're at market standard.
+
+This applies to backend AND UI. The design must also feel giant-tier (see below);
+the feature set must be giant-tier too.
+
 ## Design language — ALWAYS follow this
 
 Every UI — mobile app, admin dashboard, marketing, anything web — must look like
