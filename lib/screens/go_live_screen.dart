@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../state/app_state.dart';
 import '../models/copy_models.dart';
 import '../widgets/order_ticket.dart';
@@ -44,17 +45,20 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     _heartTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
       if (mounted && (_store?.isLive ?? false)) _reactions.burst(1 + math.Random().nextInt(2));
     });
-    // Simulated incoming chat (Millimore + YouTube) while live.
-    _chatTimer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
-      if (!mounted || !(_store?.isLive ?? false)) return;
-      final r = math.Random();
-      final src = r.nextBool() ? ChatSource.youtube : ChatSource.millimore;
-      _store!.addChat(LiveChatMessage(
-        author: _chatUsers[r.nextInt(_chatUsers.length)],
-        text: _chatLines[r.nextInt(_chatLines.length)],
-        source: src,
-      ));
-    });
+    // Demo-only simulated chat. With the backend, chat arrives over the
+    // broadcast WS channel (real viewers + YouTube ingest).
+    if (!kUseBackend) {
+      _chatTimer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
+        if (!mounted || !(_store?.isLive ?? false)) return;
+        final r = math.Random();
+        final src = r.nextBool() ? ChatSource.youtube : ChatSource.millimore;
+        _store!.addChat(LiveChatMessage(
+          author: _chatUsers[r.nextInt(_chatUsers.length)],
+          text: _chatLines[r.nextInt(_chatLines.length)],
+          source: src,
+        ));
+      });
+    }
   }
 
   @override
@@ -363,7 +367,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                         ? _ConnectingBtn()
                         : live
                             ? _EndBtn(onTap: _endLive)
-                            : _GoLiveBtn(onTap: () => store.startBroadcast()),
+                            : _GoLiveBtn(onTap: () => store.startBroadcast(title: _titleController.text.trim().isEmpty ? 'Live trading' : _titleController.text.trim())),
                   ),
                 ),
               ],

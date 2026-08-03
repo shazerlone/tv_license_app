@@ -8,6 +8,7 @@ import '../models/trader.dart';
 import '../models/copy_models.dart';
 import '../models/app_notification.dart';
 import '../services/backend_api.dart';
+import '../services/realtime_service.dart';
 
 enum BroadcastPhase { idle, connecting, live }
 
@@ -424,18 +425,34 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Begins the connecting → live handshake (mirrors a real RTMP connect).
-  void startBroadcast() {
+  // Real backend broadcast (milestone 5).
+  String? _broadcastId;
+  String? get broadcastId => _broadcastId;
+  String? _hlsUrl;
+  String? get hlsUrl => _hlsUrl;
+  StreamSubscription? _bcSub;
+  bool get isBackendLive => kUseBackend && _broadcastId != null;
+
+  /// Begins the connecting → live handshake. Backend: POST /broadcasts + start,
+  /// then subscribe to the broadcast WS channel for chat/viewers/reactions.
+  void startBroadcast({String title = 'Live trading'}) {
     if (_phase != BroadcastPhase.idle) return;
     _phase = BroadcastPhase.connecting;
+    _liveChat.clear();
     notifyListeners();
+
+    if (kUseBackend) {
+      _startBackendBroadcast(title);
+      return;
+    }
+
     Timer(const Duration(milliseconds: 1600), () {
       if (_phase != BroadcastPhase.connecting) return;
       _phase = BroadcastPhase.live;
       _liveStart = DateTime.now();
       _viewers = 1 + math.Random().nextInt(20);
       _peakViewers = _viewers;
-      startPriceFeed(); // keep duration/P&L ticking each second
+      startPriceFeed();
       _viewerTimer = Timer.periodic(const Duration(seconds: 3), (_) {
         _viewers = (_viewers + math.Random().nextInt(5) - 1).clamp(0, 1 << 30);
         if (_viewers > _peakViewers) _peakViewers = _viewers;
@@ -445,8 +462,72 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  Future<void> _startBackendBroadcast(String title) async {
+    try {
+      final created = await BackendApi.createBroadcast(title);
+      final id = created['id'].toString();
+      _broadcastId = id;
+      _hlsUrl = created['hlsUrl'] as String?;
+      await BackendApi.startBroadcast(id);
+      _phase = BroadcastPhase.live;
+      _liveStart = DateTime.now();
+      _viewers = created['viewers'] is num ? (created['viewers'] as num).toInt() : 0;
+      startPriceFeed();
+      // Live room events (chat / viewers / reactions / trade overlay).
+      RealtimeService.current?.subscribeBroadcast(id);
+      _bcSub = RealtimeService.current?.broadcastEvents.listen((m) {
+        if (m['ch'] != 'broadcast:$id') return;
+        ingestBroadcastEvent(m['type']?.toString() ?? '', (m['data'] is Map) ? (m['data'] as Map).cast<String, dynamic>() : const {});
+      });
+      notifyListeners();
+    } catch (_) {
+      _phase = BroadcastPhase.idle;
+      _broadcastId = null;
+      notifyListeners();
+    }
+  }
+
+  /// Routes a `broadcast:{id}` WS event into the live state (used by both the
+  /// broadcaster and the viewer screens).
+  void ingestBroadcastEvent(String type, Map<String, dynamic> d) {
+    switch (type) {
+      case 'chat':
+        addChat(LiveChatMessage(
+          author: (d['author'] ?? '').toString(),
+          text: (d['text'] ?? '').toString(),
+          source: _chatSource(d['source']?.toString()),
+          byHost: d['byHost'] == true,
+        ));
+        break;
+      case 'viewers':
+        _viewers = (d['viewers'] as num?)?.toInt() ?? _viewers;
+        if (_viewers > _peakViewers) _peakViewers = _viewers;
+        notifyListeners();
+        break;
+      case 'trade':
+        // On-stream order overlay (best-effort — shape mirrors LiveTrade).
+        notifyListeners();
+        break;
+      case 'reaction':
+        notifyListeners();
+        break;
+    }
+  }
+
+  ChatSource _chatSource(String? s) {
+    switch (s) {
+      case 'youtube':
+        return ChatSource.youtube;
+      case 'facebook':
+        return ChatSource.facebook;
+      default:
+        return ChatSource.millimore;
+    }
+  }
+
   void endBroadcast() {
     final wasLive = _phase != BroadcastPhase.idle;
+    final id = _broadcastId;
     _phase = BroadcastPhase.idle;
     _viewers = 0;
     _liveStart = null;
@@ -455,6 +536,14 @@ class AppState extends ChangeNotifier {
     _liveTrades.clear();
     _liveChat.clear();
     if (wasLive) stopPriceFeed();
+    if (kUseBackend && id != null) {
+      BackendApi.endBroadcast(id).catchError((_) => <String, dynamic>{});
+      RealtimeService.current?.unsubscribeBroadcast(id);
+      _bcSub?.cancel();
+      _bcSub = null;
+      _broadcastId = null;
+      _hlsUrl = null;
+    }
     notifyListeners();
   }
 
@@ -470,7 +559,22 @@ class AppState extends ChangeNotifier {
 
   void sendHostChat(String text, String hostName) {
     if (text.trim().isEmpty) return;
+    if (kUseBackend && _broadcastId != null) {
+      // Server echoes it back over WS; send without optimistic dupe.
+      BackendApi.sendBroadcastChat(_broadcastId!, text.trim()).catchError((_) {});
+      return;
+    }
     addChat(LiveChatMessage(author: hostName, text: text.trim(), byHost: true));
+  }
+
+  /// Viewer-side chat send (uses the currently-watched broadcast id).
+  void sendBroadcastChat(String broadcastId, String text) {
+    if (text.trim().isEmpty) return;
+    if (kUseBackend) {
+      BackendApi.sendBroadcastChat(broadcastId, text.trim()).catchError((_) {});
+    } else {
+      addChat(LiveChatMessage(author: 'You', text: text.trim()));
+    }
   }
 
   // ── Live price feed (simulated; becomes real MT prices via backend) ─────────
