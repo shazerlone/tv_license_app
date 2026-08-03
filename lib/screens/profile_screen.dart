@@ -16,8 +16,10 @@ import 'login_screen.dart';
 import 'accounts_screen.dart';
 import 'copied_trades_screen.dart';
 import 'support_chat_screen.dart';
+import 'support_screen.dart';
 import 'edit_profile_screen.dart';
 import 'wallet_screen.dart';
+import 'referrals_screen.dart';
 
 /// One simple profile page: who you are, your copy performance, and clear
 /// buttons out to everything else. No tabs, no nested navigation.
@@ -130,7 +132,9 @@ class ProfileScreen extends StatelessWidget {
               _MenuTile(icon: Icons.bookmark_border_rounded, color: AppColors.purple, label: 'Saved posts', trailing: '${store.savedCount}',
                   onTap: () => _push(context, const SavedPostsScreen())),
               _MenuTile(icon: Icons.group_outlined, color: AppColors.primaryLight, label: 'Subscriptions', trailing: '${store.subscriptionCount}',
-                  onTap: () => _push(context, const SubscriptionsScreen()), last: true),
+                  onTap: () => _push(context, const SubscriptionsScreen())),
+              _MenuTile(icon: Icons.card_giftcard_rounded, color: AppColors.purple, label: 'Invite & earn',
+                  onTap: () => _push(context, const ReferralsScreen()), last: true),
             ]),
             const SizedBox(height: 20),
 
@@ -144,7 +148,7 @@ class ProfileScreen extends StatelessWidget {
             _MenuCard(children: [
               _MenuTile(icon: Icons.notifications_none_rounded, color: AppColors.slate, label: 'Notifications', onTap: () => _toast(context, 'Notification settings')),
               _MenuTile(icon: Icons.shield_outlined, color: AppColors.slate, label: 'Privacy & security', onTap: () => _toast(context, 'Privacy & security')),
-              _MenuTile(icon: Icons.help_outline_rounded, color: AppColors.slate, label: 'Help & support', onTap: () => _push(context, const SupportChatScreen()), last: true),
+              _MenuTile(icon: Icons.help_outline_rounded, color: AppColors.slate, label: 'Help & support', onTap: () => _push(context, kUseBackend ? const SupportScreen() : const SupportChatScreen()), last: true),
             ]),
             const SizedBox(height: 20),
 

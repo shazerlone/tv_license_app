@@ -280,6 +280,30 @@ class AppState extends ChangeNotifier {
   double? get marginLevel => _summary?.marginLevel;
   bool get hasMargin => _summary != null && (_summary!.usedMargin > 0 || _summary!.equity > 0);
 
+  // ── Announcements ─────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _announcements = const [];
+  List<Map<String, dynamic>> get unreadAnnouncements =>
+      _announcements.where((a) => a['read'] != true).toList();
+
+  Future<void> loadAnnouncements() async {
+    if (!kUseBackend) return;
+    try {
+      final res = await BackendApi.announcements();
+      final items = (res['items'] as List?) ?? const [];
+      _announcements = items.map((e) => (e as Map).cast<String, dynamic>()).toList();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void dismissAnnouncement(String id) {
+    _announcements = _announcements.map((a) {
+      if (a['id'].toString() == id) return {...a, 'read': true};
+      return a;
+    }).toList();
+    notifyListeners();
+    if (kUseBackend) BackendApi.markAnnouncementRead(id).catchError((_) {});
+  }
+
   // ── Wallet (balance shown across the app) ─────────────────────────────────
   double _walletBalance = 0;
   double get walletBalance => _walletBalance;

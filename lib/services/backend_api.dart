@@ -373,5 +373,52 @@ class BackendApi {
     return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
   }
 
+  // ── Announcements ─────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> announcements() async {
+    final res = await _api.get('/announcements');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{'items': [], 'unread': 0};
+  }
+
+  static Future<void> markAnnouncementRead(String id) => _api.post('/announcements/$id/read');
+
+  // ── Referrals ─────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> referralMe() async {
+    final res = await _api.get('/referrals/me');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<List<Map<String, dynamic>>> referredUsers() async {
+    final res = await _api.get('/referrals');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<void> applyReferral(String code) => _api.post('/referrals/apply', {'code': code});
+
+  // ── Support tickets ───────────────────────────────────────────────────────
+  static Future<List<Map<String, dynamic>>> supportTickets() async {
+    final res = await _api.get('/support/tickets');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> supportTicket(String id) async {
+    final res = await _api.get('/support/tickets/$id');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<Map<String, dynamic>> createTicket({required String subject, required String message, String? category, String? priority}) async {
+    final res = await _api.post('/support/tickets', {
+      'subject': subject,
+      'message': message,
+      if (category != null) 'category': category,
+      if (priority != null) 'priority': priority,
+    });
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<Map<String, dynamic>> replyTicket(String id, String body) async {
+    final res = await _api.post('/support/tickets/$id/messages', {'body': body});
+    return (res as Map).cast<String, dynamic>();
+  }
+
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }

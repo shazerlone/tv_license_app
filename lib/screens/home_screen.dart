@@ -47,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     store.loadAccounts();
     store.loadCopyEngine();
     store.loadWallet();
+    store.loadAnnouncements();
   }
 
   @override
@@ -194,6 +195,13 @@ class _FollowerHomeState extends State<FollowerHome> {
             const SizedBox(width: 16),
           ],
         ),
+        if (store.unreadAnnouncements.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _AnnouncementBanner(
+              a: store.unreadAnnouncements.first,
+              onDismiss: () => store.dismissAnnouncement(store.unreadAnnouncements.first['id'].toString()),
+            ),
+          ),
         // Portfolio summary (copy engine — demo until milestone 4)
         SliverToBoxAdapter(
           child: Padding(
@@ -291,6 +299,51 @@ class _AppBarIcon extends StatelessWidget {
                   decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle, border: Border.all(color: AppColors.background, width: 1.5)),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnnouncementBanner extends StatelessWidget {
+  final Map<String, dynamic> a;
+  final VoidCallback onDismiss;
+  const _AnnouncementBanner({required this.a, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    final required = a['requiredRead'] == true;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(required ? Icons.campaign_rounded : Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a['title']?.toString() ?? '', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(a['body']?.toString() ?? '', style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onDismiss,
+              behavior: HitTestBehavior.opaque,
+              child: Text(required ? 'Got it' : 'Dismiss', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            ),
           ],
         ),
       ),
