@@ -645,3 +645,13 @@ status, entryPrice, exitPrice, pnlAmount, pnlPercent, lots, openedAt, closedAt, 
 | `reaction` | `{ count: number }` |
 | `viewers` | `{ viewers: number }` (auto on join/leave) |
 | `trade` | `LiveTrade` (on-stream order overlay) |
+
+### Admin analytics & reporting (milestone 8)
+- `GET /admin/analytics?days=30` → `{ range, series[], totals, topTraders[] }`
+  - `series[]`: one row per day — `{ date, signups, deposits, withdrawals, revenue }`.
+  - `totals`: `{ users, newUsers30d, creators, kycVerified, depositsTotal,
+    withdrawalsTotal, revenueTotal, copyVolume, walletLiabilities, activeCopies }`.
+  - `topTraders[]`: `{ id, name, username, photoUrl, copiers, aum, returnPercent }`.
+- Admin dashboard adds an **Analytics** page (signups line, deposits-vs-withdrawals
+  bars, revenue line, top-traders table) and an **Audit log** page over
+  `GET /admin/audit`. All charts are dependency-free SVG (CSP-safe).

@@ -1034,6 +1034,35 @@
         ]
       }
     },
+    "/v1/admin/analytics": {
+      "get": {
+        "operationId": "AdminController_analyticsOverview",
+        "summary": "Business analytics — daily series, totals, top traders",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/users": {
       "get": {
         "operationId": "AdminController_listUsers",

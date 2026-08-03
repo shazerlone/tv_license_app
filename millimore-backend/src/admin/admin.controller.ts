@@ -17,6 +17,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { KycStatus } from '@prisma/client';
 import { AdminService } from './admin.service';
+import { AnalyticsService } from './analytics.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { DepositsService } from '../wallet/deposits.service';
 import { TransactionsService } from '../wallet/transactions.service';
@@ -48,6 +49,7 @@ import { Paginated } from '../common/dto/pagination.dto';
 export class AdminController {
   constructor(
     private readonly admin: AdminService,
+    private readonly analytics: AnalyticsService,
     private readonly payouts: PayoutsService,
     private readonly deposits: DepositsService,
     private readonly transactions: TransactionsService,
@@ -61,6 +63,12 @@ export class AdminController {
   @ApiOkResponse({ type: AdminMetricsDto })
   metrics(): Promise<AdminMetricsDto> {
     return this.admin.metrics();
+  }
+
+  @Get('analytics')
+  @ApiOperation({ summary: 'Business analytics — daily series, totals, top traders' })
+  analyticsOverview(@Query('days') days?: string) {
+    return this.analytics.overview(days ? Number(days) : 30);
   }
 
   @Get('users')

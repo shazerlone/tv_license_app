@@ -9,23 +9,27 @@ import { Avatar, Icons } from './ui';
 
 const NAV = [
   { href: '/', label: 'Overview', icon: Icons.overview },
+  { href: '/analytics', label: 'Analytics', icon: Icons.spark },
   { href: '/traders', label: 'Traders', icon: Icons.spark },
   { href: '/users', label: 'Users', icon: Icons.users },
   { href: '/creators', label: 'Creator queue', icon: Icons.queue },
   { href: '/transactions', label: 'Transactions', icon: Icons.spark },
   { href: '/payouts', label: 'Payouts', icon: Icons.approved },
   { href: '/kyc', label: 'KYC', icon: Icons.approved },
+  { href: '/audit', label: 'Audit log', icon: Icons.queue },
   { href: '/settings', label: 'Settings', icon: Icons.users },
 ];
 
 const TITLES: Record<string, string> = {
   '/': 'Overview',
+  '/analytics': 'Analytics',
   '/traders': 'Traders',
   '/users': 'Users',
   '/creators': 'Creator verification',
   '/transactions': 'Transactions',
   '/payouts': 'Payouts',
   '/kyc': 'KYC',
+  '/audit': 'Audit log',
   '/settings': 'Settings',
 };
 
