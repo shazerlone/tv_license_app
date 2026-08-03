@@ -103,6 +103,7 @@ class ApiTrader {
   final String category;
   final List<String> tags;
   final String? bio;
+  final double? commissionPercent;
   const ApiTrader({
     required this.id,
     required this.name,
@@ -121,6 +122,7 @@ class ApiTrader {
     required this.category,
     required this.tags,
     this.bio,
+    this.commissionPercent,
   });
   factory ApiTrader.fromJson(Map<String, dynamic> j) => ApiTrader(
         id: j['id'].toString(),
@@ -140,6 +142,7 @@ class ApiTrader {
         category: j['category']?.toString() ?? 'Forex',
         tags: (j['tags'] as List?)?.map((e) => e.toString()).toList() ?? const [],
         bio: j['bio'] as String?,
+        commissionPercent: (j['commissionPercent'] as num?)?.toDouble(),
       );
 }
 

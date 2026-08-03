@@ -97,5 +97,9 @@ class AuthApi {
     return UserProfile.fromJson(((res as Map)['user'] as Map).cast<String, dynamic>());
   }
 
-  static void logout() => _api.clear();
+  static void logout() {
+    // Best-effort server logout (stateless JWT — client discards regardless).
+    _api.post('/auth/logout').catchError((_) => null);
+    _api.clear();
+  }
 }

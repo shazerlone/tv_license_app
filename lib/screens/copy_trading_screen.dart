@@ -74,7 +74,11 @@ class _CopyTradingScreenState extends State<CopyTradingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Funded from your wallet', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                          Text('Profit, minus the trader\'s fee, settles back to your wallet.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                          Text(
+                              widget.trader.commissionPercent != null
+                                  ? 'Trader keeps ${widget.trader.commissionPercent!.toStringAsFixed(0)}% of profit; the rest settles to your wallet.'
+                                  : 'Profit, minus the trader\'s fee, settles back to your wallet.',
+                              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
                         ],
                       ),
                     ),

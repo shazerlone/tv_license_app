@@ -340,6 +340,11 @@ class BackendApi {
     return ((res as Map)['commissionPercent'] as num?)?.toDouble() ?? percent;
   }
 
+  static Future<double> getCommission() async {
+    final res = await _api.get('/creator/commission');
+    return ((res as Map)['commissionPercent'] as num?)?.toDouble() ?? 20;
+  }
+
   // ── Milestone 7: leverage, KYC, payout methods, transactions ──────────────
   static Future<List<Map<String, dynamic>>> walletTransactions() async {
     final res = await _api.get('/wallet/transactions');

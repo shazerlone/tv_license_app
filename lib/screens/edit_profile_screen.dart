@@ -6,6 +6,7 @@ import '../state/session.dart';
 import '../services/auth_api.dart';
 import '../services/api_client.dart';
 import '../services/image_picker_service.dart';
+import '../services/app_config.dart';
 import '../widgets/avatar.dart';
 
 /// Edit the signed-in user's profile (PATCH /me).
@@ -24,6 +25,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _city = TextEditingController();
   final _postal = TextEditingController();
   String? _photoUrl;
+  double _leverage = 1;
   bool _saving = false;
   bool _isCreator = false;
   bool _init = false;
@@ -41,6 +43,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _city.text = u?.city ?? '';
     _postal.text = u?.postalCode ?? '';
     _photoUrl = u?.photoUrl;
+    _leverage = (u?.leverage ?? 1).clamp(1, AppConfig.instance.maxLeverage < 1 ? 1 : AppConfig.instance.maxLeverage);
     _isCreator = u?.isCreator ?? false;
   }
 
@@ -88,6 +91,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (_address.text.trim().isNotEmpty) 'addressLine': _address.text.trim(),
           if (_city.text.trim().isNotEmpty) 'city': _city.text.trim(),
           if (_postal.text.trim().isNotEmpty) 'postalCode': _postal.text.trim(),
+          if (AppConfig.instance.maxLeverage > 1) 'leverage': _leverage,
         };
         final updated = await AuthApi.updateMe(fields);
         if (!mounted) return;
@@ -208,6 +212,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ],
           ),
+          if (AppConfig.instance.maxLeverage > 1) ...[
+            const SizedBox(height: 24),
+            Text('Default leverage', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
+            const SizedBox(height: 4),
+            Text('Applied to new copies (you can override per trader).', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Text('${_leverage.toStringAsFixed(0)}x', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                Expanded(
+                  child: Slider(
+                    value: _leverage.clamp(1, AppConfig.instance.maxLeverage),
+                    min: 1,
+                    max: AppConfig.instance.maxLeverage,
+                    divisions: (AppConfig.instance.maxLeverage - 1).clamp(1, 500).toInt(),
+                    activeColor: AppColors.primary,
+                    inactiveColor: AppColors.border,
+                    onChanged: (v) => setState(() => _leverage = v),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: _saving ? null : _save,

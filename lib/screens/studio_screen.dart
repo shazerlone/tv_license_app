@@ -116,7 +116,11 @@ class StudioScreen extends StatelessWidget {
   }
 
   Future<void> _setCommission(BuildContext context) async {
-    final controller = TextEditingController(text: '20');
+    double current = 20;
+    try {
+      current = await BackendApi.getCommission();
+    } catch (_) {}
+    final controller = TextEditingController(text: current.toStringAsFixed(0));
     final percent = await showDialog<double>(
       context: context,
       builder: (ctx) => AlertDialog(

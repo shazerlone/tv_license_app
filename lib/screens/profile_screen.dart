@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
-import '../services/api_client.dart';
+import '../services/auth_api.dart';
 import '../services/backend_api.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
@@ -137,7 +137,7 @@ class ProfileScreen extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  ApiClient.instance.clear();
+                  AuthApi.logout();
                   session.signOut();
                   Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
                 },

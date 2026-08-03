@@ -18,6 +18,7 @@ class Trader {
   final int copiers;
   final int totalTrades;
   final String category; // Forex, Crypto, Indices, Stocks
+  final double? commissionPercent; // trader's performance fee (1–30%)
 
   const Trader({
     required this.id,
@@ -37,6 +38,7 @@ class Trader {
     this.copiers = 0,
     this.totalTrades = 0,
     this.category = 'Forex',
+    this.commissionPercent,
   });
 
   /// Maps a backend ApiTrader (openapi.json §4.4) onto the UI model.
@@ -58,6 +60,7 @@ class Trader {
         copiers: a.copiers,
         totalTrades: a.totalTrades,
         category: a.category,
+        commissionPercent: a.commissionPercent,
       );
 
   String get formattedFollowers {

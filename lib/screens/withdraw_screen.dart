@@ -91,6 +91,10 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       _toast('Minimum withdrawal is \$${cfg.minWithdrawal.toStringAsFixed(2)}');
       return;
     }
+    if (cfg.maxWithdrawalPerTx > 0 && amount > cfg.maxWithdrawalPerTx) {
+      _toast('Maximum per withdrawal is \$${cfg.maxWithdrawalPerTx.toStringAsFixed(2)}');
+      return;
+    }
     if (_methodId == null) {
       _toast('Add a payout method first');
       return;
