@@ -263,3 +263,17 @@ compliance (milestone 7)".
 - **Earnings** land in the normal wallet (a `referral_commission` ledger entry),
   so they show on the wallet/transactions screens and are withdrawable — no
   separate flow needed.
+
+---
+
+## 10. Support & announcements (milestone 10) — NEW, live
+
+- **Help / Support screen** — `GET /support/tickets` (list), `POST
+  /support/tickets { subject, message, category?, priority? }` (open),
+  `GET /support/tickets/{id}` (thread), `POST /support/tickets/{id}/messages
+  { body }` (reply). Admin replies arrive as a `support.reply` user event +
+  in the notification feed, so refresh the thread on that event.
+- **Notification bell / announcements** — `GET /announcements` →
+  `{ items[], unread }` (show the `unread` count on the bell; render `title`/
+  `body`; `requiredRead` items should block/interstitial until acknowledged).
+  `POST /announcements/{id}/read` when the user opens/acks one.

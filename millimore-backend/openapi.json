@@ -1027,6 +1027,254 @@
         ]
       }
     },
+    "/v1/admin/support/tickets": {
+      "get": {
+        "operationId": "AdminController_supportList",
+        "summary": "Support tickets, filter by status",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/support/tickets/{id}": {
+      "get": {
+        "operationId": "AdminController_supportGet",
+        "summary": "Ticket thread incl. internal notes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "AdminController_supportUpdate",
+        "summary": "Update ticket status / priority",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/support/tickets/{id}/messages": {
+      "post": {
+        "operationId": "AdminController_supportReply",
+        "summary": "Reply to a ticket (set internal:true for a private note)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/announcements": {
+      "get": {
+        "operationId": "AdminController_announcementsList",
+        "summary": "All announcements (with read counts)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_announcementsCreate",
+        "summary": "Create an announcement",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnnouncementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/announcements/{id}": {
+      "patch": {
+        "operationId": "AdminController_announcementsUpdate",
+        "summary": "Update an announcement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAnnouncementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "AdminController_announcementsRemove",
+        "summary": "Delete an announcement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/metrics": {
       "get": {
         "operationId": "AdminController_metrics",
@@ -2374,6 +2622,209 @@
         },
         "tags": [
           "kyc"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/support/tickets": {
+      "get": {
+        "operationId": "SupportController_list",
+        "summary": "My support tickets",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TicketDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "SupportController_create",
+        "summary": "Open a support ticket",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/support/tickets/{id}": {
+      "get": {
+        "operationId": "SupportController_get",
+        "summary": "Ticket thread (public messages only)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/support/tickets/{id}/messages": {
+      "post": {
+        "operationId": "SupportController_reply",
+        "summary": "Reply to my ticket",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/announcements": {
+      "get": {
+        "operationId": "AnnouncementsController_feed",
+        "summary": "Active announcements for me (bell feed) + unread count",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementFeedDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "announcements"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/announcements/{id}/read": {
+      "post": {
+        "operationId": "AnnouncementsController_read",
+        "summary": "Mark an announcement read / acknowledged",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "announcements"
         ],
         "security": [
           {
@@ -4735,6 +5186,115 @@
           "label"
         ]
       },
+      "AdminReplyDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "Any update on this?"
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "true = internal note (not shown to the user)."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UpdateTicketDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          }
+        }
+      },
+      "CreateAnnouncementDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Scheduled maintenance Sunday 02:00 UTC"
+          },
+          "body": {
+            "type": "string",
+            "example": "The app will be briefly unavailable while we upgrade…"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "all",
+              "followers",
+              "creators"
+            ]
+          },
+          "requiredRead": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-08-10T00:00:00Z"
+          },
+          "endsAt": {
+            "type": "string",
+            "example": "2026-08-12T00:00:00Z"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ]
+      },
+      "UpdateAnnouncementDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "all",
+              "followers",
+              "creators"
+            ]
+          },
+          "requiredRead": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          }
+        }
+      },
       "AdminMetricsDto": {
         "type": "object",
         "properties": {
@@ -5779,6 +6339,257 @@
         },
         "required": [
           "kycStatus"
+        ]
+      },
+      "TicketDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "tkt_ab12cd34"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "general",
+              "deposit",
+              "withdrawal",
+              "kyc",
+              "trading",
+              "account"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastMessageAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "category",
+          "priority",
+          "status",
+          "createdAt",
+          "lastMessageAt"
+        ]
+      },
+      "CreateTicketDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "example": "My withdrawal is stuck"
+          },
+          "message": {
+            "type": "string",
+            "example": "I requested $200 two days ago…"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "general",
+              "deposit",
+              "withdrawal",
+              "kyc",
+              "trading",
+              "account"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          }
+        },
+        "required": [
+          "subject",
+          "message"
+        ]
+      },
+      "TicketMessageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "authorRole": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "Admin-only internal note (never shown to the user)."
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "authorRole",
+          "body",
+          "internal",
+          "createdAt"
+        ]
+      },
+      "TicketDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "tkt_ab12cd34"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "general",
+              "deposit",
+              "withdrawal",
+              "kyc",
+              "trading",
+              "account"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastMessageAt": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketMessageDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "category",
+          "priority",
+          "status",
+          "createdAt",
+          "lastMessageAt",
+          "messages"
+        ]
+      },
+      "ReplyTicketDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "Any update on this?"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "AnnouncementItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "requiredRead": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean",
+            "description": "Whether the current user has read/ack’d it."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "requiredRead",
+          "createdAt",
+          "read"
+        ]
+      },
+      "AnnouncementFeedDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementItemDto"
+            }
+          },
+          "unread": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "items",
+          "unread"
         ]
       },
       "CreatePostDto": {

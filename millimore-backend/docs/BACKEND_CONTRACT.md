@@ -690,3 +690,31 @@ referrals' trading, plus an optional first-deposit bonus.
 - **Admin** — `GET /admin/referrals` (top referrers). Rates in settings:
   `referralEnabled`, `referralRevenueShare` (0..1), `referralSignupBonus`.
 - Admin UI adds a **Referrals** leaderboard page + referral controls in Settings.
+
+### Support tickets & announcements (milestone 10)
+Researched against B2Core's helpdesk + notification center; matches (threaded
+tickets, internal notes, required-read announcements) and adds realtime delivery.
+
+**Support (helpdesk):**
+- `POST /support/tickets { subject, message, category?, priority? }` → Ticket.
+  Categories: general|deposit|withdrawal|kyc|trading|account. Priority:
+  low|normal|high|urgent.
+- `GET /support/tickets` → my tickets. `GET /support/tickets/{id}` → thread
+  (public messages only — internal notes are never returned to the user).
+- `POST /support/tickets/{id}/messages { body }` → reply (reopens if resolved).
+- Admin: `GET /admin/support/tickets?status=`, `GET /admin/support/tickets/{id}`
+  (incl. internal notes), `POST /admin/support/tickets/{id}/messages { body,
+  internal? }` (internal=true = private note), `PATCH /admin/support/tickets/{id}
+  { status?, priority? }`. A public admin reply pushes a `support.reply` user
+  event + notification and sets status `pending`.
+
+**Announcements (notification bell):**
+- `GET /announcements` → `{ items:[{ id, title, body, requiredRead, createdAt,
+  read }], unread }` — active, in-window, audience-matched, with per-user read
+  state. `POST /announcements/{id}/read` acknowledges one.
+- Admin: `GET /admin/announcements` (with read counts), `POST /admin/announcements
+  { title, body, audience?(all|followers|creators), requiredRead?, active?,
+  startsAt?, endsAt? }`, `PATCH /admin/announcements/{id}`, `DELETE
+  /admin/announcements/{id}`.
+- Admin UI adds **Support** (ticket console w/ thread, internal notes, status/
+  priority) and **Announcements** (compose + audience + required-read) pages.

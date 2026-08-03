@@ -45,3 +45,9 @@ launch — are:
 
 We are **not technically backward** on the fundamentals; we're missing growth/ops
 add-ons that are natural follow-on milestones.
+
+## Update (M10)
+- **Support tickets / helpdesk** — ✅ (threaded, internal notes, status/priority,
+  realtime reply push).
+- **Announcements / notification center** — ✅ (audience targeting, required-read
+  acknowledgement, bell feed).

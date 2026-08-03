@@ -84,6 +84,8 @@ model User {
   referredById   String?
   referredByCode String?
 
+  supportTickets SupportTicket[]
+
   // Onboarding extras (follower)
   experience String?
   interests  String[] @default([])
@@ -284,6 +286,95 @@ model PayoutMethod {
   masked     String // display-safe, e.g. "USDT ••••a1b2"
   createdAt  DateTime @default(now())
 
+  @@index([userId])
+}
+
+enum TicketStatus {
+  open
+  pending // awaiting the user's reply
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+/// A customer support ticket (contract §support). Threaded via SupportMessage;
+/// admins can add internal (user-invisible) notes. Matches broker-CRM helpdesks.
+model SupportTicket {
+  id            String         @id // "tkt_..."
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject       String
+  category      String         @default("general") // general | deposit | withdrawal | kyc | trading | account
+  priority      TicketPriority @default(normal)
+  status        TicketStatus   @default(open)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lastMessageAt DateTime       @default(now())
+
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+/// One message in a ticket thread. `internal=true` = admin-only note (never
+/// returned to the ticket owner). `authorRole` is "user" or "admin".
+model SupportMessage {
+  id         String        @id // "tmsg_..."
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  authorRole String        @default("user")
+  body       String
+  internal   Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+enum AnnouncementAudience {
+  all
+  followers
+  creators
+}
+
+/// A platform announcement shown in the app's notification bell (contract
+/// §announcements). `requiredRead` forces an acknowledgement; `active` + the
+/// optional start/end window control visibility. Targeted by audience.
+model Announcement {
+  id           String               @id // "ann_..."
+  title        String
+  body         String
+  audience     AnnouncementAudience @default(all)
+  requiredRead Boolean              @default(false)
+  active       Boolean              @default(true)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdBy    String
+  createdAt    DateTime             @default(now())
+
+  reads AnnouncementRead[]
+
+  @@index([active])
+}
+
+/// Per-user read/ack of an announcement (drives the unread bell count + the
+/// required-read gate). One row per (announcement, user).
+model AnnouncementRead {
+  id             String       @id // "annr_..."
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
   @@index([userId])
 }
 

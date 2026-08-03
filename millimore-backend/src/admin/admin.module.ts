@@ -8,9 +8,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { KycModule } from '../kyc/kyc.module';
+import { SupportModule } from '../support/support.module';
 
 @Module({
-  imports: [UsersModule, TradersModule, NotificationsModule, WalletModule, PayoutsModule, KycModule],
+  imports: [UsersModule, TradersModule, NotificationsModule, WalletModule, PayoutsModule, KycModule, SupportModule],
   providers: [AdminService, AnalyticsService],
   controllers: [AdminController],
 })

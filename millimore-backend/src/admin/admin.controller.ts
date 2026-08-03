@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Delete,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -25,6 +26,10 @@ import { SettingsService } from '../settings/settings.service';
 import { KycService } from '../kyc/kyc.service';
 import { AuditService } from '../audit/audit.service';
 import { ReferralsService } from '../referrals/referrals.service';
+import { SupportService } from '../support/support.service';
+import { AnnouncementsService } from '../support/announcements.service';
+import { AdminReplyDto, UpdateTicketDto } from '../support/dto/support.dto';
+import { CreateAnnouncementDto, UpdateAnnouncementDto } from '../support/dto/announcement.dto';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import {
   AdminUserDto,
@@ -60,12 +65,67 @@ export class AdminController {
     private readonly kyc: KycService,
     private readonly audit: AuditService,
     private readonly referrals: ReferralsService,
+    private readonly support: SupportService,
+    private readonly announcements: AnnouncementsService,
   ) {}
 
   @Get('referrals')
   @ApiOperation({ summary: 'Top referrers by affiliate earnings' })
   topReferrers() {
     return this.referrals.adminTopReferrers();
+  }
+
+  // ── support (helpdesk) ─────────────────────────────────────────────
+  @Get('support/tickets')
+  @ApiOperation({ summary: 'Support tickets, filter by status' })
+  supportList(@Query('status') status?: string) {
+    return this.support.adminList(status);
+  }
+
+  @Get('support/tickets/:id')
+  @ApiOperation({ summary: 'Ticket thread incl. internal notes' })
+  supportGet(@Param('id') id: string) {
+    return this.support.adminGet(id);
+  }
+
+  @Post('support/tickets/:id/messages')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reply to a ticket (set internal:true for a private note)' })
+  supportReply(@Param('id') id: string, @Body() dto: AdminReplyDto, @CurrentUser() user: AuthUser) {
+    return this.support.adminReply(id, user.userId, dto);
+  }
+
+  @Patch('support/tickets/:id')
+  @ApiOperation({ summary: 'Update ticket status / priority' })
+  supportUpdate(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
+    return this.support.adminUpdate(id, dto);
+  }
+
+  // ── announcements ──────────────────────────────────────────────────
+  @Get('announcements')
+  @ApiOperation({ summary: 'All announcements (with read counts)' })
+  announcementsList() {
+    return this.announcements.adminList();
+  }
+
+  @Post('announcements')
+  @ApiOperation({ summary: 'Create an announcement' })
+  async announcementsCreate(@Body() dto: CreateAnnouncementDto, @CurrentUser() user: AuthUser) {
+    const res = await this.announcements.create(dto, user.userId);
+    await this.audit.record(user.userId, 'announcement.create', 'announcement', res.id, { title: dto.title });
+    return res;
+  }
+
+  @Patch('announcements/:id')
+  @ApiOperation({ summary: 'Update an announcement' })
+  announcementsUpdate(@Param('id') id: string, @Body() dto: UpdateAnnouncementDto) {
+    return this.announcements.update(id, dto);
+  }
+
+  @Delete('announcements/:id')
+  @ApiOperation({ summary: 'Delete an announcement' })
+  announcementsRemove(@Param('id') id: string) {
+    return this.announcements.remove(id);
   }
 
   @Get('metrics')
