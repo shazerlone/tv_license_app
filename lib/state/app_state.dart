@@ -280,6 +280,22 @@ class AppState extends ChangeNotifier {
   double? get marginLevel => _summary?.marginLevel;
   bool get hasMargin => _summary != null && (_summary!.usedMargin > 0 || _summary!.equity > 0);
 
+  // ── Wallet (balance shown across the app) ─────────────────────────────────
+  double _walletBalance = 0;
+  double get walletBalance => _walletBalance;
+  bool _walletLoaded = false;
+  bool get walletLoaded => _walletLoaded;
+
+  Future<void> loadWallet() async {
+    if (!kUseBackend) return;
+    try {
+      final w = await BackendApi.wallet();
+      _walletBalance = (w['balance'] as num?)?.toDouble() ?? 0;
+      _walletLoaded = true;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   /// Loads the real copy engine (milestone 4): who you copy, positions, and the
   /// portfolio summary. No-op in demo mode.
   Future<void> loadCopyEngine() async {

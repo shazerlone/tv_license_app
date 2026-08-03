@@ -46,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final store = AppStateScope.of(context);
     store.loadAccounts();
     store.loadCopyEngine();
+    store.loadWallet();
   }
 
   @override
@@ -197,7 +198,7 @@ class _FollowerHomeState extends State<FollowerHome> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-            child: _PortfolioCard(totalPnl: totalPnl, openCount: openCount, following: store.subscriptionCount),
+            child: _PortfolioCard(totalPnl: totalPnl, openCount: openCount, following: store.subscriptionCount, walletBalance: store.walletLoaded ? store.walletBalance : null),
           ),
         ),
         if (_liveTraders.isNotEmpty) ...[
@@ -320,7 +321,8 @@ class _PortfolioCard extends StatelessWidget {
   final double totalPnl;
   final int openCount;
   final int following;
-  const _PortfolioCard({required this.totalPnl, required this.openCount, required this.following});
+  final double? walletBalance;
+  const _PortfolioCard({required this.totalPnl, required this.openCount, required this.following, this.walletBalance});
 
   @override
   Widget build(BuildContext context) {
@@ -335,8 +337,25 @@ class _PortfolioCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Open copied P&L',
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white.withOpacity(0.6))),
+          Row(
+            children: [
+              Text('Open copied P&L',
+                  style: GoogleFonts.inter(fontSize: 13, color: Colors.white.withOpacity(0.6))),
+              const Spacer(),
+              if (walletBalance != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.account_balance_wallet_rounded, size: 13, color: Colors.white.withOpacity(0.8)),
+                      const SizedBox(width: 5),
+                      Text('\$${walletBalance!.toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,

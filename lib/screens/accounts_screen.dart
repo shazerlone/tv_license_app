@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
 import '../models/copy_models.dart';
 import '../data/brokers.dart';
 import '../state/app_state.dart';
+import '../services/backend_api.dart';
+import '../services/api_client.dart';
 import '../widgets/add_account_sheet.dart';
 import '../widgets/broker_logo.dart';
 
@@ -173,7 +176,23 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    if (kUseBackend) {
+      try {
+        await BackendApi.changeAccountPassword(widget.account.id, current: _current.text, next: _next.text);
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+        return;
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 800));
+    }
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated')));

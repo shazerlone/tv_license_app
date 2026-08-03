@@ -90,6 +90,7 @@ class RealtimeService {
         break;
       case 'copy.settled':
         _store.loadCopyEngine();
+        _store.loadWallet();
         _store.pushNotification(AppNotification(
           id: id(), type: AppNotificationType.tradeClosed,
           title: 'Copy settled',
