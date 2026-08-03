@@ -417,6 +417,14 @@ async function main() {
     data: { kycStatus: 'verified', kycProvider: 'manual', leverage: 100 },
   });
 
+  // ── Referral program: give demo users codes; Priya was referred by Marcus ──
+  await prisma.user.update({ where: { id: 'u_marcus' }, data: { referralCode: 'MARCUS1' } });
+  await prisma.user.update({ where: { id: 'u_priya' }, data: { referralCode: 'PRIYA01' } });
+  await prisma.user.updateMany({
+    where: { id: 'u_priya' },
+    data: { referredById: 'u_marcus', referredByCode: 'MARCUS1' },
+  });
+
   // eslint-disable-next-line no-console
   console.log('Seed complete:');
   console.log('  admin@millimore.app  / password   (admin)');

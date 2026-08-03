@@ -77,6 +77,13 @@ model User {
   kycApplicantId String?
   kycReason     String?
 
+  // Referral / affiliate (IB) program (contract §referrals). `referralCode` is
+  // this user's own share code; `referredById` is who referred THEM (FK-less,
+  // like ledger.userId — avoids a self-relation).
+  referralCode   String? @unique
+  referredById   String?
+  referredByCode String?
+
   // Onboarding extras (follower)
   experience String?
   interests  String[] @default([])
@@ -118,6 +125,7 @@ model User {
 
   @@index([role])
   @@index([creatorStatus])
+  @@index([referredById])
 }
 
 enum PayoutStatus {
@@ -177,6 +185,7 @@ enum LedgerType {
   commission // performance fee taken from a copier's profit (negative)
   commission_earned // trader's share of a performance fee (positive)
   platform_fee // Millimore's share of a performance fee (recorded on platform)
+  referral_commission // affiliate/IB revenue share paid to a referrer
   adjustment // manual admin correction
 }
 
@@ -255,6 +264,10 @@ model PlatformSettings {
   cardEnabled              Boolean  @default(false)
   bankEnabled              Boolean  @default(false)
   maintenanceMode          Boolean  @default(false)
+  // Referral / affiliate (IB) program
+  referralEnabled          Boolean  @default(true)
+  referralRevenueShare     Float    @default(0.10) // referrer's share of Millimore's fee from referred users
+  referralSignupBonus      Float    @default(0) // one-time bonus to referrer on a referred user's first deposit
   updatedAt                DateTime @updatedAt
 }
 

@@ -27,6 +27,7 @@ import { PayoutsModule } from './payouts/payouts.module';
 import { SettingsModule } from './settings/settings.module';
 import { AuditModule } from './audit/audit.module';
 import { KycModule } from './kyc/kyc.module';
+import { ReferralsModule } from './referrals/referrals.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -68,6 +69,7 @@ const staticModules = existsSync(ADMIN_DIR)
     WalletModule,
     PayoutsModule,
     KycModule,
+    ReferralsModule,
     CopyModule,
     RealtimeModule,
     UploadsModule,

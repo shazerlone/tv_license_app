@@ -670,3 +670,23 @@ status, entryPrice, exitPrice, pnlAmount, pnlPercent, lots, openedAt, closedAt, 
 - Admin UI: the Users page detail drawer now shows wallet balance, deposit/
   withdrawal/copy stats, recent transactions, a credit/debit form, freeze
   toggle, and an internal note. Market gap analysis: `docs/ADMIN_BENCHMARK.md`.
+
+### Referral / affiliate (IB) program (milestone 9)
+Users earn by referring others: a share of Millimore's revenue from their
+referrals' trading, plus an optional first-deposit bonus.
+- **My dashboard** — `GET /referrals/me` → `{ code, link, enabled,
+  revenueSharePercent, signupBonus, stats:{ referred, activeReferred,
+  totalEarned, earned30d } }`. The code is generated on first access.
+- **My referrals** — `GET /referrals` → `[{ id, name, username, photoUrl,
+  kycVerified, hasDeposited, joinedAt, earned }]`.
+- **Apply a code** — `POST /referrals/apply { code }` (once; can't self-refer).
+  Codes can also be passed at signup: `referralCode` on
+  `POST /auth/register/follower` and `/creator`.
+- **Earnings** are paid automatically: when a referred user's copy settles with a
+  profit, the referrer gets `referralRevenueShare × Millimore's platform cut`
+  (booked out of the platform fee, as a `referral_commission` ledger credit to
+  the referrer's wallet). On a referred user's first confirmed deposit, the
+  referrer gets `referralSignupBonus`. All go to the normal wallet (withdrawable).
+- **Admin** — `GET /admin/referrals` (top referrers). Rates in settings:
+  `referralEnabled`, `referralRevenueShare` (0..1), `referralSignupBonus`.
+- Admin UI adds a **Referrals** leaderboard page + referral controls in Settings.

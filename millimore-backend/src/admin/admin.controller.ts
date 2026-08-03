@@ -24,6 +24,7 @@ import { TransactionsService } from '../wallet/transactions.service';
 import { SettingsService } from '../settings/settings.service';
 import { KycService } from '../kyc/kyc.service';
 import { AuditService } from '../audit/audit.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import {
   AdminUserDto,
@@ -58,7 +59,14 @@ export class AdminController {
     private readonly settings: SettingsService,
     private readonly kyc: KycService,
     private readonly audit: AuditService,
+    private readonly referrals: ReferralsService,
   ) {}
+
+  @Get('referrals')
+  @ApiOperation({ summary: 'Top referrers by affiliate earnings' })
+  topReferrers() {
+    return this.referrals.adminTopReferrers();
+  }
 
   @Get('metrics')
   @ApiOperation({ summary: 'Live platform metrics (contract §6)' })

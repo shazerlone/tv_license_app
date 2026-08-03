@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { OtpService } from './otp/otp.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import { genId } from '../common/ids';
 import { countryNameFromIso } from '../common/countries';
 import {
@@ -34,7 +35,14 @@ export class AuthService {
     private readonly crypto: CryptoService,
     private readonly otp: OtpService,
     private readonly config: ConfigService,
+    private readonly referrals: ReferralsService,
   ) {}
+
+  /** Resolve a referral code → { referredById, referredByCode } for user create. */
+  private async referralData(code?: string): Promise<{ referredById?: string; referredByCode?: string }> {
+    const ref = await this.referrals.resolveReferrer(code);
+    return ref ? { referredById: ref.id, referredByCode: ref.code } : {};
+  }
 
   // ── token / envelope ───────────────────────────────────────────────
   private sign(user: User): string {
@@ -62,6 +70,7 @@ export class AuthService {
         residenceCountry: countryNameFromIso(dto.residenceIso),
         experience: dto.experience,
         interests: dto.interests ?? [],
+        ...(await this.referralData(dto.referralCode)),
       },
     });
     return this.envelope(user);
@@ -81,6 +90,7 @@ export class AuthService {
         residenceCountry: countryNameFromIso(dto.residenceIso),
         market: dto.market,
         platform: dto.platform,
+        ...(await this.referralData(dto.referralCode)),
       },
     });
 

@@ -54,6 +54,18 @@ export class UpdateSettingsDto {
   @ApiPropertyOptional({ example: false })
   @IsOptional() @IsBoolean()
   maintenanceMode?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional() @IsBoolean()
+  referralEnabled?: boolean;
+
+  @ApiPropertyOptional({ example: 0.1, description: "Referrer share of Millimore's fee (0..1)." })
+  @IsOptional() @IsNumber() @Min(0) @Max(1)
+  referralRevenueShare?: number;
+
+  @ApiPropertyOptional({ example: 0, description: 'One-time bonus on a referral’s first deposit.' })
+  @IsOptional() @IsNumber() @Min(0)
+  referralSignupBonus?: number;
 }
 
 /** Body for flag / KYC decision / reject actions. */

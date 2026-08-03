@@ -25,7 +25,7 @@ not "technically backward."
 | Analytics / reporting dashboards | ✅ | ✅ (M8) |
 | Leverage / margin controls | ✅ | ✅ (M7) |
 | Multi-currency wallets | ✅ | ⚠️ USD only (single-currency ledger; extendable) |
-| **IB / affiliate / referral module** (multi-level commissions) | ✅ | ❌ not yet (candidate next milestone) |
+| **IB / affiliate / referral module** | ✅ | ✅ **(M9)** — codes, revenue share + signup bonus, admin leaderboard (single-level; multi-level is a later add) |
 | Support tickets / in-app messaging | common | ❌ not yet |
 | Document management (uploaded IDs/statements) | ✅ | ⚠️ partial (uploads exist; no doc console) |
 | Bonus / promo engine | common | ❌ not yet |

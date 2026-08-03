@@ -68,6 +68,12 @@ export class RegisterFollowerDto {
   @IsOptional()
   @IsString()
   photoUrl?: string;
+
+  @ApiPropertyOptional({ example: 'A1B2C3D', description: 'Referral code the user signed up with.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  referralCode?: string;
 }
 
 /** POST /auth/register/creator */
@@ -98,4 +104,10 @@ export class RegisterCreatorDto {
   @ValidateNested()
   @Type(() => VerificationDto)
   verification: VerificationDto;
+
+  @ApiPropertyOptional({ example: 'A1B2C3D', description: 'Referral code the user signed up with.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  referralCode?: string;
 }

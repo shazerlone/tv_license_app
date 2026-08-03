@@ -247,3 +247,19 @@ compliance (milestone 7)".
    `defaultLeverage`, `minDeposit`, `minWithdrawal`, `maxWithdrawalPerTx`,
    `maxWithdrawalPerDay`, `kycRequiredForWithdrawal`, `depositMethods[]`
    (`{ id, label, active, comingSoon? }`), `maintenanceMode`.
+
+---
+
+## 9. Referral / affiliate program (milestone 9) — NEW, live
+
+- **Referral screen** — `GET /referrals/me` → show the user's `code`, shareable
+  `link`, `revenueSharePercent`, `signupBonus`, and `stats` (referred,
+  activeReferred, totalEarned, earned30d). A "Share"/copy button on `link`.
+- **My referrals list** — `GET /referrals` → who they referred + `earned` each.
+- **Apply a code** — pass `referralCode` in the signup body
+  (`POST /auth/register/follower` / `/creator`), or later via
+  `POST /referrals/apply { code }` (errors: `already_referred`, `invalid_code`,
+  `self_referral`).
+- **Earnings** land in the normal wallet (a `referral_commission` ledger entry),
+  so they show on the wallet/transactions screens and are withdrawable — no
+  separate flow needed.

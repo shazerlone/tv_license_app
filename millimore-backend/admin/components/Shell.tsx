@@ -16,6 +16,7 @@ const NAV = [
   { href: '/transactions', label: 'Transactions', icon: Icons.spark },
   { href: '/payouts', label: 'Payouts', icon: Icons.approved },
   { href: '/kyc', label: 'KYC', icon: Icons.approved },
+  { href: '/referrals', label: 'Referrals', icon: Icons.spark },
   { href: '/audit', label: 'Audit log', icon: Icons.queue },
   { href: '/settings', label: 'Settings', icon: Icons.users },
 ];
@@ -29,6 +30,7 @@ const TITLES: Record<string, string> = {
   '/transactions': 'Transactions',
   '/payouts': 'Payouts',
   '/kyc': 'KYC',
+  '/referrals': 'Referrals',
   '/audit': 'Audit log',
   '/settings': 'Settings',
 };

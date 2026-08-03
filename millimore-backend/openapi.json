@@ -1007,6 +1007,26 @@
         ]
       }
     },
+    "/v1/admin/referrals": {
+      "get": {
+        "operationId": "AdminController_topReferrers",
+        "summary": "Top referrers by affiliate earnings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/metrics": {
       "get": {
         "operationId": "AdminController_metrics",
@@ -3027,6 +3047,93 @@
         ]
       }
     },
+    "/v1/referrals/me": {
+      "get": {
+        "operationId": "ReferralsController_mine",
+        "summary": "My referral dashboard (code, link, earnings)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralMeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "referrals"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/referrals": {
+      "get": {
+        "operationId": "ReferralsController_list",
+        "summary": "People I referred + what I earned from each",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReferredUserDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "referrals"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/referrals/apply": {
+      "post": {
+        "operationId": "ReferralsController_apply",
+        "summary": "Attach a referral code to my account (once)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyReferralDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "referrals"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/copy/{traderId}/start": {
       "post": {
         "operationId": "CopyController_start",
@@ -3697,6 +3804,11 @@
           },
           "photoUrl": {
             "type": "string"
+          },
+          "referralCode": {
+            "type": "string",
+            "example": "A1B2C3D",
+            "description": "Referral code the user signed up with."
           }
         },
         "required": [
@@ -3885,6 +3997,11 @@
           },
           "verification": {
             "$ref": "#/components/schemas/VerificationDto"
+          },
+          "referralCode": {
+            "type": "string",
+            "example": "A1B2C3D",
+            "description": "Referral code the user signed up with."
           }
         },
         "required": [
@@ -5218,6 +5335,20 @@
           "maintenanceMode": {
             "type": "boolean",
             "example": false
+          },
+          "referralEnabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "referralRevenueShare": {
+            "type": "number",
+            "example": 0.1,
+            "description": "Referrer share of Millimore's fee (0..1)."
+          },
+          "referralSignupBonus": {
+            "type": "number",
+            "example": 0,
+            "description": "One-time bonus on a referral’s first deposit."
           }
         }
       },
@@ -5955,6 +6086,125 @@
           "kycRequiredForWithdrawal",
           "depositMethods",
           "maintenanceMode"
+        ]
+      },
+      "ReferralStatsDto": {
+        "type": "object",
+        "properties": {
+          "referred": {
+            "type": "number",
+            "example": 12
+          },
+          "activeReferred": {
+            "type": "number",
+            "example": 7,
+            "description": "Referred users who have deposited."
+          },
+          "totalEarned": {
+            "type": "number",
+            "example": 340.5
+          },
+          "earned30d": {
+            "type": "number",
+            "example": 90.25
+          }
+        },
+        "required": [
+          "referred",
+          "activeReferred",
+          "totalEarned",
+          "earned30d"
+        ]
+      },
+      "ReferralMeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "A1B2C3D"
+          },
+          "link": {
+            "type": "string",
+            "example": "https://millimore.app/r/A1B2C3D"
+          },
+          "enabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "revenueSharePercent": {
+            "type": "number",
+            "example": 10,
+            "description": "Referrer share of Millimore fee (%)."
+          },
+          "signupBonus": {
+            "type": "number",
+            "example": 0,
+            "description": "One-time bonus on a referral’s first deposit."
+          },
+          "stats": {
+            "$ref": "#/components/schemas/ReferralStatsDto"
+          }
+        },
+        "required": [
+          "code",
+          "link",
+          "enabled",
+          "revenueSharePercent",
+          "signupBonus",
+          "stats"
+        ]
+      },
+      "ReferredUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "kycVerified": {
+            "type": "boolean"
+          },
+          "hasDeposited": {
+            "type": "boolean"
+          },
+          "joinedAt": {
+            "type": "string"
+          },
+          "earned": {
+            "type": "number",
+            "example": 42.5
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "username",
+          "photoUrl",
+          "kycVerified",
+          "hasDeposited",
+          "joinedAt",
+          "earned"
+        ]
+      },
+      "ApplyReferralDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "A1B2C3D"
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "StartCopyDto": {

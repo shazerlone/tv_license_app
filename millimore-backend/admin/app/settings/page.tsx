@@ -18,6 +18,9 @@ interface Settings {
   cardEnabled: boolean;
   bankEnabled: boolean;
   maintenanceMode: boolean;
+  referralEnabled: boolean;
+  referralRevenueShare: number;
+  referralSignupBonus: number;
 }
 
 const NUM_FIELDS: { key: keyof Settings; label: string; hint?: string; step?: number }[] = [
@@ -28,6 +31,8 @@ const NUM_FIELDS: { key: keyof Settings; label: string; hint?: string; step?: nu
   { key: 'minWithdrawal', label: 'Min withdrawal ($)' },
   { key: 'maxWithdrawalPerTx', label: 'Max withdrawal / transaction ($)' },
   { key: 'maxWithdrawalPerDay', label: 'Max withdrawal / day ($)' },
+  { key: 'referralRevenueShare', label: 'Referral revenue share', hint: '0–1 of Millimore’s fee paid to referrers (0.10 = 10%)', step: 0.01 },
+  { key: 'referralSignupBonus', label: 'Referral signup bonus ($)', hint: 'One-time, on a referral’s first deposit' },
 ];
 
 const BOOL_FIELDS: { key: keyof Settings; label: string; hint?: string }[] = [
@@ -36,6 +41,7 @@ const BOOL_FIELDS: { key: keyof Settings; label: string; hint?: string }[] = [
   { key: 'cryptoEnabled', label: 'Crypto deposits enabled' },
   { key: 'cardEnabled', label: 'Card deposits enabled' },
   { key: 'bankEnabled', label: 'Bank deposits enabled' },
+  { key: 'referralEnabled', label: 'Referral program enabled' },
   { key: 'maintenanceMode', label: 'Maintenance mode' },
 ];
 

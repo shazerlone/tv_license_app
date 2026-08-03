@@ -111,9 +111,31 @@ export class DepositsService {
         note: `Deposit ${d.asset ?? d.method}`,
         tx,
       });
+      await this.maybePayReferralBonus(tx, d.userId);
       return d;
     });
     return this.toDto(updated);
+  }
+
+  /**
+   * On a referred user's FIRST confirmed deposit, pay their referrer the
+   * one-time signup bonus (affiliate CPA). Runs inside the confirm transaction.
+   */
+  private async maybePayReferralBonus(tx: any, userId: string): Promise<void> {
+    const s = await this.settings.get();
+    if (!s.referralEnabled || s.referralSignupBonus <= 0) return;
+    const confirmed = await tx.deposit.count({ where: { userId, status: DepositStatus.confirmed } });
+    if (confirmed !== 1) return; // only the first one
+    const user = await tx.user.findUnique({ where: { id: userId }, select: { referredById: true } });
+    if (!user?.referredById) return;
+    await this.wallet.post({
+      userId: user.referredById,
+      type: LedgerType.referral_commission,
+      amount: s.referralSignupBonus,
+      refId: userId,
+      note: 'Referral signup bonus',
+      tx,
+    });
   }
 
   async listMine(userId: string): Promise<DepositDto[]> {

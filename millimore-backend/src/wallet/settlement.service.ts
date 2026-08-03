@@ -136,7 +136,11 @@ export class SettlementService {
           platformCut = round2(platformCut + traderCut);
           traderCut = 0;
         }
-        await this.recordPlatformFee(tx, platformCut, input.refId);
+
+        // Referral (IB) revenue share: if the copier was referred, pay the
+        // referrer a slice of Millimore's cut — booked out of the platform fee.
+        const referralAmount = await this.creditReferralShare(tx, input.copierUserId, platformCut);
+        await this.recordPlatformFee(tx, round2(platformCut - referralAmount), input.refId);
       }
 
       const netToCopier = round2(principal + effectivePnl - fee);
@@ -145,6 +149,37 @@ export class SettlementService {
       );
       return { netToCopier, fee, traderCut, platformCut };
     });
+  }
+
+  /**
+   * Pay the copier's referrer a share of Millimore's platform cut (affiliate/IB
+   * revenue share). Returns the amount paid so the caller books the net platform
+   * fee. No-op when referrals are off or the copier wasn't referred.
+   */
+  private async creditReferralShare(
+    tx: Prisma.TransactionClient,
+    copierUserId: string,
+    platformCut: number,
+  ): Promise<number> {
+    if (platformCut <= 0) return 0;
+    const s = await this.settings.get();
+    if (!s.referralEnabled || s.referralRevenueShare <= 0) return 0;
+    const copier = await tx.user.findUnique({
+      where: { id: copierUserId },
+      select: { referredById: true },
+    });
+    if (!copier?.referredById) return 0;
+    const amount = round2(platformCut * s.referralRevenueShare);
+    if (amount <= 0) return 0;
+    await this.wallet.post({
+      userId: copier.referredById,
+      type: LedgerType.referral_commission,
+      amount,
+      refId: copierUserId,
+      note: 'Referral revenue share',
+      tx,
+    });
+    return amount;
   }
 
   /** Total revenue Millimore has booked (sum of platform_fee ledger rows). */
