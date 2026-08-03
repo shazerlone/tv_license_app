@@ -11,6 +11,7 @@ import 'services/api_client.dart';
 import 'services/auth_api.dart';
 import 'services/auth_store.dart';
 import 'services/app_config.dart';
+import 'services/realtime_service.dart';
 import 'config.dart';
 import 'screens/login_screen.dart';
 
@@ -81,6 +82,7 @@ class _MillimoreAppState extends State<MillimoreApp> {
   final AppState _appState = AppState();
   final ThemeController _theme = ThemeController();
   final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+  late final RealtimeService _realtime = RealtimeService(_session, _appState);
 
   bool _booting = true;
   bool _hasSession = false;
@@ -90,7 +92,20 @@ class _MillimoreAppState extends State<MillimoreApp> {
     super.initState();
     // Global 401 handler: token rejected/expired → sign out to login.
     ApiClient.instance.onUnauthorized = _forceSignOut;
+    RealtimeService.current = _realtime;
+    // Connect/disconnect the realtime socket as auth state changes.
+    _session.addListener(_syncRealtime);
     _restore();
+  }
+
+  void _syncRealtime() {
+    if (!kUseBackend) return;
+    final token = ApiClient.instance.token;
+    if (_session.isSignedIn && token != null) {
+      if (!_realtime.connected) _realtime.connect(token);
+    } else {
+      _realtime.disconnect();
+    }
   }
 
   void _forceSignOut() {
@@ -127,6 +142,8 @@ class _MillimoreAppState extends State<MillimoreApp> {
 
   @override
   void dispose() {
+    _session.removeListener(_syncRealtime);
+    _realtime.dispose();
     _session.dispose();
     _appState.dispose();
     _theme.dispose();

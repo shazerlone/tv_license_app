@@ -74,6 +74,13 @@ class AppState extends ChangeNotifier {
     if (added) notifyListeners();
   }
 
+  /// Push a notification from a realtime event (WS user channel).
+  void pushNotification(AppNotification n) {
+    if (_notifications.any((x) => x.id == n.id)) return;
+    _notifications.insert(0, n);
+    notifyListeners();
+  }
+
   void markNotificationsRead() {
     final unreadIds = _notifications.where((n) => !n.read).map((n) => n.id).toList();
     if (unreadIds.isEmpty) return;
@@ -478,11 +485,37 @@ class AppState extends ChangeNotifier {
   List<String> get symbols => _prices.keys.toList();
   double priceOf(String s) => _prices[s] ?? 1.0;
 
+  /// Live prices from the WS `prices` channel (merges into the snapshot).
+  void applyLivePrices(Map<String, double> prices) {
+    if (prices.isEmpty) return;
+    _prices.addAll(prices);
+    notifyListeners();
+  }
+
+  /// Live position update from the WS `portfolio` channel — replace by id.
+  void upsertLivePosition(CopyPosition p) {
+    final i = _positions.indexWhere((x) => x.id == p.id);
+    if (i >= 0) {
+      _positions[i] = p;
+    } else {
+      _positions.insert(0, p);
+    }
+    notifyListeners();
+  }
+
   Timer? _priceTimer;
   int _feedRefs = 0;
 
   void startPriceFeed() {
     _feedRefs++;
+    // With the backend, prices arrive over the WS `prices` channel — load a
+    // snapshot once and let the socket drive updates (no local simulation).
+    if (kUseBackend) {
+      BackendApi.prices().then((p) {
+        if (p.isNotEmpty) applyLivePrices(p);
+      }).catchError((_) {});
+      return;
+    }
     _priceTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
       final r = math.Random();
       _prices.updateAll((k, v) => v * (1 + (r.nextDouble() - 0.5) * 0.0009));
