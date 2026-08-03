@@ -38,6 +38,7 @@ export class TradersService {
       winRate: t.winRate,
       maxDrawdown: t.maxDrawdown,
       totalTrades: t.totalTrades,
+      commissionPercent: t.commissionPercent,
       category: t.category,
       tags: t.tags,
       bio: t.bio,

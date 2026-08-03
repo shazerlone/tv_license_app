@@ -9,6 +9,23 @@ export class WalletDto {
   leverage: number;
 }
 
+/** A single row in the unified transaction timeline (GET /wallet/transactions). */
+export class UserTxnDto {
+  @ApiProperty({ example: 'led_ab12cd34' }) id: string;
+  @ApiProperty({
+    example: 'deposit',
+    description: 'deposit | withdrawal | trade | commission | fee | transfer',
+  })
+  kind: string;
+  @ApiProperty({ example: 'Deposit USDT' }) title: string;
+  @ApiProperty({ example: 250, description: 'Signed: credits positive, debits negative.' })
+  amount: number;
+  @ApiProperty({ example: 'USD' }) currency: string;
+  @ApiProperty({ example: 'completed', description: 'completed | pending | rejected' })
+  status: string;
+  @ApiProperty({ example: '2026-08-02T12:00:00.000Z' }) createdAt: string;
+}
+
 /** A single money movement (GET /wallet/ledger). */
 export class LedgerEntryDto {
   @ApiProperty({ example: 'led_ab12cd34' }) id: string;

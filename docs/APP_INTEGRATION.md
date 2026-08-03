@@ -225,3 +225,25 @@ settlement & payouts (milestone 6)".
 
 **Contract details:** `BACKEND_CONTRACT.md` → "Financial operations, leverage &
 compliance (milestone 7)".
+
+---
+
+## 8. Answers to app-session questions (resolved)
+
+1. **WebSocket schemas** — now fully documented in `BACKEND_CONTRACT.md` →
+   "WebSocket message schemas (realtime — M4/M5)": connect URL, subscribe op,
+   the `{ ch, type, data }` envelope, and every payload for `prices`,
+   `portfolio`, `user` (incl. `copy.settled`), and `broadcast:{id}`.
+2. **Read current commission / leverage** —
+   - Commission: `GET /creator/commission` → `{ commissionPercent }` (new).
+   - Default leverage: already on `GET /me` (`leverage`) and `GET /wallet`
+     (`leverage`). Set via `PATCH /me { leverage }`.
+3. **`commissionPercent` on trader** — added to `TraderDto` (also on
+   `GET /traders/{id}`), so you can render it on trader profiles.
+4. **Typed responses** — `GET /config` (`PublicConfigDto`), `GET /kyc`
+   (`KycStatusResponseDto`), `POST /kyc/start` (`KycStartResponseDto`), and
+   `GET /wallet/transactions` (`[UserTxnDto]`) now publish real schemas in
+   `openapi.json`. Field names to rely on for `/config`: `maxLeverage`,
+   `defaultLeverage`, `minDeposit`, `minWithdrawal`, `maxWithdrawalPerTx`,
+   `maxWithdrawalPerDay`, `kycRequiredForWithdrawal`, `depositMethods[]`
+   (`{ id, label, active, comingSoon? }`), `maintenanceMode`.

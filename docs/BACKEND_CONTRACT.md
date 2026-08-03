@@ -598,3 +598,50 @@ address, KYC (Sumsub-ready), and an admin audit trail.
   `GET /admin/audit?targetType=&cursor=`.
 - **New env** — `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_LEVEL_NAME`,
   `MAX_LEVERAGE`, `DEFAULT_LEVERAGE` (all optional; settings row overrides).
+
+### WebSocket message schemas (realtime — M4/M5)
+**Connect:** `wss://<host>/v1/ws?token=<JWT>` (same host as the API).
+**Subscribe/unsubscribe (client → server):**
+```json
+{ "op": "subscribe",   "channels": ["prices", "portfolio", "user", "broadcast:b_1"] }
+{ "op": "unsubscribe", "channels": ["broadcast:b_1"] }
+```
+**Every server → client message has the envelope:** `{ "ch": string, "type"?: string, "data": object }`
+
+On connect the server sends: `{ "ch":"system", "type":"connected", "data":{ "ok":true } }`
+
+**Channel `prices`** (~1/sec):
+```json
+{ "ch":"prices", "data": { "EUR/USD": 1.0876, "XAU/USD": 2411.3, "BTC/USD": 64210.5 } }
+```
+`data` is a map of `symbol → price` (numbers).
+
+**Channel `portfolio`** (on each tick, one message per open position):
+```json
+{ "ch":"portfolio", "type":"position", "data": CopyPosition }
+```
+`CopyPosition` = the `/positions` object (id, traderId, traderName, pair, isBuy,
+status, entryPrice, exitPrice, pnlAmount, pnlPercent, lots, openedAt, closedAt, accountId).
+
+**Channel `user`** (per-user events; envelope `{ ch:"user", type, data }`):
+| type | data |
+| ---- | ---- |
+| `creator.status` | `{ creatorStatus: "approved"|"rejected", reason?: string }` |
+| `trade.opened` | `{ traderId, name, pair, isBuy, entryPrice }` |
+| `trade.closed` | `{ traderId, pair, pnlPercent, pnlAmount }` |
+| `copy.settled` | `{ traderId, netToCopier, fee }` |
+| `trader.live.started` | `{ traderId, name, broadcastId }` (sent to the trader's followers) |
+| `payout.status` | `{ status: "approved"|"rejected", reason?: string }` |
+| `kyc.status` | `{ kycStatus: "verified"|"rejected"|"pending", reason?: string }` |
+
+> Every `user` event is also persisted to `GET /notifications` and fires a push
+> (when a device is registered). So the app can rely on either the socket or the
+> REST feed.
+
+**Channel `broadcast:{id}`** (live room; envelope `{ ch:"broadcast:b_1", type, data }`):
+| type | data |
+| ---- | ---- |
+| `chat` | `LiveChatMessage` = `{ id, broadcastId, author, text, source, byHost, createdAt }` |
+| `reaction` | `{ count: number }` |
+| `viewers` | `{ viewers: number }` (auto on join/leave) |
+| `trade` | `LiveTrade` (on-stream order overlay) |

@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
+import { PublicConfigDto } from './dto/config.dto';
 
 /**
  * Public app config — the subset of platform settings the mobile app needs to
@@ -13,7 +14,8 @@ export class ConfigController {
 
   @Get()
   @ApiOperation({ summary: 'Public platform config (leverage cap, limits, deposit methods)' })
-  get() {
+  @ApiOkResponse({ type: PublicConfigDto })
+  get(): Promise<PublicConfigDto> {
     return this.settings.publicConfig();
   }
 }

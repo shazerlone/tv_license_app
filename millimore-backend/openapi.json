@@ -615,6 +615,31 @@
       }
     },
     "/v1/creator/commission": {
+      "get": {
+        "operationId": "CreatorController_getCommission",
+        "summary": "My current performance-fee % charged to copiers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommissionDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "creator"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
       "patch": {
         "operationId": "CreatorController_setCommission",
         "summary": "Set my performance-fee % charged to copiers (1–30)",
@@ -770,7 +795,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserTxnDto"
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2177,8 +2212,15 @@
         "summary": "Begin identity verification (returns SDK token)",
         "parameters": [],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycStartResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2198,7 +2240,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycStatusResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2861,7 +2910,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicConfigDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -4108,6 +4164,18 @@
           "history"
         ]
       },
+      "CommissionDto": {
+        "type": "object",
+        "properties": {
+          "commissionPercent": {
+            "type": "number",
+            "example": 20
+          }
+        },
+        "required": [
+          "commissionPercent"
+        ]
+      },
       "SetCommissionDto": {
         "type": "object",
         "properties": {
@@ -4120,18 +4188,6 @@
         },
         "required": [
           "percent"
-        ]
-      },
-      "CommissionDto": {
-        "type": "object",
-        "properties": {
-          "commissionPercent": {
-            "type": "number",
-            "example": 20
-          }
-        },
-        "required": [
-          "commissionPercent"
         ]
       },
       "ApplyCreatorDto": {
@@ -4223,6 +4279,51 @@
           "amount",
           "balanceAfter",
           "currency",
+          "createdAt"
+        ]
+      },
+      "UserTxnDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "led_ab12cd34"
+          },
+          "kind": {
+            "type": "string",
+            "example": "deposit",
+            "description": "deposit | withdrawal | trade | commission | fee | transfer"
+          },
+          "title": {
+            "type": "string",
+            "example": "Deposit USDT"
+          },
+          "amount": {
+            "type": "number",
+            "example": 250,
+            "description": "Signed: credits positive, debits negative."
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "status": {
+            "type": "string",
+            "example": "completed",
+            "description": "completed | pending | rejected"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-02T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "amount",
+          "currency",
+          "status",
           "createdAt"
         ]
       },
@@ -5009,6 +5110,11 @@
             "type": "number",
             "example": 612
           },
+          "commissionPercent": {
+            "type": "number",
+            "example": 20,
+            "description": "Performance fee % charged to copiers (1–30)."
+          },
           "category": {
             "type": "string",
             "example": "Forex"
@@ -5042,6 +5148,7 @@
           "winRate",
           "maxDrawdown",
           "totalTrades",
+          "commissionPercent",
           "category",
           "tags"
         ]
@@ -5312,6 +5419,60 @@
           "methodId"
         ]
       },
+      "KycStartResponseDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "example": "sumsub"
+          },
+          "applicantId": {
+            "type": "string",
+            "example": "appl_abc123"
+          },
+          "accessToken": {
+            "type": "string",
+            "example": "_act-sbx-…",
+            "description": "Short-lived SDK token."
+          },
+          "manual": {
+            "type": "boolean",
+            "example": false,
+            "description": "true when no provider is configured (manual review)."
+          }
+        },
+        "required": [
+          "provider",
+          "applicantId",
+          "accessToken"
+        ]
+      },
+      "KycStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "kycStatus": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "verified",
+              "rejected"
+            ]
+          },
+          "provider": {
+            "type": "object",
+            "nullable": true,
+            "example": "sumsub"
+          },
+          "reason": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kycStatus"
+        ]
+      },
       "CreatePostDto": {
         "type": "object",
         "properties": {
@@ -5537,6 +5698,86 @@
         },
         "required": [
           "on"
+        ]
+      },
+      "ConfigDepositMethodDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "crypto"
+          },
+          "label": {
+            "type": "string",
+            "example": "Crypto (USDT / BTC)"
+          },
+          "active": {
+            "type": "boolean",
+            "example": true
+          },
+          "comingSoon": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "active"
+        ]
+      },
+      "PublicConfigDto": {
+        "type": "object",
+        "properties": {
+          "maxLeverage": {
+            "type": "number",
+            "example": 500
+          },
+          "defaultLeverage": {
+            "type": "number",
+            "example": 100
+          },
+          "minDeposit": {
+            "type": "number",
+            "example": 10
+          },
+          "minWithdrawal": {
+            "type": "number",
+            "example": 10
+          },
+          "maxWithdrawalPerTx": {
+            "type": "number",
+            "example": 25000
+          },
+          "maxWithdrawalPerDay": {
+            "type": "number",
+            "example": 50000
+          },
+          "kycRequiredForWithdrawal": {
+            "type": "boolean",
+            "example": true
+          },
+          "depositMethods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigDepositMethodDto"
+            }
+          },
+          "maintenanceMode": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "maxLeverage",
+          "defaultLeverage",
+          "minDeposit",
+          "minWithdrawal",
+          "maxWithdrawalPerTx",
+          "maxWithdrawalPerDay",
+          "kycRequiredForWithdrawal",
+          "depositMethods",
+          "maintenanceMode"
         ]
       },
       "StartCopyDto": {

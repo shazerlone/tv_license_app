@@ -48,6 +48,13 @@ export class CreatorController {
     return this.creator.earnings(user.userId);
   }
 
+  @Get('commission')
+  @ApiOperation({ summary: 'My current performance-fee % charged to copiers' })
+  @ApiOkResponse({ type: CommissionDto })
+  getCommission(@CurrentUser() user: AuthUser): Promise<CommissionDto> {
+    return this.creator.getCommission(user.userId);
+  }
+
   @Patch('commission')
   @ApiOperation({ summary: 'Set my performance-fee % charged to copiers (1–30)' })
   @ApiOkResponse({ type: CommissionDto })

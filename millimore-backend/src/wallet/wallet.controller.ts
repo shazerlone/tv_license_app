@@ -5,7 +5,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from './wallet.service';
 import { TransactionsService } from './transactions.service';
-import { WalletDto, LedgerEntryDto } from './dto/wallet.dto';
+import { WalletDto, LedgerEntryDto, UserTxnDto } from './dto/wallet.dto';
 
 @ApiTags('wallet')
 @ApiBearerAuth('bearer')
@@ -39,7 +39,8 @@ export class WalletController {
 
   @Get('transactions')
   @ApiOperation({ summary: 'My unified transaction timeline (deposits, trades, fees, withdrawals)' })
-  transactions_(@CurrentUser() user: AuthUser, @Query('limit') limit?: string) {
+  @ApiOkResponse({ type: [UserTxnDto] })
+  transactions_(@CurrentUser() user: AuthUser, @Query('limit') limit?: string): Promise<UserTxnDto[]> {
     const n = Math.min(200, Math.max(1, Number(limit) || 50));
     return this.transactions.userTimeline(user.userId, n);
   }

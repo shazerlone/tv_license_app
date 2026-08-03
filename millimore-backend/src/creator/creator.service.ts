@@ -74,6 +74,15 @@ export class CreatorService {
     };
   }
 
+  /** Read the trader's current performance-fee percentage. */
+  async getCommission(userId: string): Promise<{ commissionPercent: number }> {
+    const trader = await this.prisma.trader.findUnique({
+      where: { userId },
+      select: { commissionPercent: true },
+    });
+    return { commissionPercent: trader?.commissionPercent ?? 20 };
+  }
+
   /** Set the trader's performance-fee percentage (1–30%, contract wallet model). */
   async setCommission(userId: string, percent: number): Promise<{ commissionPercent: number }> {
     const trader = await this.prisma.trader.findUnique({ where: { userId } });

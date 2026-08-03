@@ -18,6 +18,8 @@ export class TraderDto {
   @ApiProperty({ example: 72 }) winRate: number;
   @ApiProperty({ example: 9.2 }) maxDrawdown: number;
   @ApiProperty({ example: 612 }) totalTrades: number;
+  @ApiProperty({ example: 20, description: 'Performance fee % charged to copiers (1–30).' })
+  commissionPercent: number;
   @ApiProperty({ example: 'Forex' }) category: string;
   @ApiProperty({ type: [String], example: ['Price Action', 'EUR/USD'] }) tags: string[];
   @ApiPropertyOptional({ nullable: true }) bio: string | null;

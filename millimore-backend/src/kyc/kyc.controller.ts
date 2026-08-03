@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiExcludeEndpoint, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { KycService } from './kyc.service';
+import { KycStartResponseDto, KycStatusResponseDto } from './dto/kyc.dto';
 
 @ApiTags('kyc')
 @Controller('kyc')
@@ -14,7 +15,8 @@ export class KycController {
   @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Begin identity verification (returns SDK token)' })
-  start(@CurrentUser() user: AuthUser) {
+  @ApiOkResponse({ type: KycStartResponseDto })
+  start(@CurrentUser() user: AuthUser): Promise<KycStartResponseDto> {
     return this.kyc.start(user.userId);
   }
 
@@ -22,8 +24,9 @@ export class KycController {
   @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'My KYC status' })
-  status(@CurrentUser() user: AuthUser) {
-    return this.kyc.status(user.userId);
+  @ApiOkResponse({ type: KycStatusResponseDto })
+  status(@CurrentUser() user: AuthUser): Promise<KycStatusResponseDto> {
+    return this.kyc.status(user.userId) as Promise<KycStatusResponseDto>;
   }
 
   @Post('webhook')
