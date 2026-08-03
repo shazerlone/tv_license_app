@@ -734,3 +734,22 @@ announcements), `analyst` (read-only analytics/reports). A legacy admin with no
 - `GET /admin/team` + `POST /admin/team/{id}/role { adminRole }` (require
   `admins.manage`) manage staff roles. `AdminUserDto` now includes `adminRole`.
 - Admin UI adds a **Team** page (assign roles) and a permission-filtered sidebar.
+
+### Real integrations — push & live video (milestone 12)
+No API/shape changes — these swap dev-mode stubs for real providers when their
+env is set (isolated behind their modules, per the portability guardrails).
+- **Push (FCM HTTP v1)** — the legacy server-key API was removed by Google in
+  2024, so we use HTTP v1 with a service account. Set `FCM_SERVICE_ACCOUNT_JSON`
+  (raw JSON) or `FCM_SERVICE_ACCOUNT_B64` (base64). The server signs a JWT →
+  OAuth2 token (cached) → `messages:send`. Invalid device tokens are auto-pruned.
+  Unset ⇒ dev logging (registry + triggers already live).
+- **Live video (Cloudflare Stream)** — with `CLOUDFLARE_STREAM_TOKEN` +
+  `CLOUDFLARE_ACCOUNT_ID`, `POST /broadcasts` now creates a real Live Input
+  (RTMPS ingest + auto-recording) and returns real `ingestUrl`/`streamKey` +
+  an HLS `hlsUrl` (`https://customer-<sub>.cloudflarestream.com/<uid>/manifest/
+  video.m3u8`; set `CLOUDFLARE_STREAM_SUBDOMAIN`). Any provider hiccup falls back
+  to a dev input so going live never hard-fails. Unset ⇒ synthetic input.
+- **YouTube simulcast/chat ingest** remains the documented next step (OAuth +
+  Data API) — the auth-URL hook is in place.
+- **New env:** `FCM_SERVICE_ACCOUNT_JSON` | `FCM_SERVICE_ACCOUNT_B64`,
+  `CLOUDFLARE_STREAM_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_SUBDOMAIN`.

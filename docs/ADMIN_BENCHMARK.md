@@ -56,3 +56,10 @@ add-ons that are natural follow-on milestones.
 - **Granular admin roles / permissions (RBAC)** — ✅ (superadmin/finance/
   compliance/support/analyst; per-endpoint permission gating; Team management +
   permission-scoped nav).
+
+## Update (M12)
+- **Real push (FCM HTTP v1)** — ✅ implemented (service-account OAuth2; enable
+  with FCM_SERVICE_ACCOUNT_JSON). Was dev-mode.
+- **Real live video (Cloudflare Stream)** — ✅ implemented (real Live Inputs;
+  enable with CLOUDFLARE_STREAM_TOKEN + CLOUDFLARE_ACCOUNT_ID). Was dev-mode.
+- **YouTube simulcast/chat** — ⚠️ still pending (OAuth + Data API) — next.
