@@ -5,6 +5,7 @@ import '../config.dart';
 import '../state/session.dart';
 import '../services/auth_api.dart';
 import '../services/api_client.dart';
+import '../services/backend_api.dart';
 import '../services/image_picker_service.dart';
 import '../services/app_config.dart';
 import '../widgets/avatar.dart';

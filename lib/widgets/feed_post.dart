@@ -326,13 +326,13 @@ class _ActionIcon extends StatelessWidget {
   final IconData icon;
   final int? count;
   final bool active;
-  final Color activeColor;
+  final Color? activeColor;
   final VoidCallback onTap;
-  _ActionIcon({required this.icon, this.count, this.active = false, this.activeColor = AppColors.textMuted, required this.onTap});
+  _ActionIcon({required this.icon, this.count, this.active = false, this.activeColor, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? activeColor : AppColors.textMuted;
+    final color = active ? (activeColor ?? AppColors.textMuted) : AppColors.textMuted;
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
