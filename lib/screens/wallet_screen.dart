@@ -157,7 +157,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Icon(icon, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 14),
             Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
           ],
         ),
       ),

@@ -119,7 +119,7 @@ class _PayoutMethodsScreenState extends State<PayoutMethodsScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.textMuted),
+                            icon: Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.textMuted),
                             onPressed: () => _delete(m['id'].toString()),
                           ),
                         ],

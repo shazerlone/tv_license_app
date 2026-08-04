@@ -165,7 +165,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_outline_rounded, size: 18, color: AppColors.green),
+                      Icon(Icons.check_circle_outline_rounded, size: 18, color: AppColors.green),
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextField(

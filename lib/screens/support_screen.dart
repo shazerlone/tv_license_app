@@ -82,7 +82,7 @@ class _SupportScreenState extends State<SupportScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 22),
+                          Icon(Icons.bolt_rounded, color: AppColors.primary, size: 22),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -93,7 +93,7 @@ class _SupportScreenState extends State<SupportScreen> {
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                          Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                         ],
                       ),
                     ),
@@ -397,7 +397,7 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
   Widget _composer() {
     return Container(
       padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).viewInsets.bottom),
-      decoration: const BoxDecoration(color: AppColors.background, border: Border(top: BorderSide(color: AppColors.border))),
+      decoration: BoxDecoration(color: AppColors.background, border: Border(top: BorderSide(color: AppColors.border))),
       child: SafeArea(
         top: false,
         child: Row(
@@ -413,9 +413,9 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
                   hintText: 'Reply…',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   filled: true, fillColor: AppColors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.border)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
                 ),
               ),
             ),
@@ -424,7 +424,7 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
               onTap: _sending ? null : _send,
               child: Container(
                 width: 46, height: 46,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                 child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
               ),
             ),
