@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -20,6 +22,7 @@ import {
   ReactDto,
   BroadcastSummaryDto,
 } from './dto/broadcast.dto';
+import { BroadcastOutputDto, CreateOutputDto, ToggleOutputDto } from './dto/output.dto';
 
 @ApiTags('broadcasts')
 @ApiBearerAuth('bearer')
@@ -40,6 +43,39 @@ export class BroadcastsController {
   @ApiOkResponse({ type: [BroadcastDto] })
   liveNow(): Promise<BroadcastDto[]> {
     return this.broadcasts.live();
+  }
+
+  // ── simulcast outputs (multistream to YouTube/Facebook/Twitch) ──────
+  @Get(':id/outputs')
+  @ApiOperation({ summary: 'List simulcast destinations (owner only)' })
+  @ApiOkResponse({ type: [BroadcastOutputDto] })
+  listOutputs(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<BroadcastOutputDto[]> {
+    return this.broadcasts.listOutputs(u.userId, id);
+  }
+
+  @Post(':id/outputs')
+  @ApiOperation({ summary: 'Add a simulcast destination (YouTube/Facebook/Twitch/custom)' })
+  @ApiCreatedResponse({ type: BroadcastOutputDto })
+  addOutput(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: CreateOutputDto): Promise<BroadcastOutputDto> {
+    return this.broadcasts.addOutput(u.userId, id, dto);
+  }
+
+  @Patch(':id/outputs/:outputId')
+  @ApiOperation({ summary: 'Enable / disable a simulcast destination' })
+  @ApiOkResponse({ type: BroadcastOutputDto })
+  toggleOutput(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Param('outputId') outputId: string,
+    @Body() dto: ToggleOutputDto,
+  ): Promise<BroadcastOutputDto> {
+    return this.broadcasts.toggleOutput(u.userId, id, outputId, dto.enabled);
+  }
+
+  @Delete(':id/outputs/:outputId')
+  @ApiOperation({ summary: 'Remove a simulcast destination' })
+  removeOutput(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('outputId') outputId: string) {
+    return this.broadcasts.removeOutput(u.userId, id, outputId);
   }
 
   @Get(':id')

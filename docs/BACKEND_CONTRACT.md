@@ -753,3 +753,18 @@ env is set (isolated behind their modules, per the portability guardrails).
   Data API) — the auth-URL hook is in place.
 - **New env:** `FCM_SERVICE_ACCOUNT_JSON` | `FCM_SERVICE_ACCOUNT_B64`,
   `CLOUDFLARE_STREAM_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_SUBDOMAIN`.
+
+### Multi-destination simulcast (milestone 13)
+Creators can re-stream a live broadcast to YouTube, Facebook, Twitch, or any
+custom RTMP target at once (up to 50), via Cloudflare Stream Outputs. Owner-only;
+stream keys are AES-256-GCM encrypted (write-only) and never returned.
+- `POST /broadcasts/{id}/outputs { platform, streamKey, url? }` → `BroadcastOutput`.
+  `platform` ∈ `youtube|facebook|twitch|custom`; `url` is auto-filled for the
+  known platforms (YouTube `rtmp://a.rtmp.youtube.com/live2`, etc.) and required
+  for `custom`. Errors: `url_required`, `output_limit` (50 max).
+- `GET /broadcasts/{id}/outputs` → `[{ id, platform, targetUrl, masked, enabled,
+  createdAt }]` (masked key only).
+- `PATCH /broadcasts/{id}/outputs/{outputId} { enabled }` → start/stop that
+  destination mid-broadcast. `DELETE /broadcasts/{id}/outputs/{outputId}`.
+- Real re-streaming requires Cloudflare Stream configured (M12 env); otherwise
+  outputs are stored/synthetic so the flow works in dev.

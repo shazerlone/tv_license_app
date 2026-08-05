@@ -277,3 +277,17 @@ compliance (milestone 7)".
   `{ items[], unread }` (show the `unread` count on the bell; render `title`/
   `body`; `requiredRead` items should block/interstitial until acknowledged).
   `POST /announcements/{id}/read` when the user opens/acks one.
+
+---
+
+## 11. Multi-destination simulcast (milestone 13) — NEW, live
+
+On the creator go-live screen, let them add destinations to also broadcast to
+their own YouTube/Facebook/Twitch:
+- `GET /broadcasts/{id}/outputs` → list (masked keys).
+- `POST /broadcasts/{id}/outputs { platform, streamKey, url? }` — `platform` is
+  `youtube|facebook|twitch|custom`; URL auto-fills for known platforms, required
+  for custom. The creator pastes the stream key from their YouTube/FB/Twitch
+  studio.
+- `PATCH /broadcasts/{id}/outputs/{outputId} { enabled }` to toggle a
+  destination live; `DELETE …/{outputId}` to remove. Keys are write-only.

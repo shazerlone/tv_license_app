@@ -3,10 +3,12 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Broadcast } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
+import { Broadcast, BroadcastOutput } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudflareService } from './cloudflare.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CryptoService } from '../common/crypto/crypto.service';
 import { RealtimeBus } from '../realtime/realtime.bus';
 import { genId } from '../common/ids';
 import {
@@ -15,6 +17,14 @@ import {
   LiveChatMessageDto,
   BroadcastSummaryDto,
 } from './dto/broadcast.dto';
+import { BroadcastOutputDto, CreateOutputDto } from './dto/output.dto';
+
+/** Default RTMP ingest endpoints for the common simulcast platforms. */
+const PLATFORM_URLS: Record<string, string> = {
+  youtube: 'rtmp://a.rtmp.youtube.com/live2',
+  facebook: 'rtmps://live-api-s.facebook.com:443/rtmp/',
+  twitch: 'rtmp://live.twitch.tv/app',
+};
 
 @Injectable()
 export class BroadcastsService {
@@ -23,6 +33,7 @@ export class BroadcastsService {
     private readonly cf: CloudflareService,
     private readonly notifications: NotificationsService,
     private readonly bus: RealtimeBus,
+    private readonly crypto: CryptoService,
   ) {}
 
   private toDto(b: Broadcast, owner = false): BroadcastDto {
@@ -174,6 +185,76 @@ export class BroadcastsService {
   }
 
   // ── helpers ─────────────────────────────────────────────────────────
+  // ── simulcast outputs (milestone 13) ───────────────────────────────
+  private toOutputDto(o: BroadcastOutput): BroadcastOutputDto {
+    return {
+      id: o.id,
+      platform: o.platform,
+      targetUrl: o.targetUrl,
+      masked: o.masked,
+      enabled: o.enabled,
+      createdAt: o.createdAt.toISOString(),
+    };
+  }
+
+  /** Add a simulcast destination (YouTube/Facebook/Twitch/custom RTMP). */
+  async addOutput(userId: string, broadcastId: string, dto: CreateOutputDto): Promise<BroadcastOutputDto> {
+    const b = await this.ownedOrThrow(userId, broadcastId);
+    const url = dto.url ?? PLATFORM_URLS[dto.platform];
+    if (!url) {
+      throw new BadRequestException({ code: 'url_required', message: 'An RTMP url is required for a custom destination.' });
+    }
+    const count = await this.prisma.broadcastOutput.count({ where: { broadcastId } });
+    if (count >= 50) {
+      throw new BadRequestException({ code: 'output_limit', message: 'Maximum of 50 simulcast destinations.' });
+    }
+    const cfOutputId = await this.cf.addOutput(b.cfInputId, url, dto.streamKey);
+    const masked = `${dto.platform} ••••${dto.streamKey.replace(/\s+/g, '').slice(-4)}`;
+    const output = await this.prisma.broadcastOutput.create({
+      data: {
+        id: genId('out'),
+        broadcastId,
+        platform: dto.platform,
+        targetUrl: url,
+        streamKeyEnc: this.crypto.encrypt(dto.streamKey),
+        masked,
+        cfOutputId,
+      },
+    });
+    return this.toOutputDto(output);
+  }
+
+  async listOutputs(userId: string, broadcastId: string): Promise<BroadcastOutputDto[]> {
+    await this.ownedOrThrow(userId, broadcastId);
+    const rows = await this.prisma.broadcastOutput.findMany({
+      where: { broadcastId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((o) => this.toOutputDto(o));
+  }
+
+  async toggleOutput(userId: string, broadcastId: string, outputId: string, enabled: boolean): Promise<BroadcastOutputDto> {
+    const b = await this.ownedOrThrow(userId, broadcastId);
+    const output = await this.getOutputOrThrow(broadcastId, outputId);
+    await this.cf.setOutputEnabled(b.cfInputId, output.cfOutputId, enabled);
+    const updated = await this.prisma.broadcastOutput.update({ where: { id: outputId }, data: { enabled } });
+    return this.toOutputDto(updated);
+  }
+
+  async removeOutput(userId: string, broadcastId: string, outputId: string): Promise<{ ok: boolean }> {
+    const b = await this.ownedOrThrow(userId, broadcastId);
+    const output = await this.getOutputOrThrow(broadcastId, outputId);
+    await this.cf.deleteOutput(b.cfInputId, output.cfOutputId);
+    await this.prisma.broadcastOutput.delete({ where: { id: outputId } });
+    return { ok: true };
+  }
+
+  private async getOutputOrThrow(broadcastId: string, outputId: string): Promise<BroadcastOutput> {
+    const o = await this.prisma.broadcastOutput.findFirst({ where: { id: outputId, broadcastId } });
+    if (!o) throw new NotFoundException({ code: 'output_not_found', message: 'Simulcast destination not found' });
+    return o;
+  }
+
   private async getOrThrow(id: string): Promise<Broadcast> {
     const b = await this.prisma.broadcast.findUnique({ where: { id } });
     if (!b) throw new NotFoundException({ code: 'broadcast_not_found', message: 'Broadcast not found' });

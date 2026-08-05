@@ -3957,6 +3957,178 @@
         ]
       }
     },
+    "/v1/broadcasts/{id}/outputs": {
+      "get": {
+        "operationId": "BroadcastsController_listOutputs",
+        "summary": "List simulcast destinations (owner only)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BroadcastOutputDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "BroadcastsController_addOutput",
+        "summary": "Add a simulcast destination (YouTube/Facebook/Twitch/custom)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastOutputDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/broadcasts/{id}/outputs/{outputId}": {
+      "patch": {
+        "operationId": "BroadcastsController_toggleOutput",
+        "summary": "Enable / disable a simulcast destination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleOutputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastOutputDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "BroadcastsController_removeOutput",
+        "summary": "Remove a simulcast destination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "broadcasts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/broadcasts/{id}": {
       "get": {
         "operationId": "BroadcastsController_get",
@@ -7433,6 +7605,87 @@
           "viewers",
           "peakViewers",
           "destinations"
+        ]
+      },
+      "BroadcastOutputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "out_ab12cd34"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "youtube",
+              "facebook",
+              "twitch",
+              "custom"
+            ]
+          },
+          "targetUrl": {
+            "type": "string",
+            "example": "rtmp://a.rtmp.youtube.com/live2"
+          },
+          "masked": {
+            "type": "string",
+            "example": "youtube ••••a1b2"
+          },
+          "enabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "targetUrl",
+          "masked",
+          "enabled",
+          "createdAt"
+        ]
+      },
+      "CreateOutputDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "youtube",
+              "facebook",
+              "twitch",
+              "custom"
+            ]
+          },
+          "streamKey": {
+            "type": "string",
+            "example": "live_xxxxxxxx",
+            "description": "The destination stream key (write-only)."
+          },
+          "url": {
+            "type": "string",
+            "example": "rtmp://a.rtmp.youtube.com/live2",
+            "description": "RTMP URL; auto-filled for known platforms, required for custom."
+          }
+        },
+        "required": [
+          "platform",
+          "streamKey"
+        ]
+      },
+      "ToggleOutputDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "enabled"
         ]
       },
       "BroadcastSummaryDto": {

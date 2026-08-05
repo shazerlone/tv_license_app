@@ -63,3 +63,8 @@ add-ons that are natural follow-on milestones.
 - **Real live video (Cloudflare Stream)** — ✅ implemented (real Live Inputs;
   enable with CLOUDFLARE_STREAM_TOKEN + CLOUDFLARE_ACCOUNT_ID). Was dev-mode.
 - **YouTube simulcast/chat** — ⚠️ still pending (OAuth + Data API) — next.
+
+## Update (M13)
+- **Multi-destination simulcast** (YouTube/Facebook/Twitch/custom, up to 50) — ✅
+  via Cloudflare Stream Outputs; encrypted keys, per-destination toggle. Matches
+  Restream/StreamYard-tier multistreaming.

@@ -423,10 +423,31 @@ model Broadcast {
   endedAt      DateTime?
   createdAt    DateTime       @default(now())
 
-  chat BroadcastChat[]
+  chat    BroadcastChat[]
+  outputs BroadcastOutput[]
 
   @@index([phase])
   @@index([creatorId])
+}
+
+/// A simulcast destination for a broadcast (contract §4.9). Cloudflare Stream
+/// re-streams the live input to any RTMP target (YouTube/Facebook/Twitch/custom)
+/// — up to 50 per input. The target stream key is AES-256-GCM encrypted
+/// (write-only); responses expose only `masked`. `cfOutputId` links the
+/// Cloudflare output so it can be toggled/removed.
+model BroadcastOutput {
+  id           String    @id // "out_..."
+  broadcastId  String
+  broadcast    Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  platform     String // youtube | facebook | twitch | custom
+  targetUrl    String
+  streamKeyEnc String
+  masked       String
+  cfOutputId   String?
+  enabled      Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  @@index([broadcastId])
 }
 
 /// A live chat message (contract §3 LiveChatMessage). `source` distinguishes
