@@ -1,0 +1,4 @@
+# Runtime files created by the site/installer
+data/enquiries.log
+data/site-config.json
+data/.installed
