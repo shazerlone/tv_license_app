@@ -54,12 +54,36 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       });
       try {
-        final user = await AuthApi.login(email: email, password: _passwordController.text);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        session.applyBackendSession(user);
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
-        return;
+        String? twofaCode;
+        // Retry loop for 2FA: first attempt with no code; if the account has 2FA
+        // the server returns twofa_required, so we prompt and resubmit.
+        while (true) {
+          try {
+            final user = await AuthApi.login(
+              email: email,
+              password: _passwordController.text,
+              twofaCode: twofaCode,
+            );
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            session.applyBackendSession(user);
+            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+            return;
+          } on ApiException catch (e) {
+            if (e.code == 'twofa_required' || e.code == 'twofa_invalid') {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              final entered = await _promptTwofa(invalid: e.code == 'twofa_invalid');
+              if (entered == null || entered.isEmpty) {
+                if (mounted) setState(() => _isLoading = false);
+                return; // user cancelled
+              }
+              twofaCode = entered;
+              continue; // resubmit with the code
+            }
+            rethrow;
+          }
+        }
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
@@ -99,6 +123,45 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
+  }
+
+  /// Prompts for a 2FA code (TOTP or backup code). Returns null if cancelled.
+  Future<String?> _promptTwofa({bool invalid = false}) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Two-factor authentication', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              invalid ? 'That code was incorrect. Try again.' : 'Enter the 6-digit code from your authenticator app.',
+              style: GoogleFonts.inter(fontSize: 13.5, color: invalid ? AppColors.red : AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+              style: GoogleFonts.robotoMono(fontSize: 20, letterSpacing: 4, color: AppColors.textPrimary),
+              decoration: const InputDecoration(hintText: '000000'),
+            ),
+            const SizedBox(height: 6),
+            Text('You can also use a backup code.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textMuted))),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Verify')),
+        ],
+      ),
     );
   }
 

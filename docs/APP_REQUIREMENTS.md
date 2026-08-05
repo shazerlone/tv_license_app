@@ -261,4 +261,21 @@ so it lights up as each ships:
 Also fold in **§5b (creator side)** and the **P0 `user.id`** item — small, high
 value, unblocks the creator home now.
 
-_Maintained by the app session. Last updated for app build `894a4c0`._
+## Newly consumed — M13/M14/M15 (now wired in the app)
+
+- **2FA (M14):** `GET /2fa` → `{ enabled | twofaEnabled }`; `POST /2fa/setup` →
+  `{ secret, otpauthUrl }`; `POST /2fa/enable { code }` → `{ backupCodes: [..] }`
+  (shown once); `POST /2fa/disable { code }`. Login: `POST /auth/login` may return
+  `401 { error.code: "twofa_required" }`, resubmitted with `{ twofaCode }`;
+  wrong code → `twofa_invalid`. Surfaced in **Profile › Security & 2FA** and the
+  login flow.
+- **Simulcast outputs (M13):** `GET /broadcasts/{id}/outputs`,
+  `POST /broadcasts/{id}/outputs { platform, streamKey, url? }`,
+  `PATCH .../{outputId} { enabled }`, `DELETE .../{outputId}`. Wired into the
+  go-live destination sheet (stream-key path); applies once a broadcast is live.
+- **YouTube connect (M15):** `GET /youtube/status` → `{ connected }`;
+  `POST /youtube/connect` → `{ url }` (consent link, shown copyable — no
+  in-app browser dep); `POST /youtube/disconnect`. Chat ingest already handled
+  via the `broadcast:{id}` WS `source:"youtube"` badge.
+
+_Maintained by the app session. Last updated for app build M13–M15 sync._

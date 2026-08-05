@@ -420,5 +420,60 @@ class BackendApi {
     return (res as Map).cast<String, dynamic>();
   }
 
+  // ── Two-factor authentication (M14) ───────────────────────────────────────
+  static Future<Map<String, dynamic>> twofaStatus() async {
+    final res = await _api.get('/2fa');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> twofaSetup() async {
+    final res = await _api.post('/2fa/setup');
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  /// Returns the one-time backup codes to show the user.
+  static Future<List<String>> twofaEnable(String code) async {
+    final res = await _api.post('/2fa/enable', {'code': code});
+    final codes = (res is Map) ? res['backupCodes'] : null;
+    return (codes is List) ? codes.map((e) => e.toString()).toList() : <String>[];
+  }
+
+  static Future<void> twofaDisable(String code) => _api.post('/2fa/disable', {'code': code});
+
+  // ── Multi-destination simulcast outputs (M13) ─────────────────────────────
+  static Future<List<Map<String, dynamic>>> broadcastOutputs(String broadcastId) async {
+    final res = await _api.get('/broadcasts/$broadcastId/outputs');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> addBroadcastOutput(String broadcastId, {required String platform, required String streamKey, String? url}) async {
+    final res = await _api.post('/broadcasts/$broadcastId/outputs', {
+      'platform': platform,
+      'streamKey': streamKey,
+      if (url != null && url.isNotEmpty) 'url': url,
+    });
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<void> setBroadcastOutputEnabled(String broadcastId, String outputId, bool enabled) =>
+      _api.patch('/broadcasts/$broadcastId/outputs/$outputId', {'enabled': enabled});
+
+  static Future<void> deleteBroadcastOutput(String broadcastId, String outputId) =>
+      _api.delete('/broadcasts/$broadcastId/outputs/$outputId');
+
+  // ── YouTube connect & live-chat ingest (M15) ──────────────────────────────
+  static Future<Map<String, dynamic>> youtubeStatus() async {
+    final res = await _api.get('/youtube/status');
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  /// Returns `{ url }` — open it in a browser/webview for Google consent.
+  static Future<String?> youtubeConnect() async {
+    final res = await _api.post('/youtube/connect');
+    return (res is Map) ? res['url']?.toString() : null;
+  }
+
+  static Future<void> youtubeDisconnect() => _api.post('/youtube/disconnect');
+
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }

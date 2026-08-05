@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../state/app_state.dart';
+import '../services/backend_api.dart';
+import '../services/api_client.dart';
 import '../models/copy_models.dart';
 import '../widgets/order_ticket.dart';
 import '../widgets/live_reactions.dart';
@@ -399,17 +402,28 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
               const SizedBox(height: 4),
               Text('Simulcast your live to $name alongside Millimore.', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
               const SizedBox(height: 18),
-              // Auto connect (OAuth later)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () { store.toggleDestination(id); Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name connected'))); },
-                  icon: const Icon(Icons.link_rounded, size: 18),
-                  label: Text('Connect $name account'),
+              // YouTube: OAuth connect links your channel so its live chat flows
+              // into the in-app chat (M15). Other platforms use a stream key.
+              if (id == 'youtube')
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _connectYoutube(context, store),
+                    icon: const Icon(Icons.link_rounded, size: 18),
+                    label: const Text('Connect YouTube channel'),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () { store.toggleDestination(id); Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name connected'))); },
+                    icon: const Icon(Icons.link_rounded, size: 18),
+                    label: Text('Connect $name account'),
+                  ),
                 ),
-              ),
               const SizedBox(height: 12),
-              Row(children: [const Expanded(child: Divider()), Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or paste stream key', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted))), const Expanded(child: Divider())]),
+              Row(children: [const Expanded(child: Divider()), Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(id == 'youtube' ? 'or simulcast with a stream key' : 'or paste stream key', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted))), const Expanded(child: Divider())]),
               const SizedBox(height: 12),
               TextField(
                 controller: keyController,
@@ -420,7 +434,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () { store.toggleDestination(id); Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name key saved'))); },
+                  onPressed: () => _saveStreamKey(context, store, id, name, keyController.text.trim()),
                   child: const Text('Save key'),
                 ),
               ),
@@ -436,6 +450,104 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// M15 — link the creator's YouTube channel so its live chat is ingested into
+  /// the in-app chat. Returns a Google consent URL to open in a browser.
+  Future<void> _connectYoutube(BuildContext context, AppState store) async {
+    if (!kUseBackend) {
+      store.toggleDestination('youtube');
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('YouTube connected')));
+      return;
+    }
+    try {
+      final status = await BackendApi.youtubeStatus();
+      if (status['connected'] == true) {
+        store.toggleDestination('youtube');
+        if (!context.mounted) return;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('YouTube already connected')));
+        return;
+      }
+      final url = await BackendApi.youtubeConnect();
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      if (url == null || url.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('YouTube connect is unavailable right now')));
+        return;
+      }
+      await _showConsentUrl(context, url);
+      store.toggleDestination('youtube');
+    } on ApiException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
+  }
+
+  /// M13 — add a simulcast destination (RTMP) with a pasted stream key. Outputs
+  /// live on the active broadcast, so this only takes effect once you're live.
+  Future<void> _saveStreamKey(BuildContext context, AppState store, String id, String name, String key) async {
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Paste your stream key first')));
+      return;
+    }
+    if (!kUseBackend) {
+      store.toggleDestination(id);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name key saved')));
+      return;
+    }
+    final broadcastId = store.broadcastId;
+    if (broadcastId == null) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Go live first, then $name will simulcast')));
+      return;
+    }
+    try {
+      await BackendApi.addBroadcastOutput(broadcastId, platform: id, streamKey: key);
+      store.toggleDestination(id);
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Now simulcasting to $name')));
+    } on ApiException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
+  }
+
+  Future<void> _showConsentUrl(BuildContext context, String url) {
+    return showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Connect YouTube', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Open this link in your browser and approve access. Your live chat will then appear here automatically.',
+                style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textSecondary, height: 1.45)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border)),
+              child: SelectableText(url, style: GoogleFonts.robotoMono(fontSize: 12, color: AppColors.textPrimary)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Close', style: GoogleFonts.inter(color: AppColors.textMuted))),
+          ElevatedButton.icon(
+            onPressed: () { Clipboard.setData(ClipboardData(text: url)); Navigator.of(ctx).pop(); },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy link'),
+          ),
+        ],
       ),
     );
   }

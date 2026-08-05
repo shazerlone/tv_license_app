@@ -28,8 +28,16 @@ class AuthApi {
     return UserProfile.fromJson(user);
   }
 
-  static Future<UserProfile> login({required String email, required String password}) async {
-    final res = await _api.post('/auth/login', {'email': email, 'password': password});
+  /// Signs in with email + password. If the account has 2FA enabled, the first
+  /// call throws `ApiException(code: 'twofa_required')`; resubmit with
+  /// [twofaCode] (a TOTP code or a one-time backup code). A wrong code throws
+  /// `twofa_invalid`.
+  static Future<UserProfile> login({required String email, required String password, String? twofaCode}) async {
+    final res = await _api.post('/auth/login', {
+      'email': email,
+      'password': password,
+      if (twofaCode != null && twofaCode.isNotEmpty) 'twofaCode': twofaCode,
+    });
     return _session(res as Map);
   }
 

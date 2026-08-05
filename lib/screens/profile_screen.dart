@@ -20,6 +20,7 @@ import 'support_screen.dart';
 import 'edit_profile_screen.dart';
 import 'wallet_screen.dart';
 import 'referrals_screen.dart';
+import 'security_screen.dart';
 
 /// One simple profile page: who you are, your copy performance, and clear
 /// buttons out to everything else. No tabs, no nested navigation.
@@ -147,7 +148,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 10),
             _MenuCard(children: [
               _MenuTile(icon: Icons.notifications_none_rounded, color: AppColors.slate, label: 'Notifications', onTap: () => _toast(context, 'Notification settings')),
-              _MenuTile(icon: Icons.shield_outlined, color: AppColors.slate, label: 'Privacy & security', onTap: () => _toast(context, 'Privacy & security')),
+              _MenuTile(icon: Icons.shield_outlined, color: AppColors.slate, label: 'Security & 2FA', onTap: () => kUseBackend ? _push(context, const SecurityScreen()) : _toast(context, 'Privacy & security')),
               _MenuTile(icon: Icons.help_outline_rounded, color: AppColors.slate, label: 'Help & support', onTap: () => _push(context, kUseBackend ? const SupportScreen() : const SupportChatScreen()), last: true),
             ]),
             const SizedBox(height: 20),
