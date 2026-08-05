@@ -95,6 +95,13 @@ model User {
   appleSubject  String? @unique
   googleSubject String? @unique
 
+  // Two-factor auth (TOTP, RFC 6238). Secret is AES-256-GCM encrypted; backup
+  // codes are bcrypt-hashed; twofaLastStep blocks TOTP code reuse.
+  twofaEnabled     Boolean  @default(false)
+  twofaSecretEnc   String?
+  twofaBackupCodes String[] @default([])
+  twofaLastStep    Int?
+
   banned    Boolean  @default(false)
   // Frozen = can still log in, but withdrawals and new copies are blocked
   // (a softer control than a full ban). Standard broker back-office capability.

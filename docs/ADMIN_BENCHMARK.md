@@ -68,3 +68,8 @@ add-ons that are natural follow-on milestones.
 - **Multi-destination simulcast** (YouTube/Facebook/Twitch/custom, up to 50) — ✅
   via Cloudflare Stream Outputs; encrypted keys, per-destination toggle. Matches
   Restream/StreamYard-tier multistreaming.
+
+## Update (M14)
+- **Two-factor authentication (TOTP)** — ✅ users + admins; RFC 6238, backup
+  codes, anti-reuse; admin login prompts for the code. B2Core parity (2FA for
+  admins + clients).

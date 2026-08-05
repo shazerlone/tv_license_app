@@ -15,6 +15,7 @@ import { UsersService } from '../users/users.service';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { OtpService } from './otp/otp.service';
 import { ReferralsService } from '../referrals/referrals.service';
+import { TwofaService } from '../twofa/twofa.service';
 import { genId } from '../common/ids';
 import { countryNameFromIso } from '../common/countries';
 import {
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly config: ConfigService,
     private readonly referrals: ReferralsService,
+    private readonly twofa: TwofaService,
   ) {}
 
   /** Resolve a referral code → { referredById, referredByCode } for user create. */
@@ -187,7 +189,7 @@ export class AuthService {
   }
 
   // ── password login ─────────────────────────────────────────────────
-  async login(email: string, password: string): Promise<AuthResponseDto> {
+  async login(email: string, password: string, twofaCode?: string): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new UnauthorizedException({
@@ -197,6 +199,15 @@ export class AuthService {
     }
     if (user.banned) {
       throw new UnauthorizedException({ code: 'account_banned', message: 'Account suspended' });
+    }
+    // Second factor: if enabled, a valid TOTP or backup code is required.
+    if (user.twofaEnabled) {
+      if (!twofaCode) {
+        throw new UnauthorizedException({ code: 'twofa_required', message: 'Enter your 2FA code.' });
+      }
+      if (!(await this.twofa.verifyForLogin(user, twofaCode))) {
+        throw new UnauthorizedException({ code: 'twofa_invalid', message: 'Invalid 2FA code.' });
+      }
     }
     return this.envelope(user);
   }

@@ -291,3 +291,17 @@ their own YouTube/Facebook/Twitch:
   studio.
 - `PATCH /broadcasts/{id}/outputs/{outputId} { enabled }` to toggle a
   destination live; `DELETE …/{outputId}` to remove. Keys are write-only.
+
+---
+
+## 12. Two-factor authentication (milestone 14) — NEW, live
+
+- **Settings › Security:** `GET /2fa` (status), `POST /2fa/setup` →
+  `{ secret, otpauthUrl }` (render a QR from `otpauthUrl` or show `secret` for
+  manual entry), `POST /2fa/enable { code }` → show the returned `backupCodes`
+  once, `POST /2fa/disable { code }`.
+- **Login flow:** send `POST /auth/login { email, password }`. If 2FA is on you
+  get `401 error.code = "twofa_required"` — then show a code field and resubmit
+  `{ email, password, twofaCode }`. Wrong code → `twofa_invalid`. A backup code
+  works in the same field.
+- `user.twofaEnabled` is on `GET /me` for the Security screen state.

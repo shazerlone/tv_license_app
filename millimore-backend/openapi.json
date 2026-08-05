@@ -3654,6 +3654,106 @@
         ]
       }
     },
+    "/v1/2fa": {
+      "get": {
+        "operationId": "TwofaController_status",
+        "summary": "Is 2FA enabled on my account?",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "2fa"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/2fa/setup": {
+      "post": {
+        "operationId": "TwofaController_setup",
+        "summary": "Start 2FA setup — returns secret + otpauth URL for the QR",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "2fa"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/2fa/enable": {
+      "post": {
+        "operationId": "TwofaController_enable",
+        "summary": "Confirm a code to enable 2FA — returns one-time backup codes",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "2fa"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/2fa/disable": {
+      "post": {
+        "operationId": "TwofaController_disable",
+        "summary": "Disable 2FA (needs a valid code or backup code)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "2fa"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/copy/{traderId}/start": {
       "post": {
         "operationId": "CopyController_start",
@@ -4603,6 +4703,11 @@
             ],
             "description": "KYC status."
           },
+          "twofaEnabled": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether 2FA is enabled."
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-01-01T00:00:00Z"
@@ -4616,6 +4721,7 @@
           "creatorStatus",
           "leverage",
           "kycStatus",
+          "twofaEnabled",
           "createdAt"
         ]
       },
@@ -4762,6 +4868,11 @@
             "type": "string",
             "example": "password",
             "writeOnly": true
+          },
+          "twofaCode": {
+            "type": "string",
+            "example": "287082",
+            "description": "2FA code (or backup code) when 2FA is enabled."
           }
         },
         "required": [
@@ -5723,6 +5834,11 @@
             ],
             "description": "KYC status."
           },
+          "twofaEnabled": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether 2FA is enabled."
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-01-01T00:00:00Z"
@@ -5753,6 +5869,7 @@
           "creatorStatus",
           "leverage",
           "kycStatus",
+          "twofaEnabled",
           "createdAt",
           "banned",
           "frozen"
@@ -7258,6 +7375,18 @@
           "code": {
             "type": "string",
             "example": "A1B2C3D"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "CodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "287082"
           }
         },
         "required": [

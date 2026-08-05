@@ -33,6 +33,7 @@ export class UsersService {
       postalCode: u.postalCode,
       leverage: u.leverage,
       kycStatus: u.kycStatus,
+      twofaEnabled: u.twofaEnabled,
       createdAt: u.createdAt.toISOString(),
     };
   }

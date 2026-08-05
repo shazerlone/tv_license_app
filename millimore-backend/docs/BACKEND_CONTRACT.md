@@ -768,3 +768,18 @@ stream keys are AES-256-GCM encrypted (write-only) and never returned.
   destination mid-broadcast. `DELETE /broadcasts/{id}/outputs/{outputId}`.
 - Real re-streaming requires Cloudflare Stream configured (M12 env); otherwise
   outputs are stored/synthetic so the flow works in dev.
+
+### Two-factor authentication — 2FA/TOTP (milestone 14)
+Authenticator-app 2FA (RFC 6238) for users and admins. Secrets are AES-256-GCM
+encrypted; backup codes are bcrypt-hashed; TOTP codes can't be reused
+(server tracks the last step); ±1 window tolerates clock drift.
+- `GET /2fa` → `{ enabled }`. `POST /2fa/setup` → `{ secret, otpauthUrl }`
+  (add to the authenticator app). `POST /2fa/enable { code }` → verifies +
+  returns one-time `{ backupCodes[] }` (10). `POST /2fa/disable { code }`
+  (TOTP or backup code).
+- **Login:** when 2FA is on, `POST /auth/login` needs `twofaCode` (TOTP or backup).
+  Without it → `401 { code: "twofa_required" }`; wrong code → `twofa_invalid`.
+  The app should prompt for the code on `twofa_required` and resubmit.
+- `GET /me` / `user` objects now include `twofaEnabled`.
+- Admin UI adds a **Security** page (enable/disable + backup codes) and the login
+  screen prompts for the code.

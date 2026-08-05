@@ -66,7 +66,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Email + password login (contract §4.1)' })
   @ApiOkResponse({ type: AuthResponseDto })
   login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.auth.login(dto.email, dto.password);
+    return this.auth.login(dto.email, dto.password, dto.twofaCode);
   }
 
   @Post('social/apple')

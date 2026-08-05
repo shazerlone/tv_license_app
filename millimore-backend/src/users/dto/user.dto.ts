@@ -21,6 +21,7 @@ export class UserDto {
   @ApiProperty({ example: 100, description: 'Default leverage.' }) leverage: number;
   @ApiProperty({ enum: ['none', 'pending', 'verified', 'rejected'], description: 'KYC status.' })
   kycStatus: string;
+  @ApiProperty({ example: false, description: 'Whether 2FA is enabled.' }) twofaEnabled: boolean;
   @ApiProperty({ example: '2026-01-01T00:00:00Z' }) createdAt: string;
 }
 

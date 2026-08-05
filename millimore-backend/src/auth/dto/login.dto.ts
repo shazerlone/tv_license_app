@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 /** POST /auth/login */
 export class LoginDto {
@@ -11,6 +11,12 @@ export class LoginDto {
   @IsString()
   @MinLength(1)
   password: string;
+
+  @ApiPropertyOptional({ example: '287082', description: '2FA code (or backup code) when 2FA is enabled.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  twofaCode?: string;
 }
 
 /** POST /auth/social/apple */

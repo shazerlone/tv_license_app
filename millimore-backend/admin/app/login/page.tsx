@@ -9,6 +9,8 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('admin@millimore.app');
   const [password, setPassword] = useState('');
+  const [twofaCode, setTwofaCode] = useState('');
+  const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -21,10 +23,15 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await login(email, password);
+      await login(email, password, needs2fa ? twofaCode : undefined);
       router.replace('/');
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      if (err.code === 'twofa_required' || err.code === 'twofa_invalid') {
+        setNeeds2fa(true);
+        setError(err.code === 'twofa_invalid' ? 'Invalid code, try again.' : null);
+      } else {
+        setError(err.message || 'Login failed');
+      }
     } finally {
       setBusy(false);
     }
@@ -62,8 +69,23 @@ export default function LoginPage() {
             required
           />
         </div>
+        {needs2fa && (
+          <div className="field">
+            <label>2FA code</label>
+            <input
+              type="text"
+              value={twofaCode}
+              onChange={(e) => setTwofaCode(e.target.value)}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              placeholder="6-digit code or backup code"
+              autoFocus
+              required
+            />
+          </div>
+        )}
         <button className="btn" type="submit" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? 'Signing in…' : needs2fa ? 'Verify & sign in' : 'Sign in'}
         </button>
 
         <div className="login-foot">

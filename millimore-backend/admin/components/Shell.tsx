@@ -21,6 +21,7 @@ const NAV = [
   { href: '/announcements', label: 'Announcements', icon: Icons.spark, perm: 'announcements.write' },
   { href: '/team', label: 'Team', icon: Icons.users, perm: 'admins.manage' },
   { href: '/audit', label: 'Audit log', icon: Icons.queue, perm: 'audit.read' },
+  { href: '/security', label: 'Security', icon: Icons.approved },
   { href: '/settings', label: 'Settings', icon: Icons.users, perm: 'settings.write' },
 ];
 
@@ -38,6 +39,7 @@ const TITLES: Record<string, string> = {
   '/announcements': 'Announcements',
   '/team': 'Team',
   '/audit': 'Audit log',
+  '/security': 'Security',
   '/settings': 'Settings',
 };
 
