@@ -3754,6 +3754,66 @@
         ]
       }
     },
+    "/v1/youtube/status": {
+      "get": {
+        "operationId": "YoutubeController_status",
+        "summary": "Is my YouTube account connected?",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "youtube"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/youtube/connect": {
+      "post": {
+        "operationId": "YoutubeController_connect",
+        "summary": "Get the Google consent URL to connect YouTube",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "youtube"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/youtube/disconnect": {
+      "post": {
+        "operationId": "YoutubeController_disconnect",
+        "summary": "Disconnect my YouTube account",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "youtube"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/copy/{traderId}/start": {
       "post": {
         "operationId": "CopyController_start",

@@ -783,3 +783,22 @@ encrypted; backup codes are bcrypt-hashed; TOTP codes can't be reused
 - `GET /me` / `user` objects now include `twofaEnabled`.
 - Admin UI adds a **Security** page (enable/disable + backup codes) and the login
   screen prompts for the code.
+
+### YouTube connect & live-chat ingest (milestone 15)
+Creators connect their YouTube account so their YouTube live chat flows into the
+in-app broadcast chat. Gated by `GOOGLE_OAUTH_CLIENT_ID` +
+`GOOGLE_OAUTH_CLIENT_SECRET` + `GOOGLE_OAUTH_REDIRECT_URI`; OAuth refresh tokens
+are AES-256-GCM encrypted. No-op (and endpoints report `enabled:false`) until set.
+- `GET /youtube/status` → `{ connected, channelTitle, enabled }`.
+- `POST /youtube/connect` → `{ url }` (Google consent URL; scope
+  `youtube.readonly`, offline). `POST /youtube/disconnect`.
+- `GET /youtube/callback` — Google's redirect target (handles the code, stores
+  the token). Set `GOOGLE_OAUTH_REDIRECT_URI` to this endpoint's public URL.
+- **Ingest:** when a connected creator goes live (`POST /broadcasts/{id}/start`)
+  and is live on YouTube, the server resolves their `liveChatId`
+  (`liveBroadcasts.list`) and polls `liveChat/messages` (respecting
+  `pollingIntervalMillis`), storing each as a `BroadcastChat` (`source:"youtube"`)
+  and emitting it on the WS `broadcast:{id}` chat channel — alongside native
+  chat. Stops on `end`.
+- **New env:** `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,
+  `GOOGLE_OAUTH_REDIRECT_URI` (the `/v1/youtube/callback` public URL).

@@ -299,6 +299,19 @@ model PayoutMethod {
   @@index([userId])
 }
 
+/// A creator's connected YouTube account (contract §4.10). The OAuth refresh
+/// token is AES-256-GCM encrypted (write-only). Used to pull the creator's live
+/// chat into the in-app chat and (later) drive simulcast programmatically.
+model YoutubeAccount {
+  id               String   @id // "yt_..."
+  userId           String   @unique
+  refreshTokenEnc  String
+  channelId        String?
+  channelTitle     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 enum TicketStatus {
   open
   pending // awaiting the user's reply
@@ -423,6 +436,7 @@ model Broadcast {
   streamKey    String
   hlsUrl       String
   cfInputId    String? // Cloudflare live input id
+  youtubeLiveChatId String? // linked YouTube live chat (chat ingest)
   viewers      Int            @default(0)
   peakViewers  Int            @default(0)
   destinations Json           @default("[]") // [{ id:"youtube", connected:true }]

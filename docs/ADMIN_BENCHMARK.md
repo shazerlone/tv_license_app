@@ -73,3 +73,8 @@ add-ons that are natural follow-on milestones.
 - **Two-factor authentication (TOTP)** — ✅ users + admins; RFC 6238, backup
   codes, anti-reuse; admin login prompts for the code. B2Core parity (2FA for
   admins + clients).
+
+## Update (M15)
+- **YouTube connect + live-chat ingest** — ✅ implemented (OAuth + Data API v3
+  polling into in-app chat; enable with GOOGLE_OAUTH_* env). Last streaming
+  dev-mode item — done. Programmatic YT simulcast can build on this later.

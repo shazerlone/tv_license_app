@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CloudflareService } from './cloudflare.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CryptoService } from '../common/crypto/crypto.service';
+import { YoutubeIngestService } from '../youtube/youtube-ingest.service';
 import { RealtimeBus } from '../realtime/realtime.bus';
 import { genId } from '../common/ids';
 import {
@@ -34,6 +35,7 @@ export class BroadcastsService {
     private readonly notifications: NotificationsService,
     private readonly bus: RealtimeBus,
     private readonly crypto: CryptoService,
+    private readonly ytIngest: YoutubeIngestService,
   ) {}
 
   private toDto(b: Broadcast, owner = false): BroadcastDto {
@@ -81,6 +83,10 @@ export class BroadcastsService {
       data: { phase: 'live', startedAt: b.startedAt ?? new Date() },
     });
 
+    // Pipe the creator's YouTube live chat into the in-app chat (no-op unless
+    // YouTube is configured + the creator is connected and live on YouTube).
+    void this.ytIngest.start(id, userId);
+
     // Notify followers that a trader they follow went live (contract §6a).
     if (b.traderId) {
       const subs = await this.prisma.subscription.findMany({
@@ -99,6 +105,7 @@ export class BroadcastsService {
 
   async end(userId: string, id: string): Promise<BroadcastSummaryDto> {
     const b = await this.ownedOrThrow(userId, id);
+    this.ytIngest.stop(id);
     const endedAt = new Date();
     await this.prisma.broadcast.update({
       where: { id },

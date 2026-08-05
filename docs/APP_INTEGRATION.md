@@ -305,3 +305,15 @@ their own YouTube/Facebook/Twitch:
   `{ email, password, twofaCode }`. Wrong code → `twofa_invalid`. A backup code
   works in the same field.
 - `user.twofaEnabled` is on `GET /me` for the Security screen state.
+
+---
+
+## 13. YouTube connect & live-chat ingest (milestone 15) — NEW, live
+
+- **Creator › Connections:** `GET /youtube/status`; `POST /youtube/connect` →
+  open the returned `url` (Google consent) in a webview; on success YouTube is
+  linked. `POST /youtube/disconnect`.
+- Once connected, when the creator goes live their **YouTube chat appears in the
+  in-app live chat automatically** — messages arrive on the existing
+  `broadcast:{id}` WS channel with `source:"youtube"` (render a small YT badge).
+  No app work beyond showing the source; ingestion is server-side.
