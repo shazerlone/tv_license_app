@@ -78,7 +78,8 @@ class _WalletScreenState extends State<WalletScreen> {
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF0B1120)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      boxShadow: [BoxShadow(color: const Color(0xFF1E3A8A).withOpacity(0.35), blurRadius: 28, offset: const Offset(0, 14), spreadRadius: -12)],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
