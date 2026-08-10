@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import 'skeletons.dart';
 import '../config.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
@@ -126,7 +127,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 const Divider(height: 1),
                 Expanded(
                   child: _loading && comments.isEmpty
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const AppLoader()
                       : comments.isEmpty
                       ? Center(
                           child: Text('Be the first to comment',

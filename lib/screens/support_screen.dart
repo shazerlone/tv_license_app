@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
 import 'support_chat_screen.dart';
@@ -64,7 +65,7 @@ class _SupportScreenState extends State<SupportScreen> {
         label: Text('New ticket', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -357,7 +358,7 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoader()
           : Column(
               children: [
                 Expanded(

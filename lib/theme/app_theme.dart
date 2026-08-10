@@ -18,10 +18,31 @@ class AppColors {
   // Neutrals flip with the theme.
   static Color get background => isDark ? const Color(0xFF0B1120) : const Color(0xFFFFFFFF);
   static Color get surface => isDark ? const Color(0xFF141C2E) : const Color(0xFFF8FAFC);
+  // A slightly raised surface for cards that sit on top of `surface`.
+  static Color get surfaceHigh => isDark ? const Color(0xFF1B2436) : const Color(0xFFFFFFFF);
   static Color get border => isDark ? const Color(0xFF25304A) : const Color(0xFFE2E8F0);
   static Color get textPrimary => isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
   static Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
   static Color get textMuted => isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+
+  // Depth. Soft, low-opacity shadows read as premium; borders alone read flat.
+  static Color get _shadowColor => isDark ? Colors.black.withOpacity(0.45) : const Color(0xFF0F172A).withOpacity(0.07);
+  static List<BoxShadow> get softShadow => [
+        BoxShadow(color: _shadowColor, blurRadius: 12, offset: const Offset(0, 4), spreadRadius: -6),
+      ];
+  static List<BoxShadow> get cardShadow => [
+        BoxShadow(color: _shadowColor, blurRadius: 24, offset: const Offset(0, 10), spreadRadius: -10),
+      ];
+}
+
+/// Corner-radius scale. Use these instead of ad-hoc numbers so the whole app
+/// shares one rhythm: [chip] pills, [sm] inputs/small cards, [md] cards,
+/// [lg] sheets/hero cards.
+class AppRadius {
+  static const double chip = 999;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 22;
 }
 
 class AppTheme {

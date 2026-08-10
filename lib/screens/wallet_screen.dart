@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
@@ -66,7 +67,7 @@ class _WalletScreenState extends State<WalletScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Wallet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -312,7 +313,7 @@ class _DepositSheetState extends State<_DepositSheet> {
             ),
             const SizedBox(height: 16),
             if (_loading)
-              const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Center(child: CircularProgressIndicator()))
+              const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: AppLoader())
             else if (_methods.isNotEmpty) ...[
               Text('Method', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
               const SizedBox(height: 8),

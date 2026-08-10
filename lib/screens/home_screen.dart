@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
@@ -252,7 +253,7 @@ class _FollowerHomeState extends State<FollowerHome> {
         SliverToBoxAdapter(child: _SectionHeader(title: 'From your subscriptions')),
         if (_loading)
           const SliverToBoxAdapter(
-            child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator())),
+            child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: AppLoader()),
           )
         else if (_feed.isEmpty)
           SliverToBoxAdapter(child: _EmptyFeed())
@@ -384,8 +385,14 @@ class _PortfolioCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1120),
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111C33), Color(0xFF0B1120)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        boxShadow: [BoxShadow(color: const Color(0xFF0B1120).withOpacity(0.45), blurRadius: 28, offset: const Offset(0, 14), spreadRadius: -12)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,7 +567,7 @@ class _CreatorHomeState extends State<CreatorHome> {
         ),
         SliverToBoxAdapter(child: _SectionHeader(title: 'Your recent posts')),
         if (_loading)
-          const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator())))
+          const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: AppLoader()))
         else if (posts.isEmpty)
           SliverToBoxAdapter(
             child: Padding(

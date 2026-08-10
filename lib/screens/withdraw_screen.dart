@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../state/session.dart';
 import '../services/backend_api.dart';
@@ -128,7 +129,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Withdraw', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoader()
           : ListView(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
               children: [

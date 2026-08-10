@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
@@ -174,7 +175,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
             itemBuilder: (_, i) => _ReelPage(reel: _reels[i]),
           )
         else if (_loading)
-          const Center(child: CircularProgressIndicator(color: Colors.white))
+          const AppLoader()
         else
           _DiscoverEmpty(failed: _failed, onRetry: _loadFromBackend),
         Positioned(
@@ -747,9 +748,9 @@ class _SearchSheetState extends State<_SearchSheet> {
               ),
               Expanded(
                 child: _loading && results.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const SkeletonList()
                     : results.isEmpty
-                        ? Center(child: Text('No traders found', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)))
+                        ? const EmptyState(icon: Icons.search_off_rounded, title: 'No traders found', message: 'Try a different search or filter.')
                         : ListView.builder(
                   controller: scroll,
                   itemCount: results.length,

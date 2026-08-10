@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
@@ -380,7 +381,7 @@ class _PostsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading && posts.isEmpty) return const Center(child: CircularProgressIndicator());
+    if (loading && posts.isEmpty) return const SkeletonList();
     if (posts.isEmpty) {
       return _Empty(icon: Icons.dynamic_feed_rounded, text: 'No posts yet');
     }
@@ -399,7 +400,7 @@ class _TradesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading && trades.isEmpty) return const Center(child: CircularProgressIndicator());
+    if (loading && trades.isEmpty) return const SkeletonList();
     if (trades.isEmpty) {
       return _Empty(icon: Icons.candlestick_chart_rounded, text: 'No trades shared yet');
     }

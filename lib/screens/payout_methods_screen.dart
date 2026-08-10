@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
@@ -73,7 +74,7 @@ class _PayoutMethodsScreenState extends State<PayoutMethodsScreen> {
         label: Text('Add', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : _methods.isEmpty
               ? Center(
                   child: Padding(

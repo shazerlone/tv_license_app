@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeletons.dart';
 import '../config.dart';
 import '../services/auth_api.dart';
 import '../services/backend_api.dart';
@@ -252,9 +253,10 @@ class _MenuCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.softShadow,
       ),
       child: Column(children: children),
     );
@@ -427,7 +429,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Saved posts', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
       body: _loading && posts.isEmpty
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoader()
           : posts.isEmpty
               ? _Empty(icon: Icons.bookmark_border_rounded, title: 'No saved posts yet', sub: 'Tap the bookmark on any post to save it here for later.')
               : ListView.builder(
@@ -483,7 +485,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Subscriptions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
       body: _loading && traders.isEmpty
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoader()
           : traders.isEmpty
           ? _Empty(icon: Icons.group_outlined, title: 'No subscriptions yet', sub: 'Subscribe to traders to see their posts in your feed.')
           : ListView.separated(
