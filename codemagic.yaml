@@ -33,8 +33,17 @@ workflows:
     name: Millimore iOS (TestFlight)
     max_build_duration: 90
     instance_type: mac_mini_m2
+    # Connect your App Store Connect API key in Codemagic (Teams/App settings →
+    # Integrations → App Store Connect) and name it exactly "MillimoreASC".
+    integrations:
+      app_store_connect: MillimoreASC
     environment:
       flutter: stable
+      # Codemagic auto-manages the distribution certificate + provisioning
+      # profile for this bundle id using the API key above.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.millimore.millimore
     scripts:
       - name: Regenerate native platform folders
         script: |
@@ -46,11 +55,23 @@ workflows:
           plutil -insert NSMicrophoneUsageDescription -string "Microphone is used to go live." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
-      - name: Build iOS (unsigned)
-        script: flutter build ios --release --no-codesign --dart-define=BUILD_SHA=${CM_COMMIT} --dart-define=BUILD_BRANCH=${CM_BRANCH}
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build signed IPA
+        script: |
+          flutter build ipa --release \
+            --dart-define=BUILD_SHA=${CM_COMMIT} \
+            --dart-define=BUILD_BRANCH=${CM_BRANCH} \
+            --export-options-plist=/Users/builder/export_options.plist
     artifacts:
-      - build/ios/iphoneos/*.app
+      - build/ios/ipa/*.ipa
     publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
       email:
         recipients:
           - asrariamobicity35@gmail.com
+        notify:
+          success: true
+          failure: true
