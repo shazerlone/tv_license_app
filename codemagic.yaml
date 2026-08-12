@@ -59,7 +59,10 @@ workflows:
         script: xcode-project use-profiles
       - name: Build signed IPA
         script: |
+          # Codemagic auto-increments $BUILD_NUMBER every run, so each TestFlight
+          # upload has a unique, higher build number (Apple rejects duplicates).
           flutter build ipa --release \
+            --build-number=${BUILD_NUMBER} \
             --dart-define=BUILD_SHA=${CM_COMMIT} \
             --dart-define=BUILD_BRANCH=${CM_BRANCH} \
             --export-options-plist=/Users/builder/export_options.plist
