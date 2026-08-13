@@ -39,10 +39,13 @@ workflows:
       app_store_connect: Millimore
     environment:
       flutter: stable
-      # NOTE: no `ios_signing` block on purpose. That block makes Codemagic
-      # try to FETCH an existing profile at startup and fail ("No matching
-      # profiles found") for a brand-new bundle id. Instead we CREATE the
-      # cert + profile in the "Set up code signing" script below.
+      # Codemagic's managed automatic signing: with the App Store Connect key
+      # above, it fetches OR creates the distribution certificate + App Store
+      # provisioning profile for this bundle id and sets up the keychain before
+      # the scripts run. `xcode-project use-profiles` then applies them.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.millimore.millimore
     scripts:
       - name: Regenerate native platform folders
         script: |
@@ -56,28 +59,9 @@ workflows:
         script: flutter pub get
       - name: Set up code signing
         script: |
-          set -x
-          keychain initialize
-          # 1) Create an Apple Distribution certificate WITH a private key on
-          #    this machine. A cert made earlier on the web/Xcode has its private
-          #    key elsewhere, so the build can't sign with it — generate a fresh
-          #    one here. (If you hit a "maximum certificates" error, delete an
-          #    old Apple Distribution cert in App Store Connect → Certificates.)
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION \
-            --save
-          # 2) Create/fetch the App Store provisioning profile for the bundle id.
-          app-store-connect fetch-signing-files "com.millimore.millimore" \
-            --type IOS_APP_STORE \
-            --create
-          # 3) Import the cert(s) into the build keychain, apply profiles to Xcode.
-          keychain add-certificates
           xcode-project use-profiles
-          # 4) DIAGNOSTIC — this must list at least one "Apple Distribution" identity.
           echo "──────── signing identities in keychain ────────"
           security find-identity -v -p codesigning || true
-          echo "──────── provisioning profiles ────────"
-          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
       - name: Build signed IPA
         script: |
           # Codemagic auto-increments $BUILD_NUMBER every run, so each TestFlight
