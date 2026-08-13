@@ -111,11 +111,25 @@ class ApiClient {
         Future.delayed(const Duration(seconds: 2), () => _handling401 = false);
       }
     }
-    final err = (body is Map && body['error'] is Map) ? body['error'] as Map : const {};
-    throw ApiException(
-      r.statusCode,
-      (err['code'] ?? 'error').toString(),
-      (err['message'] ?? 'Request failed (${r.statusCode})').toString(),
-    );
+    // Parse our contract shape `{ error: { code, message } }` first, then fall
+    // back to NestJS/Express shapes `{ statusCode, message, error }` so we never
+    // surface raw router text like "Cannot POST /v1/…".
+    String code = 'error';
+    String message = 'Request failed (${r.statusCode})';
+    if (body is Map && body['error'] is Map) {
+      final err = body['error'] as Map;
+      code = (err['code'] ?? code).toString();
+      message = (err['message'] ?? message).toString();
+    } else if (body is Map && body['message'] != null) {
+      final m = body['message'];
+      message = m is List ? m.join(', ') : m.toString();
+      if (body['error'] is String) code = (body['error'] as String).toLowerCase().replaceAll(' ', '_');
+    }
+    // A 404 on a route the backend doesn't expose yet — show something human.
+    if (r.statusCode == 404 && message.startsWith('Cannot ')) {
+      code = 'not_available';
+      message = "This feature isn't available yet.";
+    }
+    throw ApiException(r.statusCode, code, message);
   }
 }
