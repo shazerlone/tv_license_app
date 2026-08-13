@@ -117,17 +117,32 @@ class AppState extends ChangeNotifier {
   Set<String> get subscribedTraderIds => _subscribed;
 
   void subscribe(String traderId) {
+    if (_subscribed.contains(traderId)) return;
     _subscribed.add(traderId);
     _notify.add(traderId);
     notifyListeners();
-    if (kUseBackend) BackendApi.subscribe(traderId).catchError((_) {});
+    // Server-authoritative: if the call fails, revert so the UI never claims a
+    // subscription the backend didn't record.
+    if (kUseBackend) {
+      BackendApi.subscribe(traderId).catchError((_) {
+        _subscribed.remove(traderId);
+        _notify.remove(traderId);
+        notifyListeners();
+      });
+    }
   }
 
   void unsubscribe(String traderId) {
+    if (!_subscribed.contains(traderId)) return;
     _subscribed.remove(traderId);
     _notify.remove(traderId);
     notifyListeners();
-    if (kUseBackend) BackendApi.unsubscribe(traderId).catchError((_) {});
+    if (kUseBackend) {
+      BackendApi.unsubscribe(traderId).catchError((_) {
+        _subscribed.add(traderId);
+        notifyListeners();
+      });
+    }
   }
 
   void toggleSubscribe(String traderId) =>

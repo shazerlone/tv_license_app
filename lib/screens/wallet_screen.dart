@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
 import '../config.dart';
+import '../state/app_state.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
 import 'payout_methods_screen.dart';
@@ -225,7 +226,16 @@ class _WalletScreenState extends State<WalletScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => const _DepositSheet(),
     );
-    if (done == true) _load();
+    if (done == true) {
+      _load();
+      // Refresh the SHARED wallet/portfolio state so the home dashboard header
+      // and copy screens update in real time (not just this screen).
+      if (mounted) {
+        final store = AppStateScope.of(context);
+        store.loadWallet();
+        store.loadCopyEngine();
+      }
+    }
   }
 }
 
