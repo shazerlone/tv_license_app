@@ -56,7 +56,15 @@ workflows:
       - name: Flutter packages get
         script: flutter pub get
       - name: Set up code signing
-        script: xcode-project use-profiles
+        script: |
+          keychain initialize
+          # Create the distribution certificate + provisioning profile for this
+          # bundle id if they don't exist yet (first-ever build), then install.
+          app-store-connect fetch-signing-files "com.millimore.millimore" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Build signed IPA
         script: |
           # Codemagic auto-increments $BUILD_NUMBER every run, so each TestFlight
