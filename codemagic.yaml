@@ -39,13 +39,10 @@ workflows:
       app_store_connect: Millimore
     environment:
       flutter: stable
-      # Codemagic's managed automatic signing: with the App Store Connect key
-      # above, it fetches OR creates the distribution certificate + App Store
-      # provisioning profile for this bundle id and sets up the keychain before
-      # the scripts run. `xcode-project use-profiles` then applies them.
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.millimore.millimore
+      # No `ios_signing` block: that block fails at startup when no provisioning
+      # profile exists yet. Instead the script below imports the distribution
+      # certificate stored in Codemagic (millimore-dist, with its private key)
+      # AND creates the App Store provisioning profile via the API key.
     scripts:
       - name: Regenerate native platform folders
         script: |
@@ -59,6 +56,16 @@ workflows:
         script: flutter pub get
       - name: Set up code signing
         script: |
+          keychain initialize
+          # Import the Codemagic-stored distribution certificate (with its
+          # private key) into the build keychain.
+          keychain add-certificates
+          # Create (or fetch) the App Store provisioning profile for the bundle id
+          # — this creates it at Apple the first time so it now exists.
+          app-store-connect fetch-signing-files "com.millimore.millimore" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
           xcode-project use-profiles
           echo "──────── signing identities in keychain ────────"
           security find-identity -v -p codesigning || true
