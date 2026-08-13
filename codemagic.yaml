@@ -56,19 +56,18 @@ workflows:
         script: flutter pub get
       - name: Set up code signing
         script: |
+          set -e
           keychain initialize
-          # Import the Codemagic-stored distribution certificate (with its
-          # private key) into the build keychain.
-          keychain add-certificates
-          # Create (or fetch) the App Store provisioning profile for the bundle id
-          # — this creates it at Apple the first time so it now exists.
+          # With no usable distribution certificate left at Apple, --create makes
+          # a brand-new one whose PRIVATE KEY lives on this build machine (so the
+          # app can actually be signed), plus the App Store provisioning profile.
           app-store-connect fetch-signing-files "com.millimore.millimore" \
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
           xcode-project use-profiles
-          echo "──────── signing identities in keychain ────────"
-          security find-identity -v -p codesigning || true
+          echo "──────── signing identities in keychain (must show Apple Distribution) ────────"
+          security find-identity -v -p codesigning
       - name: Build signed IPA
         script: |
           # Codemagic auto-increments $BUILD_NUMBER every run, so each TestFlight
