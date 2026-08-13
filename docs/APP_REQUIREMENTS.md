@@ -278,4 +278,44 @@ value, unblocks the creator home now.
   in-app browser dep); `POST /youtube/disconnect`. Chat ingest already handled
   via the `broadcast:{id}` WS `source:"youtube"` badge.
 
-_Maintained by the app session. Last updated for app build M13–M15 sync._
+## 🔴 Open bugs / needs from the backend (found in live testing)
+
+These are issues the app **cannot fix on its own** — they need backend changes.
+The app side has been made as correct as possible (server-authoritative writes,
+shared-state refresh) but the data/endpoints below are the blockers.
+
+1. **`GET /subscriptions` / `GET /feed` returning non-subscribed traders.**
+   Users report traders they never subscribed to appear in the Subscriptions
+   list and their posts appear in the feed. The app only ever calls
+   `POST/DELETE /subscriptions/{id}` on explicit user taps (verified — no
+   auto-subscribe). Please confirm `GET /subscriptions` returns **only** the
+   caller's active subscriptions, and `GET /feed` returns **only** posts from
+   those subscriptions. Suspect seed data or a follow-vs-notify mix-up.
+
+2. **Post images.** `Post` has no image field. The app needs `imageUrl?` (or
+   `images[]`) on `POST /posts` (upload via existing `POST /uploads`) and on the
+   returned/listed `Post`, so creators can attach a chart/setup screenshot to an
+   analysis or trade post.
+
+3. **Real trade posts with SL/TP (copyable).** Today a "trade" post is just
+   `pair + content`. To let a creator post an actual trade and followers copy it
+   from their wallet, we need a trade-post shape:
+   `{ pair, side(buy/sell), entryType(market/limit), entryPrice?, sl?, tp?,
+   slPct?, tpPct?, lots?/riskPct? }`, plus an endpoint
+   `POST /copy/trade/{postId} { amount, leverage? }` that opens the position
+   from the follower's wallet balance (like `/copy/{traderId}/start` but for a
+   single posted trade).
+
+4. **Live prices (real, not synthetic).** `GET /prices` + the WS `prices`
+   channel are synthetic. For the trade composer + a live price on the selected
+   pair we need real quotes for majors, gold (XAU/USD), indices and crypto.
+   Options discussed: a market-data provider (Twelve Data / Finnhub / Yahoo)
+   behind `/prices`, or the app embeds TradingView for the chart. Please expose
+   real quotes on `/prices` (same shape) when a provider is configured.
+
+5. **Per-pair live chat.** For an Exness/eToro-style chat under the chart, add a
+   WS channel `pair:{symbol}` (e.g. `pair:XAU/USD`) carrying
+   `{ author, text, createdAt }`, plus `GET /pairs/{symbol}/chat` (recent) and
+   `POST /pairs/{symbol}/chat { text }`. Reuses the existing WS envelope.
+
+_Maintained by the app session. Last updated: live-testing bug report (subscriptions, real-time wallet, trade/price/chat/photo needs)._
