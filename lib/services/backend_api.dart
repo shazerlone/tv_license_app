@@ -149,6 +149,8 @@ class BackendApi {
     String? pair,
     String? title,
     List<String>? points,
+    String? imageUrl,
+    Map<String, dynamic>? trade, // { side, entryType, entryPrice?, sl?, tp?, slPct?, tpPct? }
   }) async {
     final res = await _api.post('/posts', {
       'type': type,
@@ -156,6 +158,8 @@ class BackendApi {
       if (pair != null) 'pair': pair,
       if (title != null) 'title': title,
       if (points != null) 'points': points,
+      if (imageUrl != null) 'imageUrl': imageUrl,
+      if (trade != null) 'trade': trade,
     });
     final m = (res is Map && res['post'] is Map ? res['post'] : res) as Map;
     return ApiPost.fromJson(m.cast<String, dynamic>());
