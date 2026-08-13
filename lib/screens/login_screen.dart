@@ -7,6 +7,7 @@ import '../services/auth_api.dart';
 import '../services/api_client.dart';
 import '../widgets/millimore_logo.dart';
 import 'account_type_screen.dart';
+import 'phone_login_screen.dart';
 import 'home_screen.dart';
 
 /// Clean, modern sign-in. A soft brand header (no chart animation) over a
@@ -287,6 +288,25 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: _isLoading
                                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                 : const Text('Sign In'),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                child: Text('or', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                              ),
+                              const Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            onPressed: _isLoading ? null : () => Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const PhoneLoginScreen()),
+                                ),
+                            icon: Icon(Icons.smartphone_rounded, size: 19, color: AppColors.primary),
+                            label: Text('Sign in with phone number', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ),
                         ],
                       ),
