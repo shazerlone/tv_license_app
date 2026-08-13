@@ -48,7 +48,7 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 Text('Profile', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
                 const Spacer(),
-                _CircleIcon(icon: Icons.ios_share_rounded, onTap: () => _toast(context, 'Share profile')),
+                _CircleIcon(icon: Icons.ios_share_rounded, onTap: () => _push(context, const ReferralsScreen())),
               ],
             ),
             const SizedBox(height: 20),
@@ -148,7 +148,6 @@ class ProfileScreen extends StatelessWidget {
             Text('Support', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
             const SizedBox(height: 10),
             _MenuCard(children: [
-              _MenuTile(icon: Icons.notifications_none_rounded, color: AppColors.slate, label: 'Notifications', onTap: () => _toast(context, 'Notification settings')),
               _MenuTile(icon: Icons.shield_outlined, color: AppColors.slate, label: 'Security & 2FA', onTap: () => kUseBackend ? _push(context, const SecurityScreen()) : _toast(context, 'Privacy & security')),
               _MenuTile(icon: Icons.help_outline_rounded, color: AppColors.slate, label: 'Help & support', onTap: () => _push(context, kUseBackend ? const SupportScreen() : const SupportChatScreen()), last: true),
             ]),
