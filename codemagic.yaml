@@ -58,11 +58,13 @@ workflows:
         script: |
           set -e
           keychain initialize
-          # With no usable distribution certificate left at Apple, --create makes
-          # a brand-new one whose PRIVATE KEY lives on this build machine (so the
-          # app can actually be signed), plus the App Store provisioning profile.
+          # 1) Generate a private key on THIS machine.
+          openssl genrsa -out /tmp/millimore_cert_key.pem 2048
+          # 2) Create the Apple Distribution certificate FROM that key (so the
+          #    private key is local and can sign) + create the App Store profile.
           app-store-connect fetch-signing-files "com.millimore.millimore" \
             --type IOS_APP_STORE \
+            --certificate-key=@file:/tmp/millimore_cert_key.pem \
             --create
           keychain add-certificates
           xcode-project use-profiles
