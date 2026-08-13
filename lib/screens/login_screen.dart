@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -165,8 +164,21 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _soon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$feature is coming soon')));
+  void _showForgotPassword() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Reset your password', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Text(
+          'Reach out to support@millimore.app from your registered email and we\'ll help you reset your password.',
+          style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Got it', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.primary))),
+        ],
+      ),
+    );
   }
 
   @override
@@ -259,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () => _soon('Password reset'),
+                              onPressed: _showForgotPassword,
                               style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 minimumSize: Size.zero,
@@ -278,26 +290,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                    ),
-
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        const Expanded(child: Divider()),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Text('or', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-                        ),
-                        const Expanded(child: Divider()),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(child: _SocialButton(label: 'Apple', icon: const _AppleIcon(), dark: true, onTap: () => _soon('Apple sign-in'))),
-                        const SizedBox(width: 12),
-                        Expanded(child: _SocialButton(label: 'Google', icon: const _GoogleIcon(), dark: false, onTap: () => _soon('Google sign-in'))),
-                      ],
                     ),
 
                     const Spacer(),
@@ -343,82 +335,4 @@ class _FieldLabel extends StatelessWidget {
         text,
         style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
       );
-}
-
-class _SocialButton extends StatelessWidget {
-  final String label;
-  final Widget icon;
-  final bool dark;
-  final VoidCallback onTap;
-  const _SocialButton({required this.label, required this.icon, required this.dark, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: dark ? AppColors.textPrimary : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: dark ? null : Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            icon,
-            const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: dark ? Colors.white : AppColors.textPrimary)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AppleIcon extends StatelessWidget {
-  const _AppleIcon();
-  @override
-  Widget build(BuildContext context) => const Icon(Icons.apple, size: 22, color: Colors.white);
-}
-
-class _GoogleIcon extends StatelessWidget {
-  const _GoogleIcon();
-  @override
-  Widget build(BuildContext context) => SizedBox(width: 18, height: 18, child: CustomPaint(painter: _GoogleGPainter()));
-}
-
-/// Multi-colour Google "G".
-class _GoogleGPainter extends CustomPainter {
-  static const _blue = Color(0xFF4285F4);
-  static const _red = Color(0xFFEA4335);
-  static const _yellow = Color(0xFFFBBC05);
-  static const _green = Color(0xFF34A853);
-
-  double _deg(double d) => d * math.pi / 180;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = size.width * 0.26;
-    final rect = Rect.fromCircle(
-      center: Offset(size.width / 2, size.height / 2),
-      radius: size.width / 2 - stroke / 2,
-    );
-    Paint arc(Color c) => Paint()
-      ..color = c
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-    canvas.drawArc(rect, _deg(-16), _deg(76), false, arc(_blue));
-    canvas.drawArc(rect, _deg(64), _deg(88), false, arc(_green));
-    canvas.drawArc(rect, _deg(156), _deg(76), false, arc(_yellow));
-    canvas.drawArc(rect, _deg(236), _deg(84), false, arc(_red));
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final barRect = Rect.fromLTRB(cx, cy - stroke / 2, rect.right + stroke / 2, cy + stroke / 2);
-    canvas.drawRect(barRect, Paint()..color = _blue);
-  }
-
-  @override
-  bool shouldRepaint(_GoogleGPainter old) => false;
 }
