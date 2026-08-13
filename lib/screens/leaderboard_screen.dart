@@ -190,11 +190,12 @@ class _LeaderboardRow extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isTop3 ? AppColors.primary.withOpacity(0.04) : AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: isTop3 ? AppColors.primary.withOpacity(0.04) : AppColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: isTop3 ? AppColors.primary.withOpacity(0.15) : AppColors.border,
         ),
+        boxShadow: AppColors.softShadow,
       ),
       child: Row(
         children: [

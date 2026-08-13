@@ -447,7 +447,7 @@ class _StatsRow extends StatelessWidget {
         : (trader.maxDrawdown <= 18 ? AppColors.primary : AppColors.red);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+      decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
       child: Column(
         children: [
           Row(

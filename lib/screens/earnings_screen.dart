@@ -84,7 +84,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+      decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.sm), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
       child: Row(
         children: [
           Expanded(
@@ -179,7 +179,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+      decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.sm), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
       child: Row(
         children: [
           Expanded(
