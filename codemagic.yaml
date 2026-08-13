@@ -57,11 +57,19 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          # Create the distribution certificate + provisioning profile for this
-          # bundle id if they don't exist yet (first-ever build), then install.
+          # 1) Create an Apple Distribution certificate WITH a private key on
+          #    this machine. A cert made earlier on the web/Xcode has its private
+          #    key elsewhere, so the build can't sign with it — generate a fresh
+          #    one here. (If you hit a "maximum certificates" error, delete an
+          #    old Apple Distribution cert in App Store Connect → Certificates.)
+          app-store-connect certificates create \
+            --type IOS_DISTRIBUTION \
+            --save
+          # 2) Create/fetch the App Store provisioning profile for the bundle id.
           app-store-connect fetch-signing-files "com.millimore.millimore" \
             --type IOS_APP_STORE \
             --create
+          # 3) Import the cert(s) into the build keychain, apply profiles to Xcode.
           keychain add-certificates
           xcode-project use-profiles
       - name: Build signed IPA
