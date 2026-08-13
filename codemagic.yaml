@@ -39,11 +39,10 @@ workflows:
       app_store_connect: MillimoreASC
     environment:
       flutter: stable
-      # Codemagic auto-manages the distribution certificate + provisioning
-      # profile for this bundle id using the API key above.
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.millimore.millimore
+      # NOTE: no `ios_signing` block on purpose. That block makes Codemagic
+      # try to FETCH an existing profile at startup and fail ("No matching
+      # profiles found") for a brand-new bundle id. Instead we CREATE the
+      # cert + profile in the "Set up code signing" script below.
     scripts:
       - name: Regenerate native platform folders
         script: |
