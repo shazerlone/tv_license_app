@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
+import '../models/post.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
+import 'trader_profile_screen.dart';
 
 /// Creator composer — publish a trade idea / analysis / lesson (POST /posts).
 class ComposePostScreen extends StatefulWidget {
@@ -49,17 +52,27 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
     setState(() => _posting = true);
 
     if (kUseBackend) {
+      final nav = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
       try {
-        await BackendApi.createPost(
+        final api = await BackendApi.createPost(
           type: _type,
           content: content,
           pair: _pair.text.trim().isEmpty ? null : _pair.text.trim(),
           title: _title.text.trim().isEmpty ? null : _title.text.trim(),
           points: points.isEmpty ? null : points,
         );
+        final post = Post.fromApi(api);
+        // Remember the creator's own trader id so "My posts" works later.
+        SharedPreferences.getInstance()
+            .then((p) => p.setString('creator_trader_id', post.trader.id))
+            .catchError((_) {});
         if (!mounted) return;
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted 🎉')));
+        // Close the composer (caller refreshes) and open the creator's own
+        // profile so the new post is immediately visible + manageable.
+        nav.pop(true);
+        nav.push(MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: post.trader, isOwner: true)));
+        messenger.showSnackBar(const SnackBar(content: Text('Posted 🎉')));
         return;
       } on ApiException catch (e) {
         if (!mounted) return;

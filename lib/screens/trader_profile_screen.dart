@@ -18,7 +18,10 @@ import 'live_stream_screen.dart';
 
 class TraderProfileScreen extends StatefulWidget {
   final Trader trader;
-  const TraderProfileScreen({super.key, required this.trader});
+  /// When true this is the signed-in creator viewing their OWN profile —
+  /// enables managing (deleting) their posts.
+  final bool isOwner;
+  const TraderProfileScreen({super.key, required this.trader, this.isOwner = false});
 
   @override
   State<TraderProfileScreen> createState() => _TraderProfileScreenState();
@@ -43,6 +46,32 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
     } else {
       _trades = mockTrades.where((t) => t.traderId == widget.trader.id).toList();
       _posts = mockPosts(mockTraders).where((p) => p.trader.id == widget.trader.id).toList();
+    }
+  }
+
+  Future<void> _deletePost(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Delete post?', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Text('This permanently removes the post for everyone.', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textMuted))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.red))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final removed = _posts;
+    setState(() => _posts = _posts.where((p) => p.id != id).toList());
+    try {
+      await BackendApi.deletePost(id);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post deleted')));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _posts = removed); // restore on failure
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not delete — try again')));
     }
   }
 
@@ -208,7 +237,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _PostsList(posts: traderPosts, loading: _loading),
+            _PostsList(posts: traderPosts, loading: _loading, onDelete: widget.isOwner ? _deletePost : null),
             _TradesList(trades: traderTrades, loading: _loading),
           ],
         ),
@@ -377,7 +406,8 @@ class _EquityPainter extends CustomPainter {
 class _PostsList extends StatelessWidget {
   final List<Post> posts;
   final bool loading;
-  const _PostsList({required this.posts, this.loading = false});
+  final void Function(String id)? onDelete;
+  const _PostsList({required this.posts, this.loading = false, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -388,7 +418,37 @@ class _PostsList extends StatelessWidget {
     return ListView.builder(
       padding: EdgeInsets.zero,
       itemCount: posts.length,
-      itemBuilder: (_, i) => FeedPost(post: posts[i]),
+      itemBuilder: (_, i) {
+        final post = FeedPost(post: posts[i]);
+        if (onDelete == null) return post;
+        // Owner view: swipe a post away to delete it, plus a visible menu.
+        return Stack(
+          children: [
+            post,
+            Positioned(
+              top: 10,
+              right: 8,
+              child: IconButton(
+                iconSize: 20,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.more_horiz_rounded, color: AppColors.textMuted),
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  backgroundColor: AppColors.surface,
+                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                  builder: (ctx) => SafeArea(
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline_rounded, color: AppColors.red),
+                      title: Text('Delete post', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.red)),
+                      onTap: () { Navigator.pop(ctx); onDelete!(posts[i].id); },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

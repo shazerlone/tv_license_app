@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
 import '../config.dart';
@@ -135,6 +136,9 @@ class ProfileScreen extends StatelessWidget {
                   onTap: () => _push(context, const SavedPostsScreen())),
               _MenuTile(icon: Icons.group_outlined, color: AppColors.primaryLight, label: 'Subscriptions', trailing: '${store.subscriptionCount}',
                   onTap: () => _push(context, const SubscriptionsScreen())),
+              if (isCreator)
+                _MenuTile(icon: Icons.article_outlined, color: AppColors.primary, label: 'My posts',
+                    onTap: () => _openMyPosts(context)),
               _MenuTile(icon: Icons.card_giftcard_rounded, color: AppColors.purple, label: 'Invite & earn',
                   onTap: () => _push(context, const ReferralsScreen()), last: true),
             ]),
@@ -178,6 +182,25 @@ class ProfileScreen extends StatelessWidget {
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   static void _toast(BuildContext context, String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  /// Opens the creator's own public profile (owner mode) so they can see and
+  /// delete their posts. Resolves the trader id cached when they last posted.
+  static Future<void> _openMyPosts(BuildContext context) async {
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString('creator_trader_id');
+    if (id == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('Publish a post first — it\'ll appear on your creator profile.')));
+      return;
+    }
+    try {
+      final t = Trader.fromApi(await BackendApi.trader(id));
+      nav.push(MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: t, isOwner: true)));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not load your profile — try again')));
+    }
+  }
 }
 
 // ── Copy performance card ─────────────────────────────────────────────────────
