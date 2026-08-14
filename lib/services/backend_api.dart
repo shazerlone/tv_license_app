@@ -479,5 +479,14 @@ class BackendApi {
 
   static Future<void> youtubeDisconnect() => _api.post('/youtube/disconnect');
 
+  // ── Per-pair community chat (spec filed; degrades if not deployed) ─────────
+  static Future<List<Map<String, dynamic>>> pairChat(String symbol) async {
+    final res = await _api.get('/pairs/${Uri.encodeComponent(symbol)}/chat');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<void> sendPairChat(String symbol, String text) =>
+      _api.post('/pairs/${Uri.encodeComponent(symbol)}/chat', {'text': text});
+
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }

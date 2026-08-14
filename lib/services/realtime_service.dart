@@ -17,9 +17,13 @@ class RealtimeService {
 
   WsClient? _ws;
   final _broadcast = StreamController<Map<String, dynamic>>.broadcast();
+  final _pair = StreamController<Map<String, dynamic>>.broadcast();
 
   /// Broadcast-room events `{ ch:"broadcast:{id}", type, data }`.
   Stream<Map<String, dynamic>> get broadcastEvents => _broadcast.stream;
+
+  /// Per-instrument community-chat events `{ ch:"pair:{symbol}", type, data }`.
+  Stream<Map<String, dynamic>> get pairEvents => _pair.stream;
   bool get connected => _ws != null;
 
   void connect(String token) {
@@ -32,6 +36,9 @@ class RealtimeService {
 
   void subscribeBroadcast(String id) => _ws?.subscribe(['broadcast:$id']);
   void unsubscribeBroadcast(String id) => _ws?.unsubscribe(['broadcast:$id']);
+
+  void subscribePair(String symbol) => _ws?.subscribe(['pair:$symbol']);
+  void unsubscribePair(String symbol) => _ws?.unsubscribe(['pair:$symbol']);
 
   void disconnect() {
     _ws?.dispose();
@@ -53,6 +60,8 @@ class RealtimeService {
       _routeUser(m['type']?.toString() ?? '', data);
     } else if (ch.startsWith('broadcast:')) {
       _broadcast.add(m);
+    } else if (ch.startsWith('pair:')) {
+      _pair.add(m);
     }
   }
 
@@ -122,5 +131,6 @@ class RealtimeService {
   void dispose() {
     disconnect();
     _broadcast.close();
+    _pair.close();
   }
 }

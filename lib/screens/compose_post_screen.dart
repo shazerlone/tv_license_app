@@ -11,6 +11,7 @@ import '../services/api_client.dart';
 import '../services/price_service.dart';
 import '../services/image_picker_service.dart';
 import '../widgets/pair_picker.dart';
+import 'pair_detail_screen.dart';
 import 'trader_profile_screen.dart';
 
 /// Creator composer — publish analysis, a copyable trade (with SL/TP), a lesson
@@ -265,7 +266,18 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
 
           if (showPair) ...[
             _PairSelector(pair: _pair, quote: _quote, loading: _loadingQuote, onTap: _selectPair),
-            const SizedBox(height: 14),
+            if (_pair != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PairDetailScreen(pair: _pair!))),
+                  icon: Icon(Icons.show_chart_rounded, size: 18, color: AppColors.primary),
+                  label: Text('Open live chart & discussion', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
           ],
 
           if (isTrade) ...[
