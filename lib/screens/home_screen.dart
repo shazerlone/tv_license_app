@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
+import 'markets_screen.dart';
 import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
@@ -60,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ? const [
             CreatorHome(),
             DiscoverTab(),
+            MarketsScreen(),
             StudioScreen(),
             CopiedTradesScreen(),
             ProfileScreen(),
@@ -67,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : const [
             FollowerHome(),
             DiscoverTab(),
+            MarketsScreen(),
             CopiedTradesScreen(),
             ProfileScreen(),
           ];
@@ -75,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ? const [
             NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
             NavItem(icon: Icons.explore_outlined, activeIcon: Icons.explore_rounded, label: 'Discover'),
+            NavItem(icon: Icons.candlestick_chart_outlined, activeIcon: Icons.candlestick_chart_rounded, label: 'Markets'),
             NavItem(icon: Icons.add_rounded, activeIcon: Icons.add_rounded, label: 'Studio', emphasized: true),
             NavItem(icon: Icons.swap_vert_rounded, activeIcon: Icons.swap_vert_rounded, label: 'Trades'),
             NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
@@ -82,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : const [
             NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
             NavItem(icon: Icons.explore_outlined, activeIcon: Icons.explore_rounded, label: 'Discover'),
+            NavItem(icon: Icons.candlestick_chart_outlined, activeIcon: Icons.candlestick_chart_rounded, label: 'Markets'),
             NavItem(icon: Icons.swap_vert_rounded, activeIcon: Icons.swap_vert_rounded, label: 'Trades'),
             NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
           ];
