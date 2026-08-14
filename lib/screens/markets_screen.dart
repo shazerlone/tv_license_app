@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../data/pairs.dart';
@@ -22,17 +23,20 @@ class MarketsScreen extends StatefulWidget {
 
 class _MarketsScreenState extends State<MarketsScreen> {
   static const _popular = ['XAU/USD', 'EUR/USD', 'GBP/USD', 'BTC/USD', 'ETH/USD', 'NAS100'];
-  final _cats = const ['Popular', 'Metals', 'Forex', 'Crypto', 'Indices'];
+  final _cats = const ['Watchlist', 'Popular', 'Metals', 'Forex', 'Crypto', 'Indices'];
   String _cat = 'Popular';
 
   final Map<String, Quote> _quotes = {};
+  final Set<String> _favs = {};
   Timer? _timer;
   List<Trader> _topTraders = const [];
 
   @override
   void initState() {
     super.initState();
+    _loadFavs();
     _loadQuotes();
+    _loadMovers();
     _loadTopTraders();
     _timer = Timer.periodic(const Duration(seconds: 15), (_) => _loadQuotes());
   }
@@ -43,9 +47,42 @@ class _MarketsScreenState extends State<MarketsScreen> {
     super.dispose();
   }
 
-  List<TradingPair> get _visible => _cat == 'Popular'
-      ? _popular.map(pairBySymbol).whereType<TradingPair>().toList()
-      : kPairs.where((p) => p.category == _cat).toList();
+  Future<void> _loadFavs() async {
+    final p = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _favs
+        ..clear()
+        ..addAll(p.getStringList('market_favs') ?? const []);
+    });
+  }
+
+  Future<void> _toggleFav(String symbol) async {
+    setState(() => _favs.contains(symbol) ? _favs.remove(symbol) : _favs.add(symbol));
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList('market_favs', _favs.toList());
+  }
+
+  List<TradingPair> get _visible {
+    if (_cat == 'Watchlist') return _favs.map(pairBySymbol).whereType<TradingPair>().toList();
+    if (_cat == 'Popular') return _popular.map(pairBySymbol).whereType<TradingPair>().toList();
+    return kPairs.where((p) => p.category == _cat).toList();
+  }
+
+  // Top movers: quotes across all instruments, biggest |day %| first.
+  final Map<String, Quote> _allQuotes = {};
+  Future<void> _loadMovers() async {
+    await Future.wait(kPairs.map((p) async {
+      final q = await PriceService.quote(p);
+      if (q != null && mounted) setState(() => _allQuotes[p.symbol] = q);
+    }));
+  }
+
+  List<TradingPair> get _movers {
+    final withChange = kPairs.where((p) => _allQuotes[p.symbol]?.changePercent != null).toList();
+    withChange.sort((a, b) => _allQuotes[b.symbol]!.changePercent!.abs().compareTo(_allQuotes[a.symbol]!.changePercent!.abs()));
+    return withChange.take(8).toList();
+  }
 
   Future<void> _loadQuotes() async {
     await Future.wait(_visible.map((p) async {
@@ -126,16 +163,57 @@ class _MarketsScreenState extends State<MarketsScreen> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              // Watchlist
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => _WatchRow(pair: _visible[i], quote: _quotes[_visible[i].symbol]),
-                    childCount: _visible.length,
+              // Top movers strip
+              if (_movers.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text('Top movers', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
                   ),
                 ),
-              ),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 78,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: _movers.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (_, i) => _MoverCard(pair: _movers[i], quote: _allQuotes[_movers[i].symbol]!),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 18)),
+              ],
+              // Watchlist
+              if (_cat == 'Watchlist' && _visible.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 30, 20, 30),
+                    child: Column(children: [
+                      Icon(Icons.star_border_rounded, size: 40, color: AppColors.textMuted),
+                      const SizedBox(height: 10),
+                      Text('Your watchlist is empty', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text('Tap the star on any instrument to pin it here.', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
+                    ]),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _WatchRow(
+                        pair: _visible[i],
+                        quote: _quotes[_visible[i].symbol] ?? _allQuotes[_visible[i].symbol],
+                        isFav: _favs.contains(_visible[i].symbol),
+                        onToggleFav: () => _toggleFav(_visible[i].symbol),
+                      ),
+                      childCount: _visible.length,
+                    ),
+                  ),
+                ),
               // Top traders to copy
               if (_topTraders.isNotEmpty) ...[
                 SliverToBoxAdapter(
@@ -171,7 +249,9 @@ class _MarketsScreenState extends State<MarketsScreen> {
 class _WatchRow extends StatelessWidget {
   final TradingPair pair;
   final Quote? quote;
-  const _WatchRow({required this.pair, required this.quote});
+  final bool isFav;
+  final VoidCallback? onToggleFav;
+  const _WatchRow({required this.pair, required this.quote, this.isFav = false, this.onToggleFav});
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +296,49 @@ class _WatchRow extends StatelessWidget {
                     ),
                 ],
               ),
+            if (onToggleFav != null)
+              GestureDetector(
+                onTap: onToggleFav,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(isFav ? Icons.star_rounded : Icons.star_border_rounded, size: 22, color: isFav ? const Color(0xFFF59E0B) : AppColors.textMuted),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoverCard extends StatelessWidget {
+  final TradingPair pair;
+  final Quote quote;
+  const _MoverCard({required this.pair, required this.quote});
+
+  @override
+  Widget build(BuildContext context) {
+    final up = (quote.changePercent ?? 0) >= 0;
+    final color = up ? AppColors.green : AppColors.red;
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PairDetailScreen(pair: pair))),
+      child: Container(
+        width: 128,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(pair.symbol, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 4),
+            Text(quote.price.toStringAsFixed(quote.price >= 100 ? 2 : 4), style: GoogleFonts.robotoMono(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            const SizedBox(height: 4),
+            Row(children: [
+              Icon(up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded, size: 18, color: color),
+              Text('${up ? '+' : ''}${quote.changePercent!.toStringAsFixed(2)}%', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: color)),
+            ]),
           ],
         ),
       ),
