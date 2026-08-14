@@ -118,8 +118,14 @@ Goal: swap the demo data source for these live endpoints **without changing the 
 ```json
 { "id": "p_1", "trader": { Trader }, "type": "analysis|trade|lesson|update",
   "content": "text", "pair": "EUR/USD", "title": null, "points": [],
+  "imageUrl": "https://cdn.millimore.app/p/chart.png",   // nullable chart/screenshot
+  "trade": {                                             // non-null only for type:"trade"
+    "side": "buy|sell", "entryType": "market|limit",
+    "entryPrice": 2400, "sl": 2380, "tp": 2450, "slPct": null, "tpPct": null },
   "likes": 284, "comments": 47, "createdAt": "...", "isLiked": false, "saved": false }
 ```
+`trade` is `null` for non-trade posts. When present it makes the post **copyable**
+via `POST /copy/trade/{postId}` (§4.7).
 
 ### Comment
 ```json
@@ -212,7 +218,10 @@ POST   /posts/{id}/comments  { text }  → Comment
 
 ### 4.6 Creator content (compose)
 ```
-POST /posts   { type:"trade|analysis|lesson", content, pair?, title?, points?[] } → Post
+POST /posts   { type:"trade|analysis|lesson", content, pair?, title?, points?[],
+                imageUrl?,                                    // chart/screenshot
+                side?, entryType?, entryPrice?, sl?, tp?, slPct?, tpPct? } → Post
+                // trade fields (side..tpPct) apply when type:"trade" → makes the post copyable
 PATCH  /posts/{id}   { content?, title?, pair?, points?[] } → Post   // owner-only edit
 DELETE /posts/{id}                                                   // owner-only delete
 POST /uploads  { contentType, data(base64) } → { id, url }          // media (photos, statements)
@@ -223,19 +232,25 @@ GET  /uploads/{id}                                                  // serve fil
 ```
 POST /copy/{traderId}/start   { accountId, amount, risk, autoCopy } → CopyConfig
 POST /copy/{traderId}/stop
+POST /copy/trade/{postId}     { amount, leverage? } → CopyPosition   // copy ONE posted trade
 GET  /copy                    → [ CopyConfig ]
 GET  /positions?status=active|closed  → [ CopyPosition ]
 GET  /portfolio/summary       → { netPnl, openPnl, bookedProfit, bookedLoss,
                                   copyingCount, activeCount, closedCount, invested }
 POST /copy/live/{broadcastId}/{tradeId}  { accountId }   // copy a trade from a live
 ```
+`POST /copy/trade/{postId}` debits `amount` (margin) from the wallet and opens a
+single `CopyPosition` matching the post's `trade` (pair/side/entryPrice). The post
+must be `type:"trade"` with trade fields set, else `400 not_a_trade_post`. Close
+it like any copy (stopping the underlying config returns principal ± P/L).
 
 ### 4.8 Market data
 ```
 GET  /symbols                 → ["XAU/USD","EUR/USD",...]
 GET  /prices?symbols=XAU/USD,EUR/USD  → { "XAU/USD": 2015.3, ... }   // snapshot
 ```
-> Realtime prices come over WS (below). REST is the initial snapshot.
+> Realtime prices come over WS (below). REST is the initial snapshot. Quotes are
+> live when a provider is configured (`MARKET_DATA_PROVIDER`), else synthetic (dev).
 
 ### 4.9 Live streaming (creator)
 ```
@@ -283,6 +298,15 @@ DELETE /devices/{token}                                                        /
 > `data` is an arbitrary payload (e.g. `{ traderId, pair, pnlAmount }`).
 > Notifications are the **poll fallback** for the realtime WS channel (milestone 5).
 
+### 4.13 Per-pair chat
+```
+GET  /pairs/{symbol}/chat?limit=100  → [ { author, text, createdAt } ]   // recent, oldest→newest
+POST /pairs/{symbol}/chat  { text }  → { author, text, createdAt }        // fans out over WS pair:{symbol}
+```
+> `{symbol}` is **URL-encoded** (e.g. `XAU%2FUSD`); the server normalizes case.
+> The public chat under a pair's chart. New messages also arrive live on the WS
+> `pair:{symbol}` channel (below) using the same `{ ch, type:"chat", data }` envelope.
+
 ---
 
 ## 5. Realtime (WebSocket)
@@ -301,6 +325,7 @@ Subscribe to channels; server pushes events:
 { "ch": "broadcast:b_1",   "type": "reaction", "data": { "count": 3 } }
 { "ch": "broadcast:b_1",   "type": "trade",    "data": LiveTrade }                    // overlay
 { "ch": "portfolio",       "type": "position", "data": CopyPosition }                 // live P/L
+{ "ch": "pair:XAU/USD",    "type": "chat",     "data": { "author", "text", "createdAt" } }  // per-pair chat
 { "ch": "user",            "type": "creator.status", "data": { "creatorStatus": "approved" } }
 ```
 

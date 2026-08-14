@@ -317,3 +317,33 @@ their own YouTube/Facebook/Twitch:
   in-app live chat automatically** — messages arrive on the existing
   `broadcast:{id}` WS channel with `source:"youtube"` (render a small YT badge).
   No app work beyond showing the source; ingestion is server-side.
+
+## 14. App "open bugs / needs" batch (milestone 16) — NEW, live
+
+Answers the app session's `APP_REQUIREMENTS.md` "🔴 Open bugs / needs" list:
+
+1. **Feed / subscriptions only show subscribed traders.** This was a seed-data
+   bug, not an API bug — `GET /feed` and `GET /subscriptions` already filter
+   strictly by the caller's subscriptions and return `[]` for a fresh account.
+   The seed no longer plants any follows, so **new users start with an empty
+   feed** as intended. No app change needed; if you were filtering client-side to
+   work around it, you can drop that.
+2. **Real prices.** `GET /prices` and the WS `prices` channel now serve **live
+   quotes** when the backend has a market-data provider configured
+   (`MARKET_DATA_PROVIDER` + key); otherwise they stay synthetic for dev. Same
+   shape either way (`{ "XAU/USD": 2401.5, … }`) — no app change, prices just
+   become real once the env is set on the server.
+3. **Post images.** `Post` now carries `imageUrl` (nullable). Render it as the
+   post's chart/screenshot when present. Set it on compose via `imageUrl`.
+4. **Copyable trade posts.** A `type:"trade"` post now carries a `trade` object
+   (`side, entryType, entryPrice, sl, tp, slPct, tpPct`) — non-null only for trade
+   posts. Show a **Copy** button when `post.trade != null` and call
+   `POST /copy/trade/{postId}` with `{ amount, leverage? }`. It debits the wallet
+   and opens one `CopyPosition` (returned) that shows up in `/positions` and the
+   `portfolio` WS channel like any copy. Compose a trade post by passing the trade
+   fields alongside `type:"trade"`.
+5. **Per-pair chat.** `GET /pairs/{symbol}/chat` (recent, oldest→newest) and
+   `POST /pairs/{symbol}/chat { text }`. **URL-encode the symbol** (`XAU%2FUSD`).
+   New messages also stream live over the WS channel **`pair:{symbol}`** (subscribe
+   with the decoded name, e.g. `pair:XAU/USD`) using the standard
+   `{ ch, type:"chat", data:{ author, text, createdAt } }` envelope.

@@ -16,6 +16,7 @@ import { CopyService } from './copy.service';
 import {
   CopyConfigDto,
   CopyPositionDto,
+  CopyTradeDto,
   StartCopyDto,
   PortfolioSummaryDto,
 } from './dto/copy.dto';
@@ -36,6 +37,17 @@ export class CopyController {
     @Body() dto: StartCopyDto,
   ): Promise<CopyConfigDto> {
     return this.copy.start(u.userId, traderId, dto);
+  }
+
+  @Post('copy/trade/:postId')
+  @ApiOperation({ summary: 'Copy a single posted trade from the wallet (contract §4.6)' })
+  @ApiOkResponse({ type: CopyPositionDto })
+  copyTrade(
+    @CurrentUser() u: AuthUser,
+    @Param('postId') postId: string,
+    @Body() dto: CopyTradeDto,
+  ): Promise<CopyPositionDto> {
+    return this.copy.copyTrade(u.userId, postId, dto.amount, dto.leverage);
   }
 
   @Post('copy/:traderId/stop')

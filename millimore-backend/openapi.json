@@ -3814,6 +3814,102 @@
         ]
       }
     },
+    "/v1/pairs/{symbol}/chat": {
+      "get": {
+        "operationId": "PairsController_list",
+        "summary": "Recent messages in a pair’s public chat (contract §pairs)",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "description": "URL-encoded symbol, e.g. XAU%2FUSD.",
+            "schema": {
+              "example": "XAU%2FUSD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PairChatMessageDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pairs"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "PairsController_send",
+        "summary": "Send a message to a pair’s public chat; fans out over WS pair:{symbol}",
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "in": "path",
+            "description": "URL-encoded symbol, e.g. XAU%2FUSD.",
+            "schema": {
+              "example": "XAU%2FUSD",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendPairChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairChatMessageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pairs"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/copy/{traderId}/start": {
       "post": {
         "operationId": "CopyController_start",
@@ -3845,6 +3941,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CopyConfigDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "copy"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/copy/trade/{postId}": {
+      "post": {
+        "operationId": "CopyController_copyTrade",
+        "summary": "Copy a single posted trade from the wallet (contract §4.6)",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyTradeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyPositionDto"
                 }
               }
             }
@@ -7041,11 +7183,90 @@
             "items": {
               "type": "string"
             }
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "Uploaded image URL (from POST /uploads)."
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "market",
+              "limit"
+            ]
+          },
+          "entryPrice": {
+            "type": "number"
+          },
+          "sl": {
+            "type": "number"
+          },
+          "tp": {
+            "type": "number"
+          },
+          "slPct": {
+            "type": "number"
+          },
+          "tpPct": {
+            "type": "number"
           }
         },
         "required": [
           "type",
           "content"
+        ]
+      },
+      "TradePostDto": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "market",
+              "limit"
+            ]
+          },
+          "entryPrice": {
+            "type": "object",
+            "nullable": true,
+            "example": 2411.3
+          },
+          "sl": {
+            "type": "object",
+            "nullable": true
+          },
+          "tp": {
+            "type": "object",
+            "nullable": true
+          },
+          "slPct": {
+            "type": "object",
+            "nullable": true,
+            "example": 1.5
+          },
+          "tpPct": {
+            "type": "object",
+            "nullable": true,
+            "example": 3
+          }
+        },
+        "required": [
+          "side",
+          "entryType"
         ]
       },
       "PostDto": {
@@ -7083,6 +7304,20 @@
             "items": {
               "type": "string"
             }
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true,
+            "description": "Chart/setup image."
+          },
+          "trade": {
+            "nullable": true,
+            "description": "Present on trade posts.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TradePostDto"
+              }
+            ]
           },
           "likes": {
             "type": "number",
@@ -7453,6 +7688,42 @@
           "code"
         ]
       },
+      "PairChatMessageDto": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "type": "string",
+            "example": "marcus",
+            "description": "Sender handle (username, falling back to name)."
+          },
+          "text": {
+            "type": "string",
+            "example": "XAU looks heavy into the London close."
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-08-14T09:30:00.000Z"
+          }
+        },
+        "required": [
+          "author",
+          "text",
+          "createdAt"
+        ]
+      },
+      "SendPairChatDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "XAU looks heavy into the London close.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
       "StartCopyDto": {
         "type": "object",
         "properties": {
@@ -7527,6 +7798,24 @@
           "risk",
           "autoCopy",
           "startedAt"
+        ]
+      },
+      "CopyTradeDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 200,
+            "description": "Margin to allocate from the wallet."
+          },
+          "leverage": {
+            "type": "number",
+            "example": 100,
+            "description": "Leverage (1..maxLeverage). Defaults to your setting."
+          }
+        },
+        "required": [
+          "amount"
         ]
       },
       "CopyPositionDto": {

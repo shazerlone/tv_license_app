@@ -4,6 +4,7 @@ import { RedisService } from '../redis/redis.service';
 
 const CH_USER = 'rt:user';
 const CH_BROADCAST = 'rt:broadcast';
+const CH_CHANNEL = 'rt:channel';
 
 /**
  * Decouples event producers (copy engine, broadcasts, notifications) from the
@@ -28,6 +29,9 @@ export class RealtimeBus extends EventEmitter implements OnModuleInit {
     await this.redis.subscribe(CH_BROADCAST, ({ broadcastId, payload }) =>
       super.emit('broadcast', { broadcastId, payload }),
     );
+    await this.redis.subscribe(CH_CHANNEL, ({ channel, payload }) =>
+      super.emit('channel', { channel, payload }),
+    );
   }
 
   emitUser(userId: string, payload: unknown) {
@@ -38,6 +42,12 @@ export class RealtimeBus extends EventEmitter implements OnModuleInit {
   emitBroadcast(broadcastId: string, payload: unknown) {
     if (this.redis.enabled) void this.redis.publish(CH_BROADCAST, { broadcastId, payload });
     else super.emit('broadcast', { broadcastId, payload });
+  }
+
+  /** Fan out to subscribers of an exact channel name (e.g. `pair:XAU/USD`). */
+  emitChannel(channel: string, payload: unknown) {
+    if (this.redis.enabled) void this.redis.publish(CH_CHANNEL, { channel, payload });
+    else super.emit('channel', { channel, payload });
   }
 }
 

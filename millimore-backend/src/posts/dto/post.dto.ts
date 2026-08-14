@@ -1,6 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsArray, IsIn, IsNumber, IsOptional, IsString, IsUrl, MaxLength, MinLength,
+} from 'class-validator';
 import { TraderDto } from '../../traders/dto/trader.dto';
+
+/** The copyable trade attached to a `type:"trade"` post (contract §4.6). */
+export class TradePostDto {
+  @ApiProperty({ enum: ['buy', 'sell'] }) side: string;
+  @ApiProperty({ enum: ['market', 'limit'] }) entryType: string;
+  @ApiPropertyOptional({ nullable: true, example: 2411.3 }) entryPrice: number | null;
+  @ApiPropertyOptional({ nullable: true }) sl: number | null;
+  @ApiPropertyOptional({ nullable: true }) tp: number | null;
+  @ApiPropertyOptional({ nullable: true, example: 1.5 }) slPct: number | null;
+  @ApiPropertyOptional({ nullable: true, example: 3.0 }) tpPct: number | null;
+}
 
 /** Contract §3 `Post`. */
 export class PostDto {
@@ -11,6 +24,9 @@ export class PostDto {
   @ApiPropertyOptional({ nullable: true }) pair: string | null;
   @ApiPropertyOptional({ nullable: true }) title: string | null;
   @ApiProperty({ type: [String] }) points: string[];
+  @ApiPropertyOptional({ nullable: true, description: 'Chart/setup image.' }) imageUrl: string | null;
+  @ApiPropertyOptional({ type: TradePostDto, nullable: true, description: 'Present on trade posts.' })
+  trade: TradePostDto | null;
   @ApiProperty({ example: 284 }) likes: number;
   @ApiProperty({ example: 47 }) comments: number;
   @ApiProperty() createdAt: string;
@@ -55,6 +71,27 @@ export class CreatePostDto {
   @IsArray()
   @IsString({ each: true })
   points?: string[];
+
+  @ApiPropertyOptional({ description: 'Uploaded image URL (from POST /uploads).' })
+  @IsOptional()
+  @IsString()
+  @IsUrl({ require_tld: false })
+  imageUrl?: string;
+
+  // Trade fields (type=trade) — makes the post copyable.
+  @ApiPropertyOptional({ enum: ['buy', 'sell'] })
+  @IsOptional() @IsIn(['buy', 'sell'])
+  side?: string;
+
+  @ApiPropertyOptional({ enum: ['market', 'limit'] })
+  @IsOptional() @IsIn(['market', 'limit'])
+  entryType?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsNumber() entryPrice?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() sl?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() tp?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() slPct?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() tpPct?: number;
 }
 
 /** POST /posts/{id}/comments body. */

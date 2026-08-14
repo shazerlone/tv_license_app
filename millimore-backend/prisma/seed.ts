@@ -315,24 +315,14 @@ async function main() {
     await prisma.comment.upsert({ where: { id: c.id }, update: c, create: c });
   }
 
-  // ── Social graph (priya follows marcus + kenji, likes/saves a post) ──
-  for (const traderId of ['t_marcus', 't_kenji']) {
-    await prisma.subscription.upsert({
-      where: { userId_traderId: { userId: 'u_priya', traderId } },
-      update: {},
-      create: { userId: 'u_priya', traderId, notify: traderId === 't_marcus' },
-    });
-  }
-  await prisma.postLike.upsert({
-    where: { userId_postId: { userId: 'u_priya', postId: 'p_1' } },
-    update: {},
-    create: { userId: 'u_priya', postId: 'p_1' },
-  });
-  await prisma.postSave.upsert({
-    where: { userId_postId: { userId: 'u_priya', postId: 'p_3' } },
-    update: {},
-    create: { userId: 'u_priya', postId: 'p_3' },
-  });
+  // NOTE: no seeded subscriptions/likes/saves. Every account (including the demo
+  // users) starts with a clean social graph, so GET /subscriptions and GET /feed
+  // return only what the user explicitly followed — fixes the "traders I never
+  // subscribed to appear" report (was seed data, not a query bug).
+  // Clear any pre-existing seeded social graph from older seeds.
+  await prisma.subscription.deleteMany({ where: { userId: 'u_priya' } });
+  await prisma.postLike.deleteMany({ where: { userId: 'u_priya' } });
+  await prisma.postSave.deleteMany({ where: { userId: 'u_priya' } });
 
   // ── Backfill: every approved creator must have a public Trader profile ──
   // (so approved-but-inactive creators show up in GET /traders / search).
@@ -436,7 +426,7 @@ async function main() {
   console.log('  1 pending creator application (Aisha Khan) for the approval queue');
   console.log(`  ${brokers.length} brokers + 1 demo trading account (XM ••••1487)`);
   console.log(`  ${traders.length} traders, ${posts.length} posts, ${comments.length} comments`);
-  console.log('  priya follows Marcus + Kenji, liked p_1, saved p_3');
+  console.log('  clean social graph — no seeded follows (feed/subscriptions start empty)');
 }
 
 main()

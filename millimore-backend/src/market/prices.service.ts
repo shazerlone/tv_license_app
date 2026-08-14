@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { EventEmitter } from 'events';
 import { randomBytes } from 'crypto';
 import { RedisService } from '../redis/redis.service';
+import { MarketFeedService } from './market-feed.service';
 
 export type PriceMap = Record<string, number>;
 
@@ -24,6 +25,11 @@ const CH_PRICES = 'rt:prices';
 const KEY_SNAPSHOT = 'prices:snapshot';
 const KEY_LEADER = 'prices:leader';
 const LEADER_TTL_MS = 3000;
+// How often the leader pulls fresh real quotes (free provider tiers rate-limit,
+// so we anchor to reality every REFRESH_MS and interpolate on each 1s tick).
+const REFRESH_MS = 15000;
+// Per-tick pull of the live price toward its real anchor (0..1).
+const REVERSION = 0.25;
 
 /**
  * Market price engine. Ticks ~1/sec and emits the snapshot on `tick`.
@@ -33,23 +39,42 @@ const LEADER_TTL_MS = 3000;
  * clients see identical prices regardless of which instance they're on.
  * Single-instance (no Redis): generates and emits locally.
  *
- * Synthetic now → swap the generator for the MT bridge / MetaApi feed (milestone
- * 6) with no change to consumers or the WS protocol.
+ * Real feed (MarketFeedService) anchors the ticks to live provider quotes when a
+ * provider is configured; otherwise anchors stay at the built-in bases and the
+ * engine is fully synthetic. Either way consumers and the WS protocol are
+ * unchanged — the MT bridge / MetaApi feed can later replace MarketFeedService.
  */
 @Injectable()
 export class PricesService extends EventEmitter implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('PricesService');
   private readonly instanceId = randomBytes(6).toString('hex');
   private prices: PriceMap = {};
+  // Real-world targets each tick reverts toward. Default to the synthetic bases.
+  private anchors: PriceMap = {};
+  private lastRefresh = 0;
   private timer?: NodeJS.Timeout;
 
-  constructor(private readonly redis: RedisService) {
+  constructor(
+    private readonly redis: RedisService,
+    private readonly feed: MarketFeedService,
+  ) {
     super();
     this.setMaxListeners(0);
   }
 
   async onModuleInit() {
-    for (const [sym, cfg] of Object.entries(SYMBOLS)) this.prices[sym] = cfg.base;
+    for (const [sym, cfg] of Object.entries(SYMBOLS)) {
+      this.prices[sym] = cfg.base;
+      this.anchors[sym] = cfg.base;
+    }
+
+    if (this.feed.enabled) {
+      this.logger.log(`market feed: ${this.feed.providerName} (anchoring every ${REFRESH_MS / 1000}s)`);
+      // Prime real anchors immediately so prices are correct from the first tick.
+      await this.refreshAnchors();
+    } else {
+      this.logger.log('market feed: synthetic (no provider configured)');
+    }
 
     if (this.redis.enabled) {
       // Prime from the last shared snapshot so a fresh instance is correct now.
@@ -77,22 +102,46 @@ export class PricesService extends EventEmitter implements OnModuleInit, OnModul
       // Only the elected leader generates + publishes; others just consume.
       const leader = await this.redis.acquireLeader(KEY_LEADER, this.instanceId, LEADER_TTL_MS);
       if (!leader) return;
+      this.maybeRefresh();
       const next = this.generate(this.prices);
       await this.redis.set(KEY_SNAPSHOT, JSON.stringify(next));
       await this.redis.publish(CH_PRICES, next); // sub handler applies + emits everywhere
       return;
     }
     // Single-instance: generate and emit directly.
+    this.maybeRefresh();
     this.prices = this.generate(this.prices);
     this.emit('tick', this.prices);
+  }
+
+  /** Kick off a real-quote refresh if the interval has elapsed (non-blocking). */
+  private maybeRefresh() {
+    if (!this.feed.enabled) return;
+    const now = Date.now();
+    if (now - this.lastRefresh < REFRESH_MS) return;
+    this.lastRefresh = now;
+    void this.refreshAnchors();
+  }
+
+  /** Pull live quotes and move the anchors; unresolved symbols keep their base. */
+  private async refreshAnchors() {
+    const quotes = await this.feed.fetchQuotes(this.symbols());
+    for (const [sym, cfg] of Object.entries(SYMBOLS)) {
+      const q = quotes[sym];
+      if (q != null && Number.isFinite(q)) this.anchors[sym] = this.round(q, cfg.dp);
+    }
   }
 
   private generate(from: PriceMap): PriceMap {
     const out: PriceMap = {};
     for (const [sym, cfg] of Object.entries(SYMBOLS)) {
       const cur = from[sym] ?? cfg.base;
-      const drift = (Math.random() - 0.5) * 2 * cfg.vol;
-      out[sym] = this.round(cur * (1 + drift), cfg.dp);
+      const anchor = this.anchors[sym] ?? cfg.base;
+      // Reversion toward the real (or base) anchor + small volatility jitter, so
+      // prices track reality between refreshes while still ticking every second.
+      const revert = (anchor - cur) * REVERSION;
+      const jitter = (Math.random() - 0.5) * 2 * cfg.vol * cur;
+      out[sym] = this.round(cur + revert + jitter, cfg.dp);
     }
     return out;
   }

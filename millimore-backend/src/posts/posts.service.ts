@@ -34,6 +34,19 @@ export class PostsService {
       pair: p.pair,
       title: p.title,
       points: p.points,
+      imageUrl: p.imageUrl,
+      trade:
+        p.type === PostType.trade && p.tradeSide
+          ? {
+              side: p.tradeSide,
+              entryType: p.tradeEntryType ?? 'market',
+              entryPrice: p.tradeEntryPrice,
+              sl: p.tradeSl,
+              tp: p.tradeTp,
+              slPct: p.tradeSlPct,
+              tpPct: p.tradeTpPct,
+            }
+          : null,
       likes: p._count.likes,
       comments: p._count.comments,
       createdAt: p.createdAt.toISOString(),
@@ -184,6 +197,15 @@ export class PostsService {
         pair: dto.pair,
         title: dto.title,
         points: dto.points ?? [],
+        imageUrl: dto.imageUrl,
+        // Trade fields only meaningful on a trade post.
+        tradeSide: dto.type === 'trade' ? dto.side : null,
+        tradeEntryType: dto.type === 'trade' ? dto.entryType ?? 'market' : null,
+        tradeEntryPrice: dto.type === 'trade' ? dto.entryPrice : null,
+        tradeSl: dto.type === 'trade' ? dto.sl : null,
+        tradeTp: dto.type === 'trade' ? dto.tp : null,
+        tradeSlPct: dto.type === 'trade' ? dto.slPct : null,
+        tradeTpPct: dto.type === 'trade' ? dto.tpPct : null,
       },
       include: postInclude(userId),
     });

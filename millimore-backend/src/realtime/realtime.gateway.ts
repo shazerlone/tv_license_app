@@ -68,6 +68,7 @@ export class RealtimeGateway {
     this.bus.on('broadcast', ({ broadcastId, payload }) =>
       this.forwardBroadcast(broadcastId, payload),
     );
+    this.bus.on('channel', ({ channel, payload }) => this.forwardChannel(channel, payload));
 
     const hb = setInterval(() => {
       this.wss?.clients.forEach((c: Client) => {
@@ -168,6 +169,13 @@ export class RealtimeGateway {
     const ch = `${BROADCAST_PREFIX}${broadcastId}`;
     this.wss?.clients.forEach((c: Client) => {
       if (c.readyState === WebSocket.OPEN && c.subs?.has(ch)) c.send(JSON.stringify(payload));
+    });
+  }
+
+  /** Forward to subscribers of an exact channel name (e.g. `pair:XAU/USD`). */
+  private forwardChannel(channel: string, payload: unknown) {
+    this.wss?.clients.forEach((c: Client) => {
+      if (c.readyState === WebSocket.OPEN && c.subs?.has(channel)) c.send(JSON.stringify(payload));
     });
   }
 

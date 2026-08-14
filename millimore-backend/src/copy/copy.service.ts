@@ -215,6 +215,69 @@ export class CopyService {
     }
   }
 
+  /**
+   * Copy a single posted trade (contract §4.6): allocate wallet margin and open
+   * one position matching the post's pair/side/entry. Reuses the copy-config +
+   * settlement machinery, so stopping the trader settles it like any copy.
+   */
+  async copyTrade(userId: string, postId: string, amount: number, leverage?: number): Promise<CopyPositionDto> {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { trader: true },
+    });
+    if (!post) throw new NotFoundException({ code: 'post_not_found', message: 'Post not found' });
+    if (post.type !== 'trade' || !post.tradeSide || !post.pair) {
+      throw new BadRequestException({ code: 'not_a_trade_post', message: 'This post is not a copyable trade.' });
+    }
+    const trader = post.trader;
+
+    const settings = await this.settings.get();
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { leverage: true, frozen: true, banned: true },
+    });
+    if (user?.frozen || user?.banned) {
+      throw new BadRequestException({ code: 'account_restricted', message: 'Trading is disabled on this account.' });
+    }
+    const lev = Math.min(settings.maxLeverage, Math.max(1, Math.round(leverage ?? user?.leverage ?? settings.defaultLeverage)));
+
+    // Allocate margin from the wallet (deposit-first).
+    const existing = await this.prisma.copyConfig.findUnique({ where: { userId_traderId: { userId, traderId: trader.id } } });
+    if (!existing || !existing.active) {
+      await this.wallet.post({ userId, type: LedgerType.copy_allocate, amount: -amount, refId: existing?.id, note: `Copy trade ${post.pair}` });
+    }
+    await this.prisma.copyConfig.upsert({
+      where: { userId_traderId: { userId, traderId: trader.id } },
+      update: { amount, leverage: lev, active: true, stoppedAt: null, accountId: 'wallet' },
+      create: { id: genId('cc'), userId, traderId: trader.id, accountId: 'wallet', amount, leverage: lev },
+    });
+
+    // Open exactly one position matching the posted trade.
+    const isBuy = post.tradeSide === 'buy';
+    const entry = post.tradeEntryPrice ?? this.prices.price(post.pair) ?? 1;
+    const lots = round(Math.max(0.01, ((amount * lev) / 500000)), 2);
+    const position = await this.prisma.copyPosition.create({
+      data: {
+        id: genId('pos'),
+        userId,
+        traderId: trader.id,
+        traderName: trader.name,
+        accountId: 'wallet',
+        pair: post.pair,
+        isBuy,
+        entryPrice: entry,
+        lots,
+      },
+    });
+    void this.bridge
+      .placeOrder({ accountRef: `corp:${trader.id}`, symbol: post.pair, side: isBuy ? 'buy' : 'sell', volume: amount * lev })
+      .catch(() => undefined);
+    await this.notifications.pushEvent(userId, 'trade.opened', `Copied ${trader.name}: ${post.pair}`, {
+      data: { traderId: trader.id, name: trader.name, pair: post.pair, isBuy, entryPrice: entry },
+    });
+    return this.toPositionDto(position);
+  }
+
   async stop(userId: string, traderId: string): Promise<void> {
     const trader = await this.prisma.trader.findUnique({
       where: { id: traderId },

@@ -45,6 +45,20 @@ export class StartCopyDto {
   autoCopy?: boolean;
 }
 
+/** POST /copy/trade/{postId} body — copy a single posted trade. */
+export class CopyTradeDto {
+  @ApiProperty({ example: 200, description: 'Margin to allocate from the wallet.' })
+  @IsNumber()
+  @Min(1)
+  amount: number;
+
+  @ApiPropertyOptional({ example: 100, description: 'Leverage (1..maxLeverage). Defaults to your setting.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  leverage?: number;
+}
+
 /** Contract §3 CopyPosition. */
 export class CopyPositionDto {
   @ApiProperty({ example: 'pos_1' }) id: string;

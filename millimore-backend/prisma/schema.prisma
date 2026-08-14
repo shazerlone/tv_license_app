@@ -628,6 +628,16 @@ model Post {
   pair     String?
   title    String?
   points   String[] @default([])
+  imageUrl String? // optional chart/setup screenshot (uploaded via /uploads)
+
+  // Trade-post fields (type=trade) — makes a post copyable (contract §4.6).
+  tradeSide       String? // "buy" | "sell"
+  tradeEntryType  String? // "market" | "limit"
+  tradeEntryPrice Float?
+  tradeSl         Float?
+  tradeTp         Float?
+  tradeSlPct      Float?
+  tradeTpPct      Float?
 
   createdAt DateTime @default(now())
 
@@ -637,6 +647,19 @@ model Post {
 
   @@index([traderId])
   @@index([createdAt])
+}
+
+/// A per-pair public chat message (contract §pairs). Powers the Exness/eToro-style
+/// chat under a symbol's chart. Broadcast over the WS `pair:{symbol}` channel.
+model PairChat {
+  id        String   @id // "pc_..."
+  symbol    String // e.g. "XAU/USD"
+  userId    String
+  author    String // username/name snapshot
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([symbol, createdAt])
 }
 
 model PostLike {
