@@ -16,6 +16,7 @@ import { CryptoService } from '../common/crypto/crypto.service';
 import { OtpService } from './otp/otp.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { TwofaService } from '../twofa/twofa.service';
+import { MailService } from '../mail/mail.service';
 import { genId } from '../common/ids';
 import { countryNameFromIso } from '../common/countries';
 import {
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly referrals: ReferralsService,
     private readonly twofa: TwofaService,
+    private readonly mail: MailService,
   ) {}
 
   /** Resolve a referral code → { referredById, referredByCode } for user create. */
@@ -210,6 +212,85 @@ export class AuthService {
       }
     }
     return this.envelope(user);
+  }
+
+  // ── password reset / change ─────────────────────────────────────────
+  private resetTtlMinutes(): number {
+    return Number(this.config.get<string>('PASSWORD_RESET_TTL_MINUTES', '30'));
+  }
+
+  /**
+   * Start a password reset. Always returns ok (never reveals whether the email
+   * exists — no account enumeration). When email isn't configured
+   * (MAIL_PROVIDER=console) the raw token is returned as `devToken` so the app
+   * team can test end-to-end, mirroring the OTP `devCode` behaviour.
+   */
+  async forgotPassword(email: string): Promise<{ ok: true; devToken?: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Only email/password accounts can reset; phone-only users use OTP login.
+    if (!user || !user.passwordHash) return { ok: true };
+
+    const token = this.crypto.randomToken();
+    const ttl = this.resetTtlMinutes();
+    await this.prisma.passwordReset.create({
+      data: {
+        id: genId('pr'),
+        userId: user.id,
+        tokenHash: this.crypto.hashCode(token),
+        expiresAt: new Date(Date.now() + ttl * 60_000),
+      },
+    });
+    const delivered = await this.mail.sendPasswordReset(email, { name: user.name ?? undefined, token, ttlMinutes: ttl });
+    if (!delivered) this.logger.log(`[console] password reset token for ${email}: ${token}`);
+    return delivered ? { ok: true } : { ok: true, devToken: token };
+  }
+
+  /** Complete a reset with the emailed token; sets a new password. */
+  async resetPassword(token: string, newPassword: string): Promise<{ ok: true }> {
+    const row = await this.prisma.passwordReset.findFirst({
+      where: { tokenHash: this.crypto.hashCode(token), usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!row) {
+      throw new BadRequestException({ code: 'reset_token_invalid', message: 'This reset link is invalid or has expired.' });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: row.userId }, data: { passwordHash } }),
+      this.prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
+      // Invalidate any other outstanding reset tokens for this user.
+      this.prisma.passwordReset.updateMany({
+        where: { userId: row.userId, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+    const user = await this.prisma.user.findUnique({ where: { id: row.userId } });
+    if (user?.email) {
+      void this.mail.sendSecurityAlert(user.email, {
+        name: user.name ?? undefined,
+        title: 'Your password was reset',
+        detail: 'Your Millimore password was just changed using a reset link.',
+      });
+    }
+    return { ok: true };
+  }
+
+  /** Change password for a logged-in user (requires the current password). */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ ok: true }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException({ code: 'invalid_credentials', message: 'Your current password is incorrect.' });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    if (user.email) {
+      void this.mail.sendSecurityAlert(user.email, {
+        name: user.name ?? undefined,
+        title: 'Your password was changed',
+        detail: 'Your Millimore password was just changed from your account settings.',
+      });
+    }
+    return { ok: true };
   }
 
   // ── social login ───────────────────────────────────────────────────

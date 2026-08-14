@@ -161,13 +161,19 @@ POST /auth/register/creator    { name, phone, residenceIso, market, platform,
                                  verification: { platform, server?, account?, investorPassword?, statementUrl? } }
 POST /auth/otp/request         { phone } → { requestId }
 POST /auth/otp/verify          { requestId, code } → { token, user }
-POST /auth/login               { email, password } → { token, user }
+POST /auth/login               { email, password, twofaCode? } → { token, user }
 POST /auth/social/apple        { identityToken } → { token, user }
 POST /auth/social/google       { idToken } → { token, user }
+POST /auth/password/forgot     { email } → { ok:true, devToken? }   // emails a reset token; devToken only when MAIL_PROVIDER=console
+POST /auth/password/reset      { token, newPassword } → { ok:true } // err: reset_token_invalid
+POST /auth/password/change     { currentPassword, newPassword } → { ok:true }  // auth; err: invalid_credentials
 GET  /me                       → { user }
 PATCH /me                      { name?, photoUrl?, ... } → { user }
 POST /auth/logout
 ```
+> `password/forgot` always returns `{ ok:true }` (never reveals whether the email
+> exists). New passwords must be ≥ 8 chars. Sensitive auth routes (login, otp,
+> password/*) are rate-limited (429 `rate_limited`).
 > App mapping: replaces `SessionController.signInAsFollower/Creator`, OTP screen,
 > login demo (`trader@millimore.app`).
 
@@ -365,13 +371,19 @@ GET  /admin/system             → server load, queue depth, API quota (YouTube)
 ```
 DATABASE_URL
 JWT_SECRET
+CREDENTIAL_ENCRYPTION_KEY   # AES-256-GCM key for write-only secrets (set ONCE, never rotate)
 OTP_PROVIDER_KEY            # e.g. Twilio/MSG91
+MAIL_PROVIDER / MAIL_SMTP_* # transactional email (password reset, security alerts) — SES/SendGrid SMTP
+MARKET_DATA_PROVIDER + key  # live /prices quotes (twelvedata/finnhub); synthetic if unset
 CLOUDFLARE_STREAM_TOKEN     # live inputs + outputs (simulcast)
 YOUTUBE_OAUTH_CLIENT_ID / SECRET   # live chat + simulcast auth
 FACEBOOK_APP_ID / SECRET
 BROKER_BRIDGE_URL          # MT4/MT5 gateway / EA bridge for prices+orders
 STORAGE_BUCKET             # statements, photos (S3/GCS)
 ```
+> Full annotated list with defaults lives in `.env.example`. Email is optional
+> (dev logs the reset token); security hardening (rate limiting, helmet headers)
+> needs no config.
 
 ## 8. Suggested stack
 - **Backend:** NestJS (TS) or FastAPI (Py); Postgres; Redis (WS/pubsub); or **Supabase** for speed (auth + DB + realtime).

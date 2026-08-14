@@ -764,6 +764,20 @@ model OtpRequest {
   @@index([phone])
 }
 
+/// Email password-reset token. The raw token is emailed to the user; only its
+/// hash is stored (like OtpRequest). Single-use, short-lived.
+model PasswordReset {
+  id         String    @id // "pr_..."
+  userId     String
+  tokenHash  String // sha-256 of the raw token, never the raw value
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
 /// Creator verification application (from /auth/register/creator or /creator/apply).
 /// The admin approval queue (milestone 2) reads pending rows here.
 model CreatorApplication {

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
@@ -32,6 +34,7 @@ import { SupportModule } from './support/support.module';
 import { TwofaModule } from './twofa/twofa.module';
 import { YoutubeModule } from './youtube/youtube.module';
 import { PairsModule } from './pairs/pairs.module';
+import { MailModule } from './mail/mail.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -53,6 +56,10 @@ const staticModules = existsSync(ADMIN_DIR)
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Global rate limit (per IP, per instance). Sensitive auth routes tighten
+    // this further with @Throttle. Behind an ALB, main.ts sets 'trust proxy' so
+    // the real client IP is used.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
     RedisModule,
     RealtimeBusModule,
     PrismaModule,
@@ -78,6 +85,7 @@ const staticModules = existsSync(ADMIN_DIR)
     TwofaModule,
     YoutubeModule,
     PairsModule,
+    MailModule,
     CopyModule,
     RealtimeModule,
     UploadsModule,
@@ -85,5 +93,6 @@ const staticModules = existsSync(ADMIN_DIR)
     ...staticModules,
   ],
   controllers: [HealthController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

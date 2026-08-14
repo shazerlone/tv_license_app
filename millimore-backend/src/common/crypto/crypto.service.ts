@@ -66,4 +66,9 @@ export class CryptoService {
   hashCode(code: string): string {
     return createHash('sha256').update(`${code}:${this.key.toString('hex')}`).digest('hex');
   }
+
+  /** URL-safe random token for one-time links (password reset, etc.). */
+  randomToken(bytes = 32): string {
+    return randomBytes(bytes).toString('base64url');
+  }
 }

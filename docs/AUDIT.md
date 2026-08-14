@@ -31,12 +31,14 @@ These all work in dev/synthetic today and turn on when you add env vars.
 - 🟡 **B2. Trading-account credential verification.** `POST /accounts` stores the
   investor password but doesn't yet verify it against the broker (TODO in
   `accounts.service.ts`).
-- 🟡 **B3. Account password reset / forgot-password.** No email/OTP password-reset
-  flow, and no "change my password" for a logged-in email user. (Phone users can
-  still log in via OTP.)
-- 🟡 **B4. Transactional email.** No email at all (only push + in-app). A fintech
-  should email deposit receipts, withdrawal approvals, security/login alerts,
-  KYC results. Needs an email provider (SES/SendGrid) + a small mail module.
+- ✅ **B3. Account password reset / forgot-password.** DONE (M17). `POST
+  /auth/password/forgot|reset|change` — email token flow (no account
+  enumeration, single-use tokens, ≥8-char policy) + authenticated change with
+  security-alert emails.
+- ⚠️ **B4. Transactional email.** Mail seam DONE (M17): `src/mail/` sends via SMTP
+  (SES/SendGrid) gated by `MAIL_PROVIDER`, console fallback in dev. Wired for
+  password reset + security alerts. Still to add: deposit/withdrawal/KYC receipt
+  templates on the money + KYC flows.
 - 🟢 **B5. On-stream trade overlays / live orders.** Broadcast `trades`/`pnl`
   return 0 until the broker bridge (B1).
 - 🟢 **B6. Programmatic YouTube simulcast.** Manual simulcast (paste stream key)
@@ -65,9 +67,10 @@ built for most of it yet** (that's the other session's job — see
 - 🟢 A few pages use inline styles rather than shared classes (cosmetic only).
 
 ## E. Hardening & quality (pre-scale)
-- 🟡 **Rate limiting** — no `@nestjs/throttler` on auth/OTP/login (brute-force +
-  abuse protection). Recommended before public launch.
-- 🟢 **Security headers** — add `helmet`.
+- ✅ **Rate limiting** — DONE (M17). `@nestjs/throttler` global (200/min/IP) with
+  a tighter 10/min on login/otp/password routes; health exempt; `trust proxy` set
+  so the real client IP is used behind the ALB. Returns 429 `rate_limited`.
+- ✅ **Security headers** — DONE (M17). `helmet` enabled in `main.ts`.
 - 🟡 **Automated tests** — 0 `.spec.ts`. Logic was verified per-milestone via
   scripts, but there's no CI test suite guarding regressions.
 - 🟢 **CSRF on OAuth `state`** — YouTube callback uses `state=userId`; sign it.

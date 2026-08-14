@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { buildOpenApiConfig } from './openapi';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -12,6 +13,14 @@ async function bootstrap() {
   // verify the payload signature; JSON parsing still works as normal.
   const app = await NestFactory.create(AppModule, { bufferLogs: false, rawBody: true });
   const config = app.get(ConfigService);
+
+  // Behind an ALB/CloudFront, trust the proxy so req.ip is the real client (used
+  // by the rate limiter) and secure-cookie/redirect logic is correct.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  // Security headers. Keep CSP off here — the API serves JSON, and the admin SPA
+  // it also hosts sets its own; enabling a strict CSP would break the SPA/Swagger.
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
   const apiPrefix = config.get<string>('API_PREFIX', 'v1');
   app.setGlobalPrefix(apiPrefix);
