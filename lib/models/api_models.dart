@@ -223,6 +223,8 @@ class ApiPost {
   final String createdAt;
   final bool isLiked;
   final bool saved;
+  final String? imageUrl;
+  final Map<String, dynamic>? trade; // { side, entryType, entryPrice?, sl?, tp? }
   const ApiPost({
     required this.id,
     required this.trader,
@@ -236,6 +238,8 @@ class ApiPost {
     required this.createdAt,
     required this.isLiked,
     required this.saved,
+    this.imageUrl,
+    this.trade,
   });
   factory ApiPost.fromJson(Map<String, dynamic> j) => ApiPost(
         id: j['id'].toString(),
@@ -250,6 +254,8 @@ class ApiPost {
         createdAt: j['createdAt']?.toString() ?? '',
         isLiked: j['isLiked'] == true,
         saved: j['saved'] == true,
+        imageUrl: (j['imageUrl'] ?? j['chartImageUrl']) as String?,
+        trade: j['trade'] is Map ? (j['trade'] as Map).cast<String, dynamic>() : null,
       );
 }
 

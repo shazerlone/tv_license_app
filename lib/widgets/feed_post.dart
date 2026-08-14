@@ -80,6 +80,22 @@ class FeedPost extends StatelessWidget {
                     const SizedBox(height: 12),
                     _TradeChip(pair: post.pair!, type: post.type),
                   ],
+                  if (post.type == PostType.trade && post.side != null) ...[
+                    const SizedBox(height: 12),
+                    _TradeDetails(post: post),
+                  ],
+                  if (post.chartImageUrl != null && post.chartImageUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      child: Image.network(
+                        post.chartImageUrl!,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   Row(
                     children: [
@@ -316,6 +332,56 @@ class _TradeChip extends StatelessWidget {
           Text(type == PostType.trade ? 'Trade' : 'Analysis', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+        ],
+      ),
+    );
+  }
+}
+
+/// A copyable-trade summary: BUY/SELL badge + entry / SL / TP.
+class _TradeDetails extends StatelessWidget {
+  final Post post;
+  const _TradeDetails({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final buy = post.side == 'buy';
+    final color = buy ? AppColors.green : AppColors.red;
+    String fmt(double? v) => v == null ? '—' : (v >= 100 ? v.toStringAsFixed(2) : v.toStringAsFixed(4));
+    Widget cell(String label, String value, Color c) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+              const SizedBox(height: 2),
+              Text(value, style: GoogleFonts.robotoMono(fontSize: 13.5, fontWeight: FontWeight.w700, color: c)),
+            ],
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: color.withOpacity(0.35))),
+      child: Column(
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(6)),
+              child: Row(children: [
+                Icon(buy ? Icons.trending_up_rounded : Icons.trending_down_rounded, size: 14, color: color),
+                const SizedBox(width: 5),
+                Text(buy ? 'BUY' : 'SELL', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+              ]),
+            ),
+            const SizedBox(width: 10),
+            if (post.pair != null) Text(post.pair!, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            cell('Entry', fmt(post.entryPrice), AppColors.textPrimary),
+            cell('Stop loss', fmt(post.sl), AppColors.red),
+            cell('Take profit', fmt(post.tp), AppColors.green),
+          ]),
         ],
       ),
     );

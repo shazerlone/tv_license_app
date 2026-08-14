@@ -27,6 +27,11 @@ class Post {
   final int comments;
   final DateTime createdAt;
   final bool isLiked;
+  // Trade posts: direction + levels so the feed can render a proper trade card.
+  final String? side; // buy|sell
+  final double? entryPrice;
+  final double? sl;
+  final double? tp;
 
   const Post({
     required this.id,
@@ -39,20 +44,33 @@ class Post {
     this.comments = 0,
     required this.createdAt,
     this.isLiked = false,
+    this.side,
+    this.entryPrice,
+    this.sl,
+    this.tp,
   });
 
   /// Maps a backend ApiPost (openapi.json §4.5) onto the UI model.
-  factory Post.fromApi(ApiPost a) => Post(
-        id: a.id,
-        trader: Trader.fromApi(a.trader),
-        type: _postTypeFromApi(a.type),
-        content: a.content,
-        pair: a.pair,
-        likes: a.likes,
-        comments: a.comments,
-        createdAt: DateTime.tryParse(a.createdAt)?.toLocal() ?? DateTime.now(),
-        isLiked: a.isLiked,
-      );
+  factory Post.fromApi(ApiPost a) {
+    final t = a.trade;
+    double? num(k) => (t?[k] as num?)?.toDouble();
+    return Post(
+      id: a.id,
+      trader: Trader.fromApi(a.trader),
+      type: _postTypeFromApi(a.type),
+      content: a.content,
+      pair: a.pair,
+      chartImageUrl: a.imageUrl,
+      likes: a.likes,
+      comments: a.comments,
+      createdAt: DateTime.tryParse(a.createdAt)?.toLocal() ?? DateTime.now(),
+      isLiked: a.isLiked,
+      side: t?['side']?.toString(),
+      entryPrice: num('entryPrice'),
+      sl: num('sl'),
+      tp: num('tp'),
+    );
+  }
 
   String get timeAgo {
     final diff = DateTime.now().difference(createdAt);
