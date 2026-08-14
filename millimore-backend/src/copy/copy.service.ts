@@ -227,7 +227,7 @@ export class CopyService {
     });
     if (!post) throw new NotFoundException({ code: 'post_not_found', message: 'Post not found' });
     if (post.type !== 'trade' || !post.tradeSide || !post.pair) {
-      throw new BadRequestException({ code: 'not_a_trade_post', message: 'This post is not a copyable trade.' });
+      throw new BadRequestException({ code: 'post_not_a_trade', message: 'This post is not a copyable trade.' });
     }
     const trader = post.trader;
 
@@ -241,14 +241,16 @@ export class CopyService {
     }
     const lev = Math.min(settings.maxLeverage, Math.max(1, Math.round(leverage ?? user?.leverage ?? settings.defaultLeverage)));
 
-    // Allocate margin from the wallet (deposit-first).
+    // Each copied trade allocates its own margin from the wallet (deposit-first).
+    // The debit always runs, so a short balance throws `insufficient_balance`
+    // before any position is opened; the config's amount accumulates so stopping
+    // returns the full principal ± P/L.
     const existing = await this.prisma.copyConfig.findUnique({ where: { userId_traderId: { userId, traderId: trader.id } } });
-    if (!existing || !existing.active) {
-      await this.wallet.post({ userId, type: LedgerType.copy_allocate, amount: -amount, refId: existing?.id, note: `Copy trade ${post.pair}` });
-    }
+    await this.wallet.post({ userId, type: LedgerType.copy_allocate, amount: -amount, refId: existing?.id, note: `Copy trade ${post.pair}` });
+    const totalAmount = existing?.active ? existing.amount + amount : amount;
     await this.prisma.copyConfig.upsert({
       where: { userId_traderId: { userId, traderId: trader.id } },
-      update: { amount, leverage: lev, active: true, stoppedAt: null, accountId: 'wallet' },
+      update: { amount: totalAmount, leverage: lev, active: true, stoppedAt: null, accountId: 'wallet' },
       create: { id: genId('cc'), userId, traderId: trader.id, accountId: 'wallet', amount, leverage: lev },
     });
 

@@ -7157,6 +7157,40 @@
           "unread"
         ]
       },
+      "CreateTradeDto": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "market",
+              "limit"
+            ]
+          },
+          "entryPrice": {
+            "type": "number"
+          },
+          "sl": {
+            "type": "number"
+          },
+          "tp": {
+            "type": "number"
+          },
+          "slPct": {
+            "type": "number"
+          },
+          "tpPct": {
+            "type": "number"
+          }
+        }
+      },
       "CreatePostDto": {
         "type": "object",
         "properties": {
@@ -7187,6 +7221,14 @@
           "imageUrl": {
             "type": "string",
             "description": "Uploaded image URL (from POST /uploads)."
+          },
+          "trade": {
+            "description": "Trade payload (type=trade) — makes the post copyable.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CreateTradeDto"
+              }
+            ]
           },
           "side": {
             "type": "string",

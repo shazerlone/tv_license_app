@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray, IsIn, IsNumber, IsOptional, IsString, IsUrl, MaxLength, MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { TraderDto } from '../../traders/dto/trader.dto';
 
 /** The copyable trade attached to a `type:"trade"` post (contract §4.6). */
@@ -44,6 +46,23 @@ export class CommentDto {
   @ApiProperty() byMe: boolean;
 }
 
+/** Nested trade payload the app sends on a `type:"trade"` post. */
+export class CreateTradeDto {
+  @ApiPropertyOptional({ enum: ['buy', 'sell'] })
+  @IsOptional() @IsIn(['buy', 'sell'])
+  side?: string;
+
+  @ApiPropertyOptional({ enum: ['market', 'limit'] })
+  @IsOptional() @IsIn(['market', 'limit'])
+  entryType?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsNumber() entryPrice?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() sl?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() tp?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() slPct?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() tpPct?: number;
+}
+
 /** POST /posts compose body (contract §4.6). */
 export class CreatePostDto {
   @ApiProperty({ enum: ['trade', 'analysis', 'lesson', 'update'] })
@@ -78,7 +97,14 @@ export class CreatePostDto {
   @IsUrl({ require_tld: false })
   imageUrl?: string;
 
-  // Trade fields (type=trade) — makes the post copyable.
+  // Preferred: the app sends the trade as a nested object on a trade post.
+  @ApiPropertyOptional({ type: CreateTradeDto, description: 'Trade payload (type=trade) — makes the post copyable.' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateTradeDto)
+  trade?: CreateTradeDto;
+
+  // Back-compat: the same fields may also arrive flat at the top level.
   @ApiPropertyOptional({ enum: ['buy', 'sell'] })
   @IsOptional() @IsIn(['buy', 'sell'])
   side?: string;

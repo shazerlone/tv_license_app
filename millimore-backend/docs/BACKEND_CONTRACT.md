@@ -220,8 +220,9 @@ POST   /posts/{id}/comments  { text }  → Comment
 ```
 POST /posts   { type:"trade|analysis|lesson", content, pair?, title?, points?[],
                 imageUrl?,                                    // chart/screenshot
-                side?, entryType?, entryPrice?, sl?, tp?, slPct?, tpPct? } → Post
-                // trade fields (side..tpPct) apply when type:"trade" → makes the post copyable
+                trade?: { side, entryType, entryPrice?, sl?, tp?, slPct?, tpPct? } } → Post
+                // `trade` applies when type:"trade" → makes the post copyable.
+                // (the same fields are also accepted flat at the top level, back-compat)
 PATCH  /posts/{id}   { content?, title?, pair?, points?[] } → Post   // owner-only edit
 DELETE /posts/{id}                                                   // owner-only delete
 POST /uploads  { contentType, data(base64) } → { id, url }          // media (photos, statements)
@@ -240,9 +241,10 @@ GET  /portfolio/summary       → { netPnl, openPnl, bookedProfit, bookedLoss,
 POST /copy/live/{broadcastId}/{tradeId}  { accountId }   // copy a trade from a live
 ```
 `POST /copy/trade/{postId}` debits `amount` (margin) from the wallet and opens a
-single `CopyPosition` matching the post's `trade` (pair/side/entryPrice). The post
-must be `type:"trade"` with trade fields set, else `400 not_a_trade_post`. Close
-it like any copy (stopping the underlying config returns principal ± P/L).
+single `CopyPosition` matching the post's `trade` (pair/side/entryPrice). Errors:
+`400 post_not_a_trade` (post isn't a copyable trade), `400 insufficient_balance`
+(wallet can't cover `amount`). Close it like any copy (stopping the underlying
+config returns principal ± P/L).
 
 ### 4.8 Market data
 ```

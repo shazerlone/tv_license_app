@@ -188,6 +188,10 @@ export class PostsService {
   /** Compose a post (contract §4.6). Ensures the author has a trader profile. */
   async compose(userId: string, dto: CreatePostDto): Promise<PostDto> {
     const trader = await this.traders.ensureForUser(userId);
+    // Accept the trade payload nested (app's preferred shape) or flat (back-compat).
+    const isTrade = dto.type === 'trade';
+    const t = dto.trade ?? {};
+    const side = t.side ?? dto.side;
     const post = await this.prisma.post.create({
       data: {
         id: genId('p'),
@@ -199,13 +203,13 @@ export class PostsService {
         points: dto.points ?? [],
         imageUrl: dto.imageUrl,
         // Trade fields only meaningful on a trade post.
-        tradeSide: dto.type === 'trade' ? dto.side : null,
-        tradeEntryType: dto.type === 'trade' ? dto.entryType ?? 'market' : null,
-        tradeEntryPrice: dto.type === 'trade' ? dto.entryPrice : null,
-        tradeSl: dto.type === 'trade' ? dto.sl : null,
-        tradeTp: dto.type === 'trade' ? dto.tp : null,
-        tradeSlPct: dto.type === 'trade' ? dto.slPct : null,
-        tradeTpPct: dto.type === 'trade' ? dto.tpPct : null,
+        tradeSide: isTrade ? side ?? null : null,
+        tradeEntryType: isTrade ? t.entryType ?? dto.entryType ?? 'market' : null,
+        tradeEntryPrice: isTrade ? t.entryPrice ?? dto.entryPrice ?? null : null,
+        tradeSl: isTrade ? t.sl ?? dto.sl ?? null : null,
+        tradeTp: isTrade ? t.tp ?? dto.tp ?? null : null,
+        tradeSlPct: isTrade ? t.slPct ?? dto.slPct ?? null : null,
+        tradeTpPct: isTrade ? t.tpPct ?? dto.tpPct ?? null : null,
       },
       include: postInclude(userId),
     });

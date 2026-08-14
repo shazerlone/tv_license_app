@@ -335,13 +335,16 @@ Answers the app session's `APP_REQUIREMENTS.md` "🔴 Open bugs / needs" list:
    become real once the env is set on the server.
 3. **Post images.** `Post` now carries `imageUrl` (nullable). Render it as the
    post's chart/screenshot when present. Set it on compose via `imageUrl`.
-4. **Copyable trade posts.** A `type:"trade"` post now carries a `trade` object
-   (`side, entryType, entryPrice, sl, tp, slPct, tpPct`) — non-null only for trade
-   posts. Show a **Copy** button when `post.trade != null` and call
-   `POST /copy/trade/{postId}` with `{ amount, leverage? }`. It debits the wallet
-   and opens one `CopyPosition` (returned) that shows up in `/positions` and the
-   `portfolio` WS channel like any copy. Compose a trade post by passing the trade
-   fields alongside `type:"trade"`.
+4. **Copyable trade posts.** Compose a trade post by sending a **nested `trade`
+   object** alongside `type:"trade"`:
+   `trade: { side, entryType, entryPrice?, sl?, tp?, slPct?, tpPct? }` (the same
+   fields flat at the top level are also accepted). The returned `Post` carries
+   `trade` (non-null only for trade posts). Show a **Copy** button when
+   `post.trade != null` and call `POST /copy/trade/{postId}` with
+   `{ amount, leverage? }` — it debits the wallet and opens one `CopyPosition`
+   (returned) that shows up in `/positions` and the `portfolio` WS channel like
+   any copy. Errors use the standard envelope: `post_not_a_trade` (not a trade
+   post) and `insufficient_balance` (wallet can't cover `amount` → deposit prompt).
 5. **Per-pair chat.** `GET /pairs/{symbol}/chat` (recent, oldest→newest) and
    `POST /pairs/{symbol}/chat { text }`. **URL-encode the symbol** (`XAU%2FUSD`).
    New messages also stream live over the WS channel **`pair:{symbol}`** (subscribe
