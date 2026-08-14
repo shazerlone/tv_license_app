@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/post.dart';
 import '../state/app_state.dart';
+import '../screens/copy_trading_screen.dart';
 import 'verified_badge.dart';
 import 'comments_sheet.dart';
 
@@ -83,6 +84,18 @@ class FeedPost extends StatelessWidget {
                   if (post.type == PostType.trade && post.side != null) ...[
                     const SizedBox(height: 12),
                     _TradeDetails(post: post),
+                  ],
+                  if (post.type == PostType.trade) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: post.trader))),
+                        style: ElevatedButton.styleFrom(minimumSize: const Size(0, 44)),
+                        icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.white),
+                        label: Text('Copy this trader', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
+                    ),
                   ],
                   if (post.chartImageUrl != null && post.chartImageUrl!.isNotEmpty) ...[
                     const SizedBox(height: 12),
