@@ -99,6 +99,21 @@ export class MailService {
     });
   }
 
+  async sendPriceAlert(to: string, opts: { name?: string; symbol: string; direction: string; targetPrice: number; price: number }): Promise<boolean> {
+    const hi = opts.name ? `Hi ${opts.name},` : 'Hi,';
+    const line = `${opts.symbol} is now ${opts.direction} ${opts.targetPrice} — trading at ${opts.price}.`;
+    return this.send({
+      to,
+      subject: `Price alert: ${opts.symbol} ${opts.direction} ${opts.targetPrice}`,
+      text: `${hi}\n\n${line}\n\nOpen Millimore to act on it.`,
+      html: this.wrap(
+        `<p>${hi}</p>
+         <p><strong>${line}</strong></p>
+         <p style="color:#64748B;font-size:13px">This alert has now fired and won't trigger again. Set a new one anytime.</p>`,
+      ),
+    });
+  }
+
   /** Minimal, brand-consistent HTML shell (light, Inter, restrained accent). */
   private wrap(inner: string): string {
     return `<div style="font-family:Inter,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#0F172A">

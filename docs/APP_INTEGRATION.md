@@ -350,3 +350,19 @@ Answers the app session's `APP_REQUIREMENTS.md` "🔴 Open bugs / needs" list:
    New messages also stream live over the WS channel **`pair:{symbol}`** (subscribe
    with the decoded name, e.g. `pair:XAU/USD`) using the standard
    `{ ch, type:"chat", data:{ author, text, createdAt } }` envelope.
+
+## 15. Price alerts (milestone 18) — NEW, live
+
+Let users set a target price on any pair and get notified when it's hit.
+
+- **List / create / cancel:** `GET /alerts?status=active|triggered|cancelled`,
+  `POST /alerts { symbol, direction:"above"|"below", targetPrice, note?, notifyEmail? }`,
+  `DELETE /alerts/{id}`.
+- **One-shot:** fires once when the live price crosses the target, then
+  `status:"triggered"` (with `triggeredPrice`/`triggeredAt`). The user gets a push
+  + in-app notification (type `price.alert`), and an email if `notifyEmail` was
+  set. Also arrives live on the WS `user` channel as
+  `{ ch:"user", type:"price.alert", data:{ symbol, direction, targetPrice, price } }`.
+- **Guards:** max 50 active alerts; creating one that's already true is rejected
+  (`alert_already_met`) — nudge the user to a target on the other side of the
+  current price. Unknown symbols → `unknown_symbol` (use `GET /symbols`).

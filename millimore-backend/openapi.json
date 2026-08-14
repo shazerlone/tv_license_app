@@ -4015,6 +4015,114 @@
         ]
       }
     },
+    "/v1/alerts": {
+      "get": {
+        "operationId": "AlertsController_list",
+        "summary": "My price alerts (contract §alerts)",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "active",
+                "triggered",
+                "cancelled"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceAlertDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "alerts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "AlertsController_create",
+        "summary": "Create a price alert (contract §alerts)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePriceAlertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceAlertDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "alerts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/v1/alerts/{id}": {
+      "delete": {
+        "operationId": "AlertsController_cancel",
+        "summary": "Cancel a price alert (contract §alerts)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "alerts"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/copy/{traderId}/start": {
       "post": {
         "operationId": "CopyController_start",
@@ -7936,6 +8044,108 @@
         },
         "required": [
           "text"
+        ]
+      },
+      "PriceAlertDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pa_1"
+          },
+          "symbol": {
+            "type": "string",
+            "example": "XAU/USD"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "above",
+              "below"
+            ]
+          },
+          "targetPrice": {
+            "type": "number",
+            "example": 2450
+          },
+          "note": {
+            "type": "object",
+            "nullable": true,
+            "example": "Take profit zone"
+          },
+          "notifyEmail": {
+            "type": "boolean",
+            "example": false,
+            "description": "Also email when it triggers."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "triggered",
+              "cancelled"
+            ]
+          },
+          "triggeredAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "triggeredPrice": {
+            "type": "object",
+            "nullable": true,
+            "example": 2450.2
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "direction",
+          "targetPrice",
+          "notifyEmail",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CreatePriceAlertDto": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "example": "XAU/USD",
+            "description": "A tradable symbol (see GET /symbols)."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "above",
+              "below"
+            ],
+            "description": "Fire when price crosses the target upward (above) or downward (below)."
+          },
+          "targetPrice": {
+            "type": "number",
+            "example": 2450,
+            "description": "Target price; must be positive."
+          },
+          "note": {
+            "type": "string",
+            "example": "Take profit zone",
+            "maxLength": 140
+          },
+          "notifyEmail": {
+            "type": "boolean",
+            "example": false,
+            "default": false,
+            "description": "Also send an email when it triggers."
+          }
+        },
+        "required": [
+          "symbol",
+          "direction",
+          "targetPrice"
         ]
       },
       "StartCopyDto": {

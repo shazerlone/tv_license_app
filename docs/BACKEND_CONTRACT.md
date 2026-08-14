@@ -315,6 +315,20 @@ POST /pairs/{symbol}/chat  { text }  → { author, text, createdAt }        // f
 > The public chat under a pair's chart. New messages also arrive live on the WS
 > `pair:{symbol}` channel (below) using the same `{ ch, type:"chat", data }` envelope.
 
+### 4.14 Price alerts
+```
+GET    /alerts?status=active|triggered|cancelled  → [ PriceAlert ]
+POST   /alerts   { symbol, direction:"above"|"below", targetPrice, note?, notifyEmail? } → PriceAlert
+DELETE /alerts/{id}                                                        // cancel (204)
+```
+`PriceAlert = { id, symbol, direction, targetPrice, note, notifyEmail, status,
+triggeredAt, triggeredPrice, createdAt }`. One-shot: fires once when the live
+price crosses `targetPrice` in `direction`, then `status:"triggered"`. On firing
+the user gets an in-app notification + push (type `price.alert`) and, when
+`notifyEmail`, an email. Max 50 active alerts. Errors: `unknown_symbol`,
+`alert_already_met` (target is on the wrong side of the current price),
+`too_many_alerts`.
+
 ---
 
 ## 5. Realtime (WebSocket)
@@ -334,6 +348,7 @@ Subscribe to channels; server pushes events:
 { "ch": "broadcast:b_1",   "type": "trade",    "data": LiveTrade }                    // overlay
 { "ch": "portfolio",       "type": "position", "data": CopyPosition }                 // live P/L
 { "ch": "pair:XAU/USD",    "type": "chat",     "data": { "author", "text", "createdAt" } }  // per-pair chat
+{ "ch": "user",            "type": "price.alert", "data": { "alertId", "symbol", "direction", "targetPrice", "price" } }
 { "ch": "user",            "type": "creator.status", "data": { "creatorStatus": "approved" } }
 ```
 

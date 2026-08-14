@@ -35,6 +35,7 @@ import { TwofaModule } from './twofa/twofa.module';
 import { YoutubeModule } from './youtube/youtube.module';
 import { PairsModule } from './pairs/pairs.module';
 import { MailModule } from './mail/mail.module';
+import { AlertsModule } from './alerts/alerts.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -86,6 +87,7 @@ const staticModules = existsSync(ADMIN_DIR)
     YoutubeModule,
     PairsModule,
     MailModule,
+    AlertsModule,
     CopyModule,
     RealtimeModule,
     UploadsModule,

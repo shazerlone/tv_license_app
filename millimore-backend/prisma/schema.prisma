@@ -778,6 +778,25 @@ model PasswordReset {
   @@index([tokenHash])
 }
 
+/// A user's price alert on a symbol. One-shot: fires once when the live price
+/// crosses `targetPrice` in `direction`, then status → triggered.
+model PriceAlert {
+  id             String    @id // "pa_..."
+  userId         String
+  symbol         String // e.g. "XAU/USD"
+  direction      String // "above" | "below"
+  targetPrice    Float
+  note           String?
+  notifyEmail    Boolean   @default(false)
+  status         String    @default("active") // active | triggered | cancelled
+  triggeredAt    DateTime?
+  triggeredPrice Float?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([status, symbol])
+}
+
 /// Creator verification application (from /auth/register/creator or /creator/apply).
 /// The admin approval queue (milestone 2) reads pending rows here.
 model CreatorApplication {
