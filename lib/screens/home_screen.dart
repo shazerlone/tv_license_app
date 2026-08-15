@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
+import '../widgets/market_ticker.dart';
 import 'markets_screen.dart';
 import '../config.dart';
 import '../models/trader.dart';
@@ -211,10 +212,12 @@ class _FollowerHomeState extends State<FollowerHome> {
         // Portfolio summary (copy engine — demo until milestone 4)
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 14),
             child: _PortfolioCard(totalPnl: totalPnl, openCount: openCount, following: store.subscriptionCount, walletBalance: store.walletLoaded ? store.walletBalance : null),
           ),
         ),
+        const SliverToBoxAdapter(child: MarketTicker()),
+        const SliverToBoxAdapter(child: SizedBox(height: 8)),
         if (_liveTraders.isNotEmpty) ...[
           SliverToBoxAdapter(child: _SectionHeader(dot: true, title: 'Live now')),
           SliverToBoxAdapter(
@@ -554,10 +557,12 @@ class _CreatorHomeState extends State<CreatorHome> {
           ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(24, pending ? 0 : 8, 24, 20),
+            padding: EdgeInsets.fromLTRB(24, pending ? 0 : 8, 24, 14),
             child: _CreatorStatsCard(),
           ),
         ),
+        const SliverToBoxAdapter(child: MarketTicker()),
+        const SliverToBoxAdapter(child: SizedBox(height: 18)),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
