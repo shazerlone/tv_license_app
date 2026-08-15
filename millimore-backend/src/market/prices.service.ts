@@ -1,7 +1,9 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { randomBytes } from 'crypto';
+import { PositionStatus } from '@prisma/client';
 import { RedisService } from '../redis/redis.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { MarketFeedService } from './market-feed.service';
 
 export type PriceMap = Record<string, number>;
@@ -25,11 +27,22 @@ const CH_PRICES = 'rt:prices';
 const KEY_SNAPSHOT = 'prices:snapshot';
 const KEY_LEADER = 'prices:leader';
 const LEADER_TTL_MS = 3000;
-// How often the leader pulls fresh real quotes (free provider tiers rate-limit,
-// so we anchor to reality every REFRESH_MS and interpolate on each 1s tick).
-const REFRESH_MS = 15000;
 // Per-tick pull of the live price toward its real anchor (0..1).
 const REVERSION = 0.25;
+
+const num = (v: string | undefined, d: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : d;
+};
+// How often the leader pulls fresh real quotes. Providers bill 1 credit per
+// symbol per call, so this × (active symbols) × 1440 = credits/day — keep it high.
+const REFRESH_MS = num(process.env.MARKET_REFRESH_MS, 60_000);
+// A symbol counts as "in use" for this long after it's requested via REST.
+const ACTIVE_WINDOW_MS = num(process.env.MARKET_ACTIVE_WINDOW_MS, 180_000);
+// Hard daily cap on provider credits (symbols fetched). Once hit, we hold the
+// last real anchors (synthetic interpolation continues) until the UTC-day reset.
+// Prevents ever blowing a metered plan again, whatever the load.
+const DAILY_CREDIT_BUDGET = num(process.env.MARKET_DAILY_CREDIT_BUDGET, 750);
 
 /**
  * Market price engine. Ticks ~1/sec and emits the snapshot on `tick`.
@@ -52,14 +65,28 @@ export class PricesService extends EventEmitter implements OnModuleInit, OnModul
   // Real-world targets each tick reverts toward. Default to the synthetic bases.
   private anchors: PriceMap = {};
   private lastRefresh = 0;
+  // symbol → epoch-ms until which a REST-requested symbol stays "in use".
+  private activeUntil = new Map<string, number>();
+  // Daily credit accounting (UTC day) for the hard budget guard.
+  private creditDay = '';
+  private creditsUsedToday = 0;
+  private budgetWarned = false;
   private timer?: NodeJS.Timeout;
 
   constructor(
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
     private readonly feed: MarketFeedService,
   ) {
     super();
     this.setMaxListeners(0);
+  }
+
+  /** Mark symbols as actively viewed (from GET /prices) so the leader refreshes
+   *  their real quotes for the next ACTIVE_WINDOW_MS. */
+  markActive(symbols: string[]) {
+    const until = Date.now() + ACTIVE_WINDOW_MS;
+    for (const s of symbols) if (SYMBOLS[s]) this.activeUntil.set(s, until);
   }
 
   async onModuleInit() {
@@ -69,7 +96,9 @@ export class PricesService extends EventEmitter implements OnModuleInit, OnModul
     }
 
     if (this.feed.enabled) {
-      this.logger.log(`market feed: ${this.feed.providerName} (anchoring every ${REFRESH_MS / 1000}s)`);
+      this.logger.log(
+        `market feed: ${this.feed.providerName} · refresh ${REFRESH_MS / 1000}s · active-only · budget ${DAILY_CREDIT_BUDGET} credits/day`,
+      );
       // Prime real anchors immediately so prices are correct from the first tick.
       await this.refreshAnchors();
     } else {
@@ -123,12 +152,63 @@ export class PricesService extends EventEmitter implements OnModuleInit, OnModul
     void this.refreshAnchors();
   }
 
-  /** Pull live quotes and move the anchors; unresolved symbols keep their base. */
+  /**
+   * The symbols worth spending real quotes on right now: those actively viewed
+   * (GET /prices within the window) plus those the server needs regardless of
+   * viewers — open copy positions (P/L) and active price alerts (triggers).
+   * Everything else keeps drifting synthetically. Returns [] when nothing is in
+   * use, so an idle server spends zero credits.
+   */
+  private async neededSymbols(): Promise<string[]> {
+    const now = Date.now();
+    const set = new Set<string>();
+    for (const [sym, until] of this.activeUntil) {
+      if (until > now) set.add(sym);
+      else this.activeUntil.delete(sym);
+    }
+    try {
+      const [positions, alerts] = await Promise.all([
+        this.prisma.copyPosition.findMany({ where: { status: PositionStatus.active }, select: { pair: true }, distinct: ['pair'] }),
+        this.prisma.priceAlert.findMany({ where: { status: 'active' }, select: { symbol: true }, distinct: ['symbol'] }),
+      ]);
+      for (const p of positions) if (p.pair) set.add(p.pair);
+      for (const a of alerts) if (a.symbol) set.add(a.symbol);
+    } catch {
+      /* transient DB issue — fall back to just the actively-viewed set */
+    }
+    return [...set].filter((s) => SYMBOLS[s]);
+  }
+
+  /**
+   * Pull live quotes for the in-use symbols only, in one batched request, within
+   * the daily credit budget. Unfetched symbols keep their last anchor.
+   */
   private async refreshAnchors() {
-    const quotes = await this.feed.fetchQuotes(this.symbols());
-    for (const [sym, cfg] of Object.entries(SYMBOLS)) {
+    const needed = await this.neededSymbols();
+    if (needed.length === 0) return; // idle → no provider calls, no credits
+
+    const day = new Date().toISOString().slice(0, 10);
+    if (day !== this.creditDay) {
+      this.creditDay = day;
+      this.creditsUsedToday = 0;
+      this.budgetWarned = false;
+    }
+    const remaining = DAILY_CREDIT_BUDGET - this.creditsUsedToday;
+    if (remaining <= 0) {
+      if (!this.budgetWarned) {
+        this.budgetWarned = true;
+        this.logger.warn(`market data daily credit budget (${DAILY_CREDIT_BUDGET}) reached — holding last quotes until UTC reset`);
+      }
+      return;
+    }
+
+    const batch = needed.slice(0, remaining); // never spend past the budget
+    const quotes = await this.feed.fetchQuotes(batch);
+    this.creditsUsedToday += batch.length; // providers bill per requested symbol
+    for (const sym of batch) {
       const q = quotes[sym];
-      if (q != null && Number.isFinite(q)) this.anchors[sym] = this.round(q, cfg.dp);
+      const cfg = SYMBOLS[sym];
+      if (cfg && q != null && Number.isFinite(q)) this.anchors[sym] = this.round(q, cfg.dp);
     }
   }
 

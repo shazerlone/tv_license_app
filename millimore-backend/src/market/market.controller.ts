@@ -23,6 +23,9 @@ export class MarketController {
   @ApiOkResponse({ schema: { example: { 'XAU/USD': 2015.3, 'EUR/USD': 1.0851 } } })
   snapshot(@Query('symbols') symbols?: string): PriceMap {
     const only = symbols?.split(',').map((s) => s.trim()).filter(Boolean);
+    // Requesting a symbol marks it "in use" so the engine refreshes its real
+    // quote for the next few minutes (and only those symbols cost credits).
+    if (only && only.length) this.prices.markActive(only);
     return this.prices.snapshot(only);
   }
 }

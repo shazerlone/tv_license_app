@@ -259,6 +259,10 @@ GET  /prices?symbols=XAU/USD,EUR/USD  → { "XAU/USD": 2015.3, ... }   // snapsh
 ```
 > Realtime prices come over WS (below). REST is the initial snapshot. Quotes are
 > live when a provider is configured (`MARKET_DATA_PROVIDER`), else synthetic (dev).
+> To respect metered provider credits, the engine fetches real quotes **only for
+> symbols in use** (open positions, active alerts, or a pair requested via
+> `GET /prices` recently) at `MARKET_REFRESH_MS`, and enforces a hard
+> `MARKET_DAILY_CREDIT_BUDGET`; other symbols interpolate synthetically.
 
 ### 4.9 Live streaming (creator)
 ```
