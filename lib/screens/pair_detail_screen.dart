@@ -4,10 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../data/pairs.dart';
+import '../models/trader.dart';
 import '../services/price_service.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
 import '../widgets/tradingview_chart.dart';
+import 'trader_profile_screen.dart';
+import 'copy_trading_screen.dart';
 
 /// Broker-style instrument view: live pro chart with timeframes, live price,
 /// market stats (open/high/low/prev close, 52-week range) and price alerts.
@@ -24,12 +27,43 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   Timer? _priceTimer;
   String _interval = '60'; // 60=1H, D=1D, W=1W, M=1M
   static const _timeframes = [('60', '1H'), ('D', '1D'), ('W', '1W'), ('M', '1M')];
+  List<Trader> _traders = const [];
+  bool _tradersFiltered = false; // true when the list is specific to this pair
 
   @override
   void initState() {
     super.initState();
     _refreshPrice();
+    _loadTraders();
     _priceTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshPrice());
+  }
+
+  /// Loads creators and keeps those who trade this pair (by tags/category);
+  /// falls back to top traders so the section is never empty.
+  Future<void> _loadTraders() async {
+    if (!kUseBackend) return;
+    try {
+      final page = await BackendApi.traders(sort: 'copiers');
+      final all = page.items.map(Trader.fromApi).toList();
+      final matched = all.where(_matchesPair).toList();
+      if (!mounted) return;
+      setState(() {
+        _tradersFiltered = matched.isNotEmpty;
+        _traders = (matched.isNotEmpty ? matched : all).take(10).toList();
+      });
+    } catch (_) {}
+  }
+
+  bool _matchesPair(Trader t) {
+    final sym = widget.pair.symbol.toUpperCase();
+    final base = sym.split('/').first;
+    final cat = widget.pair.category.toLowerCase();
+    final tcat = t.category.toLowerCase();
+    final tags = t.tags.map((e) => e.toUpperCase());
+    if (tags.any((tg) => tg.contains(sym) || tg.contains(base))) return true;
+    if (tcat == cat) return true;
+    if (cat == 'metals' && (tcat.contains('gold') || tcat.contains('metal'))) return true;
+    return false;
   }
 
   @override
@@ -158,6 +192,19 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
                 ),
               ),
             ),
+          // Traders trading this pair → copy them right here.
+          if (_traders.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                _tradersFiltered ? 'Traders trading ${widget.pair.symbol}' : 'Top traders to copy',
+                style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final t in _traders) _TraderPairCard(trader: t),
+          ],
           const SizedBox(height: 28),
         ],
       ),
@@ -250,6 +297,56 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A trader row on the instrument page: profile + one-tap copy.
+class _TraderPairCard extends StatelessWidget {
+  final Trader trader;
+  const _TraderPairCard({required this.trader});
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = trader.returnPercent >= 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: trader))),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
+          child: Row(
+            children: [
+              CircleAvatar(radius: 20, backgroundColor: AppColors.primary.withOpacity(0.12), child: Text(trader.name.isNotEmpty ? trader.name[0] : '?', style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: AppColors.primary))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(trader.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      Text('${positive ? '+' : ''}${trader.returnPercent.toStringAsFixed(1)}%', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: positive ? AppColors.green : AppColors.red)),
+                      const SizedBox(width: 8),
+                      Text('· ${trader.copiers} copiers', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 36,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: trader))),
+                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16), minimumSize: const Size(0, 36)),
+                  child: Text('Copy', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                ),
+              ),
+            ],
           ),
         ),
       ),
