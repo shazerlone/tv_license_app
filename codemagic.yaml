@@ -68,10 +68,12 @@ workflows:
           #    old App Store profiles first, so we stay permanently at 1 cert and
           #    can build any number of times. Guarded with `|| true` so a cleanup
           #    hiccup never fails the build.
-          app-store-connect certificates list --type IOS_DISTRIBUTION --json 2>/dev/null \
-            | python3 -c "import sys,json,subprocess; [subprocess.run(['app-store-connect','certificates','delete',c['id']],check=False) for c in (json.load(sys.stdin) or [])]" || true
-          app-store-connect profiles list --type IOS_APP_STORE --json 2>/dev/null \
-            | python3 -c "import sys,json,subprocess; [subprocess.run(['app-store-connect','profiles','delete',p['id']],check=False) for p in (json.load(sys.stdin) or [])]" || true
+          # Distribution certs come in two API types — DISTRIBUTION (Apple
+          # Distribution) and IOS_DISTRIBUTION (legacy iOS Distribution). Revoke
+          # BOTH so creating a fresh one never hits the "already have a current
+          # Distribution certificate" 409. (single-line python — keeps YAML valid)
+          for CT in DISTRIBUTION IOS_DISTRIBUTION; do app-store-connect certificates list --type "$CT" --json 2>/dev/null | python3 -c "import sys,json,subprocess; [subprocess.run(['app-store-connect','certificates','delete',c['id']],check=False) for c in (json.load(sys.stdin) or [])]" || true; done
+          app-store-connect profiles list --type IOS_APP_STORE --json 2>/dev/null | python3 -c "import sys,json,subprocess; [subprocess.run(['app-store-connect','profiles','delete',p['id']],check=False) for p in (json.load(sys.stdin) or [])]" || true
           # 1) Generate a private key on THIS machine.
           openssl genrsa -out /tmp/millimore_cert_key.pem 2048
           # 2) Create the Apple Distribution certificate FROM that key (so the
