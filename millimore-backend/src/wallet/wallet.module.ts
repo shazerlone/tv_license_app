@@ -7,6 +7,7 @@ import { PayoutMethodsService } from './payout-methods.service';
 import { TransactionsService } from './transactions.service';
 import { WalletController } from './wallet.controller';
 import { DepositsController } from './deposits.controller';
+import { DepositsWebhookController } from './deposits.webhook.controller';
 import { PayoutMethodsController } from './payout-methods.controller';
 
 /**
@@ -24,7 +25,7 @@ import { PayoutMethodsController } from './payout-methods.controller';
     PayoutMethodsService,
     TransactionsService,
   ],
-  controllers: [WalletController, DepositsController, PayoutMethodsController],
+  controllers: [WalletController, DepositsController, DepositsWebhookController, PayoutMethodsController],
   exports: [
     WalletService,
     SettlementService,

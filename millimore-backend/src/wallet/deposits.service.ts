@@ -1,11 +1,22 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { Deposit, DepositStatus, LedgerType } from '@prisma/client';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from './wallet.service';
 import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
 import { CreateDepositDto, DepositDto, DepositMethodDto } from './dto/deposit.dto';
+
+// Hard production safety gate: auto-crediting a deposit without real on-chain
+// confirmation is a DEV-ONLY convenience. It is OFF unless DEPOSIT_AUTO_CONFIRM
+// is explicitly "true", regardless of the admin PlatformSettings toggle — so a
+// misconfigured setting can never mint real balance in production.
+const DEPOSIT_AUTO_CONFIRM = process.env.DEPOSIT_AUTO_CONFIRM === 'true';
+// Real crypto processor (e.g. NOWPayments/Coinbase Commerce/BitPay or an HD
+// wallet service) that issues real deposit addresses and calls our webhook on
+// confirmation. Unset in dev; required before prod crypto deposits are enabled.
+const CRYPTO_DEPOSIT_PROVIDER = (process.env.CRYPTO_DEPOSIT_PROVIDER ?? '').trim();
+const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET ?? '';
 
 /**
  * Deposits into the Millimore wallet. Method availability, the minimum amount,
@@ -15,6 +26,8 @@ import { CreateDepositDto, DepositDto, DepositMethodDto } from './dto/deposit.dt
  */
 @Injectable()
 export class DepositsService {
+  private readonly logger = new Logger('DepositsService');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
@@ -45,10 +58,35 @@ export class DepositsService {
     };
   }
 
-  /** A placeholder deposit address (a real crypto processor issues these). */
+  /** A placeholder deposit address — DEV ONLY (never handed out in production). */
   private mockAddress(asset: string): string {
     const prefix = asset === 'BTC' ? 'bc1' : '0x';
     return `${prefix}${randomBytes(18).toString('hex')}`;
+  }
+
+  /**
+   * Issue a deposit address. In production this must come from a real crypto
+   * processor; we NEVER hand out a fake address there (users would send real
+   * funds into the void). Dev/test (DEPOSIT_AUTO_CONFIRM=true) uses a mock.
+   */
+  private async depositAddress(asset: string): Promise<string> {
+    if (CRYPTO_DEPOSIT_PROVIDER) {
+      // TODO: call the configured processor to generate a real address.
+      // Left unwired until a provider + creds are chosen; fail closed for now.
+      throw new BadRequestException({
+        code: 'deposits_unavailable',
+        message: 'Crypto deposits are being set up. Please try again soon.',
+      });
+    }
+    if (DEPOSIT_AUTO_CONFIRM) return this.mockAddress(asset); // dev/test only
+    throw new BadRequestException({
+      code: 'deposits_unavailable',
+      message: 'Crypto deposits aren’t enabled yet. A payment processor is being connected.',
+    });
+  }
+
+  private autoConfirmEnabled(settingsAllows: boolean): boolean {
+    return DEPOSIT_AUTO_CONFIRM && settingsAllows;
   }
 
   async create(userId: string, dto: CreateDepositDto): Promise<DepositDto> {
@@ -68,6 +106,7 @@ export class DepositsService {
       });
     }
     const asset = dto.asset ?? 'USDT';
+    const address = await this.depositAddress(asset); // refuses a fake address in prod
     const deposit = await this.prisma.deposit.create({
       data: {
         id: genId('dep'),
@@ -76,15 +115,42 @@ export class DepositsService {
         currency: 'USD',
         method,
         asset,
-        address: this.mockAddress(asset),
+        address,
         status: DepositStatus.pending,
       },
     });
 
-    if (s.depositAutoConfirm) {
+    // Auto-credit ONLY in dev/test (env-gated). In production the wallet is
+    // credited by confirmViaWebhook() when the processor reports funds arrived,
+    // or by an admin approval — never on request.
+    if (this.autoConfirmEnabled(s.depositAutoConfirm)) {
       return this.confirm(deposit.id, `test-${deposit.id}`);
     }
     return this.toDto(deposit);
+  }
+
+  /**
+   * Confirm a deposit from a crypto-processor webhook. Verifies the HMAC-SHA256
+   * signature over the raw body with CRYPTO_WEBHOOK_SECRET before crediting, then
+   * confirms idempotently. Wire the chosen provider's webhook to this endpoint.
+   */
+  async confirmViaWebhook(rawBody: string, signature: string | undefined, body: { depositId?: string; txRef?: string }): Promise<{ ok: true }> {
+    if (!CRYPTO_WEBHOOK_SECRET) {
+      throw new UnauthorizedException({ code: 'webhook_not_configured', message: 'Deposit webhook is not configured.' });
+    }
+    const expected = createHmac('sha256', CRYPTO_WEBHOOK_SECRET).update(rawBody).digest('hex');
+    const provided = (signature ?? '').trim();
+    const ok =
+      provided.length === expected.length &&
+      timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+    if (!ok) {
+      throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
+    }
+    if (!body.depositId) {
+      throw new BadRequestException({ code: 'missing_deposit', message: 'depositId is required.' });
+    }
+    await this.confirm(body.depositId, body.txRef ?? `webhook:${Date.now()}`);
+    return { ok: true };
   }
 
   /**

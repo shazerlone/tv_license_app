@@ -8444,6 +8444,26 @@
             "type": "string",
             "example": "u_1"
           },
+          "traderId": {
+            "type": "object",
+            "nullable": true,
+            "example": "t_1"
+          },
+          "name": {
+            "type": "object",
+            "nullable": true,
+            "example": "Marcus Sterling"
+          },
+          "username": {
+            "type": "object",
+            "nullable": true,
+            "example": "marcussterling"
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true,
+            "example": "https://…/photo.jpg"
+          },
           "title": {
             "type": "string",
             "example": "Live trading"

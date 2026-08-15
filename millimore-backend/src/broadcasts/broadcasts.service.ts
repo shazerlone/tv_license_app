@@ -38,10 +38,18 @@ export class BroadcastsService {
     private readonly ytIngest: YoutubeIngestService,
   ) {}
 
-  private toDto(b: Broadcast, owner = false): BroadcastDto {
+  private toDto(
+    b: Broadcast,
+    owner = false,
+    identity?: { name?: string | null; username?: string | null; photoUrl?: string | null },
+  ): BroadcastDto {
     return {
       id: b.id,
       creatorId: b.creatorId,
+      traderId: b.traderId ?? null,
+      name: identity?.name ?? null,
+      username: identity?.username ?? null,
+      photoUrl: identity?.photoUrl ?? null,
       title: b.title,
       phase: b.phase,
       // Ingest credentials are only exposed to the broadcasting creator.
@@ -83,6 +91,11 @@ export class BroadcastsService {
       data: { phase: 'live', startedAt: b.startedAt ?? new Date() },
     });
 
+    // isLive is driven by real broadcast lifecycle only (never seeded).
+    if (b.traderId) {
+      await this.prisma.trader.update({ where: { id: b.traderId }, data: { isLive: true } });
+    }
+
     // Pipe the creator's YouTube live chat into the in-app chat (no-op unless
     // YouTube is configured + the creator is connected and live on YouTube).
     void this.ytIngest.start(id, userId);
@@ -111,6 +124,15 @@ export class BroadcastsService {
       where: { id },
       data: { phase: 'ended', endedAt, viewers: 0 },
     });
+    // Clear isLive unless the trader still has another live broadcast.
+    if (b.traderId) {
+      const stillLive = await this.prisma.broadcast.count({
+        where: { traderId: b.traderId, phase: 'live', id: { not: id } },
+      });
+      if (stillLive === 0) {
+        await this.prisma.trader.update({ where: { id: b.traderId }, data: { isLive: false } });
+      }
+    }
     const duration = b.startedAt ? Math.round((endedAt.getTime() - b.startedAt.getTime()) / 1000) : 0;
     // trades/pnl come from on-stream orders (milestone 6 MT bridge).
     return { duration, peakViewers: b.peakViewers, trades: 0, pnl: 0 };
@@ -126,7 +148,27 @@ export class BroadcastsService {
       where: { phase: 'live' },
       orderBy: { startedAt: 'desc' },
     });
-    return rows.map((b) => this.toDto(b, false));
+    if (rows.length === 0) return [];
+    // Attach trader identity so the app can render live cards directly.
+    const traderIds = [...new Set(rows.map((r) => r.traderId).filter((x): x is string => !!x))];
+    const creatorIds = [...new Set(rows.map((r) => r.creatorId))];
+    const [traders, users] = await Promise.all([
+      traderIds.length
+        ? this.prisma.trader.findMany({ where: { id: { in: traderIds } }, select: { id: true, name: true, username: true, photoUrl: true } })
+        : Promise.resolve([]),
+      this.prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, name: true, username: true, photoUrl: true } }),
+    ]);
+    const traderById = new Map(traders.map((t) => [t.id, t] as const));
+    const userById = new Map(users.map((u) => [u.id, u] as const));
+    return rows.map((b) => {
+      const t = b.traderId ? traderById.get(b.traderId) : undefined;
+      const u = userById.get(b.creatorId);
+      return this.toDto(b, false, {
+        name: t?.name ?? u?.name ?? null,
+        username: t?.username ?? u?.username ?? null,
+        photoUrl: t?.photoUrl ?? u?.photoUrl ?? null,
+      });
+    });
   }
 
   // ── destinations (simulcast) ────────────────────────────────────────

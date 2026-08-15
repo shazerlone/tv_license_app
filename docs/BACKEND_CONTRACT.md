@@ -141,7 +141,9 @@ via `POST /copy/trade/{postId}` (§4.7).
 
 ### Broadcast
 ```json
-{ "id": "b_1", "creatorId": "u_1", "title": "Live trading",
+{ "id": "b_1", "creatorId": "u_1",
+  "traderId": "t_1", "name": "Marcus Sterling", "username": "marcussterling", "photoUrl": null,
+  "title": "Live trading",
   "phase": "connecting|live|ended",
   "ingestUrl": "rtmps://ingest.millimore.app/live",
   "streamKey": "mlm_xxx",
@@ -149,6 +151,9 @@ via `POST /copy/trade/{postId}` (§4.7).
   "viewers": 42, "peakViewers": 80, "startedAt": "...", "endedAt": null,
   "destinations": [{ "id":"youtube","connected":true }] }
 ```
+> `traderId`/`name`/`username`/`photoUrl` are the trader identity so the app can
+> render live cards directly (populated on `GET /broadcasts/live`). `Trader.isLive`
+> is driven **only** by real broadcast start/end — never seeded.
 
 ---
 
@@ -399,6 +404,9 @@ YOUTUBE_OAUTH_CLIENT_ID / SECRET   # live chat + simulcast auth
 FACEBOOK_APP_ID / SECRET
 BROKER_BRIDGE_URL          # MT4/MT5 gateway / EA bridge for prices+orders
 STORAGE_BUCKET             # statements, photos (S3/GCS)
+SEED_DEMO                  # true only in dev; ADMIN_EMAIL/ADMIN_PASSWORD create the prod admin
+DEPOSIT_AUTO_CONFIRM       # dev-only auto-credit; prod uses CRYPTO_WEBHOOK_SECRET + processor webhook
+CRYPTO_DEPOSIT_PROVIDER / CRYPTO_WEBHOOK_SECRET   # real crypto deposits
 ```
 > Full annotated list with defaults lives in `.env.example`. Email is optional
 > (dev logs the reset token); security hardening (rate limiting, helmet headers)
@@ -579,9 +587,14 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
 - **Deposits** (crypto live; others "coming soon")
   - `GET /deposits/methods` → `[{ id, label, active, comingSoon?, assets? }]`
     (crypto active; metatrader/card/bank `comingSoon`).
-  - `POST /deposits { amount, asset?, method? }` → `Deposit`. In test mode
-    (`DEPOSIT_AUTO_CONFIRM=true`) it confirms and credits the wallet immediately;
-    in prod a crypto webhook calls confirm exactly once.
+  - `POST /deposits { amount, asset?, method? }` → `Deposit`. Auto-credit happens
+    **only** in dev/test (`DEPOSIT_AUTO_CONFIRM=true`). In production the wallet is
+    credited solely by the processor webhook (below) or admin approval. With no
+    processor configured and auto-confirm off, deposit creation **fails closed**
+    (`deposits_unavailable`) — no fake address is ever issued.
+  - `POST /webhooks/deposits/crypto` (public; no JWT) — the crypto processor calls
+    this on confirmation. Verifies HMAC-SHA256 of the raw body against
+    `CRYPTO_WEBHOOK_SECRET` (header `x-signature`), then credits once (idempotent).
   - `GET /deposits` → my deposits.
 - **Copy funding & settlement** — `POST /copy/{traderId}/start` now debits the
   wallet by `amount` (`copy_allocate`; throws `insufficient_balance` if unfunded —

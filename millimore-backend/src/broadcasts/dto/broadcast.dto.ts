@@ -5,6 +5,11 @@ import { IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-va
 export class BroadcastDto {
   @ApiProperty({ example: 'b_1' }) id: string;
   @ApiProperty({ example: 'u_1' }) creatorId: string;
+  // Trader identity so the app can render live cards without a second lookup.
+  @ApiPropertyOptional({ nullable: true, example: 't_1' }) traderId?: string | null;
+  @ApiPropertyOptional({ nullable: true, example: 'Marcus Sterling' }) name?: string | null;
+  @ApiPropertyOptional({ nullable: true, example: 'marcussterling' }) username?: string | null;
+  @ApiPropertyOptional({ nullable: true, example: 'https://…/photo.jpg' }) photoUrl?: string | null;
   @ApiProperty({ example: 'Live trading' }) title: string;
   @ApiProperty({ enum: ['connecting', 'live', 'ended'] }) phase: string;
   @ApiPropertyOptional({ description: 'Owner-only', nullable: true }) ingestUrl?: string | null;
