@@ -53,7 +53,7 @@ class Post {
   /// Maps a backend ApiPost (openapi.json §4.5) onto the UI model.
   factory Post.fromApi(ApiPost a) {
     final t = a.trade;
-    double? num(k) => (t?[k] as num?)?.toDouble();
+    double? tradeNum(String k) => (t?[k] as num?)?.toDouble();
     return Post(
       id: a.id,
       trader: Trader.fromApi(a.trader),
@@ -66,9 +66,9 @@ class Post {
       createdAt: DateTime.tryParse(a.createdAt)?.toLocal() ?? DateTime.now(),
       isLiked: a.isLiked,
       side: t?['side']?.toString(),
-      entryPrice: num('entryPrice'),
-      sl: num('sl'),
-      tp: num('tp'),
+      entryPrice: tradeNum('entryPrice'),
+      sl: tradeNum('sl'),
+      tp: tradeNum('tp'),
     );
   }
 
