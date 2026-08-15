@@ -14,6 +14,7 @@ class Quote {
   final double? prevClose;
   final double? yearHigh;
   final double? yearLow;
+  final List<double>? spark; // intraday close series for a sparkline
   const Quote({
     required this.price,
     this.changePercent,
@@ -24,6 +25,7 @@ class Quote {
     this.prevClose,
     this.yearHigh,
     this.yearLow,
+    this.spark,
   });
 }
 
@@ -34,10 +36,11 @@ class Quote {
 class PriceService {
   static final _client = http.Client();
 
-  /// Live quote for a pair. Returns null on any failure (offline, bad symbol).
+  /// Live quote + intraday trend for a pair. One call returns both the current
+  /// price/stats (meta) and the intraday close series (for a sparkline).
   static Future<Quote?> quote(TradingPair pair) async {
     final uri = Uri.parse(
-        'https://query1.finance.yahoo.com/v8/finance/chart/${Uri.encodeComponent(pair.yahoo)}?interval=1d&range=1d');
+        'https://query1.finance.yahoo.com/v8/finance/chart/${Uri.encodeComponent(pair.yahoo)}?interval=15m&range=1d');
     try {
       final r = await _client
           .get(uri, headers: {'User-Agent': 'Mozilla/5.0'})
@@ -56,6 +59,17 @@ class PriceService {
       if (prevClose != null && prevClose != 0) {
         changePct = (price - prevClose) / prevClose * 100;
       }
+      // Intraday close series → sparkline (skip nulls, cap at ~40 points).
+      List<double>? spark;
+      final closes = ((result?['indicators']?['quote'] as List?)?.firstOrNull?['close'] as List?)
+          ?.whereType<num>()
+          .map((e) => e.toDouble())
+          .toList();
+      if (closes != null && closes.length >= 2) {
+        final step = (closes.length / 40).ceil();
+        spark = [for (var i = 0; i < closes.length; i += step) closes[i]];
+        if (spark.last != closes.last) spark.add(closes.last);
+      }
       return Quote(
         price: price,
         changePercent: changePct,
@@ -66,6 +80,7 @@ class PriceService {
         prevClose: prevClose,
         yearHigh: d('fiftyTwoWeekHigh'),
         yearLow: d('fiftyTwoWeekLow'),
+        spark: spark,
       );
     } catch (_) {
       return null;

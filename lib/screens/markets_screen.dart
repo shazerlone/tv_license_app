@@ -9,6 +9,7 @@ import '../models/trader.dart';
 import '../services/price_service.dart';
 import '../services/backend_api.dart';
 import '../widgets/pair_picker.dart';
+import '../widgets/sparkline.dart';
 import 'pair_detail_screen.dart';
 import 'trader_profile_screen.dart';
 
@@ -69,14 +70,27 @@ class _MarketsScreenState extends State<MarketsScreen> {
     return kPairs.where((p) => p.category == _cat).toList();
   }
 
+  // Liquid universe used to compute Top movers (bounded so we don't fetch all
+  // ~35 instruments every cycle).
+  static const _moversUniverse = [
+    'XAU/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'BTC/USD', 'ETH/USD', 'SOL/USD',
+    'NAS100', 'US500', 'US30', 'WTI', 'TSLA', 'NVDA', 'AAPL',
+  ];
+
   // One quote cache feeds the watchlist AND the movers. Fetched sequentially so
-  // we never fire 20 concurrent requests (which Yahoo throttles).
+  // we never fire many concurrent requests (which Yahoo throttles).
   final Map<String, Quote> _allQuotes = {};
   bool _loading = false;
   Future<void> _loadAll() async {
     if (_loading) return;
     _loading = true;
-    for (final p in kPairs) {
+    final want = <TradingPair>{
+      ..._visible,
+      ..._popular.map(pairBySymbol).whereType<TradingPair>(),
+      ..._favs.map(pairBySymbol).whereType<TradingPair>(),
+      ..._moversUniverse.map(pairBySymbol).whereType<TradingPair>(),
+    };
+    for (final p in want) {
       final q = await PriceService.quote(p);
       if (!mounted) break;
       if (q != null) setState(() => _allQuotes[p.symbol] = q);
@@ -146,7 +160,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                       final c = _cats[i];
                       final active = c == _cat;
                       return GestureDetector(
-                        onTap: () => setState(() => _cat = c),
+                        onTap: () { setState(() => _cat = c); _loadAll(); },
                         child: Container(
                           alignment: Alignment.center,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -280,6 +294,10 @@ class _WatchRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (q?.spark != null && q!.spark!.length >= 2) ...[
+              Sparkline(data: q.spark!, color: up ? AppColors.green : AppColors.red, width: 60, height: 30),
+              const SizedBox(width: 12),
+            ],
             if (q == null)
               SizedBox(width: 46, child: Align(alignment: Alignment.centerRight, child: Text('—', style: GoogleFonts.robotoMono(fontSize: 14, color: AppColors.textMuted))))
             else

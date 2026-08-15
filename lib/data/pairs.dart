@@ -23,6 +23,9 @@ const List<TradingPair> kPairs = [
   TradingPair('AUD/USD', 'Aussie / Dollar', 'Forex', 'AUDUSD=X', 'FX:AUDUSD'),
   TradingPair('USD/CAD', 'Dollar / Loonie', 'Forex', 'CAD=X', 'FX:USDCAD'),
   TradingPair('NZD/USD', 'Kiwi / Dollar', 'Forex', 'NZDUSD=X', 'FX:NZDUSD'),
+  TradingPair('EUR/GBP', 'Euro / Pound', 'Forex', 'EURGBP=X', 'FX:EURGBP'),
+  TradingPair('EUR/JPY', 'Euro / Yen', 'Forex', 'EURJPY=X', 'FX:EURJPY'),
+  TradingPair('GBP/JPY', 'Pound / Yen', 'Forex', 'GBPJPY=X', 'FX:GBPJPY'),
   // Crypto
   TradingPair('BTC/USD', 'Bitcoin', 'Crypto', 'BTC-USD', 'BINANCE:BTCUSDT'),
   TradingPair('ETH/USD', 'Ethereum', 'Crypto', 'ETH-USD', 'BINANCE:ETHUSDT'),
@@ -30,15 +33,31 @@ const List<TradingPair> kPairs = [
   TradingPair('XRP/USD', 'XRP', 'Crypto', 'XRP-USD', 'BINANCE:XRPUSDT'),
   TradingPair('BNB/USD', 'BNB', 'Crypto', 'BNB-USD', 'BINANCE:BNBUSDT'),
   TradingPair('DOGE/USD', 'Dogecoin', 'Crypto', 'DOGE-USD', 'BINANCE:DOGEUSDT'),
+  TradingPair('ADA/USD', 'Cardano', 'Crypto', 'ADA-USD', 'BINANCE:ADAUSDT'),
+  TradingPair('AVAX/USD', 'Avalanche', 'Crypto', 'AVAX-USD', 'BINANCE:AVAXUSDT'),
+  TradingPair('LINK/USD', 'Chainlink', 'Crypto', 'LINK-USD', 'BINANCE:LINKUSDT'),
   // Indices
   TradingPair('US30', 'Dow Jones', 'Indices', '^DJI', 'OANDA:US30USD'),
   TradingPair('NAS100', 'Nasdaq 100', 'Indices', '^NDX', 'OANDA:NAS100USD'),
   TradingPair('US500', 'S&P 500', 'Indices', '^GSPC', 'OANDA:SPX500USD'),
   TradingPair('GER40', 'DAX 40', 'Indices', '^GDAXI', 'OANDA:DE30EUR'),
   TradingPair('UK100', 'FTSE 100', 'Indices', '^FTSE', 'OANDA:UK100GBP'),
+  TradingPair('JP225', 'Nikkei 225', 'Indices', '^N225', 'OANDA:JP225USD'),
+  // Commodities
+  TradingPair('WTI', 'Crude Oil (WTI)', 'Commodities', 'CL=F', 'TVC:USOIL'),
+  TradingPair('BRENT', 'Brent Crude', 'Commodities', 'BZ=F', 'TVC:UKOIL'),
+  TradingPair('NATGAS', 'Natural Gas', 'Commodities', 'NG=F', 'TVC:NATGAS'),
+  TradingPair('COPPER', 'Copper', 'Commodities', 'HG=F', 'TVC:COPPER'),
+  // Stocks
+  TradingPair('AAPL', 'Apple', 'Stocks', 'AAPL', 'NASDAQ:AAPL'),
+  TradingPair('TSLA', 'Tesla', 'Stocks', 'TSLA', 'NASDAQ:TSLA'),
+  TradingPair('NVDA', 'NVIDIA', 'Stocks', 'NVDA', 'NASDAQ:NVDA'),
+  TradingPair('MSFT', 'Microsoft', 'Stocks', 'MSFT', 'NASDAQ:MSFT'),
+  TradingPair('AMZN', 'Amazon', 'Stocks', 'AMZN', 'NASDAQ:AMZN'),
+  TradingPair('META', 'Meta', 'Stocks', 'META', 'NASDAQ:META'),
 ];
 
-const List<String> kPairCategories = ['Metals', 'Forex', 'Crypto', 'Indices'];
+const List<String> kPairCategories = ['Metals', 'Forex', 'Crypto', 'Indices', 'Commodities', 'Stocks'];
 
 /// Finds a known pair by its display symbol (case-insensitive), or null.
 TradingPair? pairBySymbol(String symbol) {
