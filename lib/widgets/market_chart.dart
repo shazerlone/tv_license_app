@@ -5,7 +5,8 @@ import '../data/pairs.dart';
 import '../services/price_service.dart';
 
 /// A clean, native price chart — our own rendering, no third-party chrome.
-/// Supports a line/area view and a candlestick view from one OHLC fetch.
+/// Supports a line/area view and a candlestick view from one OHLC fetch, and
+/// is pinch-to-zoom + drag-to-pan (like a real broker terminal).
 class MarketChart extends StatefulWidget {
   final TradingPair pair;
   final String range;
@@ -21,6 +22,13 @@ class MarketChart extends StatefulWidget {
 class _MarketChartState extends State<MarketChart> {
   List<Candle>? _data;
   bool _loading = true;
+
+  // Viewport into the data: _count candles starting at _start are visible.
+  // _count shrinks on zoom-in; _start slides on pan. Both re-derive on new data.
+  double _start = 0;
+  double _count = 0;
+  double _width = 0; // plot width captured at layout, for px→candle math
+  double _startAtGestureBegin = 0;
 
   @override
   void initState() {
@@ -44,6 +52,32 @@ class _MarketChartState extends State<MarketChart> {
     setState(() {
       _data = s;
       _loading = false;
+      // Reset the viewport to show everything for the new range.
+      _count = (s?.length ?? 0).toDouble();
+      _start = 0;
+    });
+  }
+
+  void _onScaleStart(ScaleStartDetails d) {
+    _startAtGestureBegin = _start;
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails d, int total) {
+    final slot = _width <= 0 || _count <= 0 ? 1.0 : _width / _count;
+    setState(() {
+      // Pan: horizontal drag moves the window (drag right → look back in time).
+      if (d.pointerCount <= 1) {
+        _start = (_start - d.focalPointDelta.dx / slot);
+      }
+      // Zoom: pinch scales the number of visible candles around the focal point.
+      if (d.scale != 1.0) {
+        final focalCandle = _start + (d.localFocalPoint.dx / _width) * _count;
+        final newCount = (_count / d.scale).clamp(12.0, total.toDouble());
+        _start = focalCandle - (d.localFocalPoint.dx / _width) * newCount;
+        _count = newCount;
+      }
+      // Keep the window inside the data.
+      _start = _start.clamp(0.0, (total - _count).clamp(0.0, total.toDouble()));
     });
   }
 
@@ -56,18 +90,38 @@ class _MarketChartState extends State<MarketChart> {
     if (data == null || data.length < 2) {
       return SizedBox(height: widget.height, child: Center(child: Text('Chart unavailable', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted))));
     }
+    final total = data.length;
+    if (_count <= 0) _count = total.toDouble();
     return SizedBox(
       height: widget.height,
-      child: CustomPaint(
-        painter: _ChartPainter(
-          data: data,
-          candle: widget.candle,
-          up: AppColors.green,
-          down: AppColors.red,
-          grid: AppColors.border,
-          labelStyle: GoogleFonts.robotoMono(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600),
-        ),
-        child: const SizedBox.expand(),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          const rightPad = 52.0;
+          _width = c.maxWidth - rightPad;
+          final startI = _start.floor().clamp(0, total - 2);
+          final endI = (_start + _count).ceil().clamp(startI + 2, total);
+          final visible = data.sublist(startI, endI);
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onScaleStart: _onScaleStart,
+            onScaleUpdate: (d) => _onScaleUpdate(d, total),
+            onDoubleTap: () => setState(() {
+              _count = total.toDouble();
+              _start = 0;
+            }),
+            child: CustomPaint(
+              painter: _ChartPainter(
+                data: visible,
+                candle: widget.candle,
+                up: AppColors.green,
+                down: AppColors.red,
+                grid: AppColors.border,
+                labelStyle: GoogleFonts.robotoMono(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+              ),
+              child: const SizedBox.expand(),
+            ),
+          );
+        },
       ),
     );
   }

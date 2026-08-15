@@ -154,44 +154,45 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
               ],
             ),
           ),
-          // Our own clean chart (no third-party chrome)
+          // Our own clean chart (no third-party chrome) — pinch to zoom, drag to pan.
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 12, 4),
-            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, candle: _candle, height: 260),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 2),
+            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, candle: _candle, height: 340),
           ),
-          const SizedBox(height: 18),
-          // Market stats
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text('Market stats', style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Text('Pinch to zoom · drag to pan · double-tap to reset',
+                  style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.textMuted)),
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
+          // Market stats — compact single card, secondary to the chart.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppColors.border)),
               child: Column(
                 children: [
                   Row(children: [
                     _stat('Open', _fmt(q?.open)),
-                    _stat('Prev close', _fmt(q?.prevClose)),
+                    _stat('Prev', _fmt(q?.prevClose)),
+                    _stat('Day H', _fmt(q?.dayHigh), color: AppColors.green),
+                    _stat('Day L', _fmt(q?.dayLow), color: AppColors.red),
                   ]),
-                  Divider(height: 1, color: AppColors.border),
+                  const SizedBox(height: 8),
                   Row(children: [
-                    _stat('Day high', _fmt(q?.dayHigh), color: AppColors.green),
-                    _stat('Day low', _fmt(q?.dayLow), color: AppColors.red),
-                  ]),
-                  Divider(height: 1, color: AppColors.border),
-                  Row(children: [
-                    _stat('52W high', _fmt(q?.yearHigh)),
-                    _stat('52W low', _fmt(q?.yearLow)),
+                    _stat('52W H', _fmt(q?.yearHigh)),
+                    _stat('52W L', _fmt(q?.yearLow)),
+                    const Spacer(),
+                    const Spacer(),
                   ]),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           if (kUseBackend)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -225,16 +226,13 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   }
 
   Widget _stat(String label, String value, {Color? color}) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-              const SizedBox(height: 3),
-              Text(value, style: GoogleFonts.robotoMono(fontSize: 14.5, fontWeight: FontWeight.w700, color: color ?? AppColors.textPrimary)),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.textMuted)),
+            const SizedBox(height: 2),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.robotoMono(fontSize: 12.5, fontWeight: FontWeight.w700, color: color ?? AppColors.textPrimary)),
+          ],
         ),
       );
 

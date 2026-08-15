@@ -332,10 +332,16 @@ in the app — it is server data. Status tracked against backend M19 (`da95f5b`)
 3. ✅ **`GET /broadcasts/live` carries trader identity** — `BroadcastDto` now includes
    `{ traderId, name, username, photoUrl }`. **App synced:** home renders "Live now"
    by matching `traderId`/`creatorId` from real broadcasts against loaded traders.
-4. ✅ **Real crypto deposits.** Auto-credit gated behind `DEPOSIT_AUTO_CONFIRM` (dev
-   only); real crypto via `POST /webhooks/deposits/crypto` (HMAC-SHA256, idempotent);
-   fails closed with `deposits_unavailable`. **App synced:** deposit sheet shows a
-   friendly "Deposits are being set up — please check back soon." on that code.
+4. ⚠️ **Real crypto deposits — STILL AUTO-CREDITING IN PROD (regression/not deployed).**
+   The M19 code gates auto-credit behind `DEPOSIT_AUTO_CONFIRM` and adds real crypto
+   via `POST /webhooks/deposits/crypto` (HMAC-SHA256, idempotent) failing closed with
+   `deposits_unavailable`. **But live testing (2026-08-15) shows a crypto deposit is
+   still credited to the user's wallet instantly.** The production server must have
+   `DEPOSIT_AUTO_CONFIRM=true` (or the demo seed path) still active. **Backend action:**
+   set `DEPOSIT_AUTO_CONFIRM=false` in the prod env and redeploy; verify `POST /deposits`
+   returns a pending deposit (or `deposits_unavailable`) and only the signed webhook
+   credits the wallet. **App synced:** deposit sheet already handles `deposits_unavailable`
+   with a friendly "Deposits are being set up — please check back soon." message.
 5. 🟡 **Real market data** on `GET /prices` + WS `prices` from a **licensed provider**
    (the app's Yahoo fetch is a testing placeholder only — ToS-restricted, not
    production-safe). Backend now throttles Twelve Data usage (`43426530`). Still
