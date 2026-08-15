@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../models/post.dart';
+import '../config.dart';
 import '../state/app_state.dart';
+import '../services/backend_api.dart';
+import '../services/api_client.dart';
 import '../screens/copy_trading_screen.dart';
 import 'verified_badge.dart';
 import 'comments_sheet.dart';
@@ -90,10 +93,12 @@ class FeedPost extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: post.trader))),
+                        onPressed: () => (kUseBackend && post.side != null)
+                            ? CopyTradeSheet.open(context, post)
+                            : Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: post.trader))),
                         style: ElevatedButton.styleFrom(minimumSize: const Size(0, 44)),
                         icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.white),
-                        label: Text('Copy this trader', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+                        label: Text(post.side != null ? 'Copy this trade' : 'Copy this trader', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -469,6 +474,120 @@ class _SimpleSheet extends StatelessWidget {
                 ),
               )),
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet to copy one posted trade with a chosen amount (POST /copy/trade/{id}).
+class CopyTradeSheet extends StatefulWidget {
+  final Post post;
+  const CopyTradeSheet({super.key, required this.post});
+
+  static void open(BuildContext context, Post post) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CopyTradeSheet(post: post),
+    );
+  }
+
+  @override
+  State<CopyTradeSheet> createState() => _CopyTradeSheetState();
+}
+
+class _CopyTradeSheetState extends State<CopyTradeSheet> {
+  final _amount = TextEditingController(text: '100');
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
+  Future<void> _copy() async {
+    final amount = double.tryParse(_amount.text.trim());
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
+      return;
+    }
+    setState(() => _busy = true);
+    final store = AppStateScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    try {
+      await BackendApi.copyTrade(widget.post.id, amount: amount);
+      store.loadCopyEngine();
+      store.loadWallet();
+      if (!mounted) return;
+      nav.pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Trade copied — tracking in your portfolio')));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text(
+        e.code == 'insufficient_balance' ? 'Not enough wallet balance — add funds to copy.' : e.message,
+      )));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger.showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.post;
+    final buy = p.side == 'buy';
+    final color = buy ? AppColors.green : AppColors.red;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(color: AppColors.background, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 18),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(6)),
+                child: Text(buy ? 'BUY' : 'SELL', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+              ),
+              const SizedBox(width: 10),
+              Text(p.pair ?? '', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const Spacer(),
+              Text('by ${p.trader.name}', style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
+            ]),
+            const SizedBox(height: 6),
+            Text('Copied from your wallet balance. Profit and loss track in your portfolio just like a copy.',
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.45)),
+            const SizedBox(height: 18),
+            Text('Amount (USD)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _amount,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              decoration: const InputDecoration(prefixText: '\$ '),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity, height: 52,
+              child: ElevatedButton(
+                onPressed: _busy ? null : _copy,
+                child: _busy
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Text('Copy trade', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

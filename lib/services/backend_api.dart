@@ -488,5 +488,41 @@ class BackendApi {
   static Future<void> sendPairChat(String symbol, String text) =>
       _api.post('/pairs/${Uri.encodeComponent(symbol)}/chat', {'text': text});
 
+  // ── Copy a specific posted trade (M16) ────────────────────────────────────
+  static Future<void> copyTrade(String postId, {required double amount, double? leverage}) =>
+      _api.post('/copy/trade/$postId', {'amount': amount, if (leverage != null) 'leverage': leverage});
+
+  // ── Account recovery (M17) ────────────────────────────────────────────────
+  /// Returns a dev reset token when the server is in console mail mode, else null.
+  static Future<String?> forgotPassword(String email) async {
+    final res = await _api.post('/auth/password/forgot', {'email': email});
+    return (res is Map) ? res['devToken']?.toString() : null;
+  }
+
+  static Future<void> resetPassword(String token, String newPassword) =>
+      _api.post('/auth/password/reset', {'token': token, 'newPassword': newPassword});
+
+  static Future<void> changePassword(String currentPassword, String newPassword) =>
+      _api.post('/auth/password/change', {'currentPassword': currentPassword, 'newPassword': newPassword});
+
+  // ── Price alerts (M18) ────────────────────────────────────────────────────
+  static Future<List<Map<String, dynamic>>> alerts({String? status}) async {
+    final res = await _api.get('/alerts${status != null ? '?status=$status' : ''}');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> createAlert({required String symbol, required String direction, required double targetPrice, String? note, bool? notifyEmail}) async {
+    final res = await _api.post('/alerts', {
+      'symbol': symbol,
+      'direction': direction,
+      'targetPrice': targetPrice,
+      if (note != null) 'note': note,
+      if (notifyEmail != null) 'notifyEmail': notifyEmail,
+    });
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
+  static Future<void> deleteAlert(String id) => _api.delete('/alerts/$id');
+
   static int _int(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 }
