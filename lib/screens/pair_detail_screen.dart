@@ -6,6 +6,7 @@ import '../config.dart';
 import '../data/pairs.dart';
 import '../services/price_service.dart';
 import '../services/backend_api.dart';
+import '../services/api_client.dart';
 import '../services/realtime_service.dart';
 import '../widgets/tradingview_chart.dart';
 
@@ -58,6 +59,84 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
     if (mounted && q != null) setState(() => _quote = q);
   }
 
+  Future<void> _createAlert() async {
+    final priceCtrl = TextEditingController(text: _quote != null ? _quote!.price.toStringAsFixed(_quote!.price >= 100 ? 2 : 4) : '');
+    String direction = (_quote != null) ? 'above' : 'above';
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(color: AppColors.background, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 18),
+                Text('Alert me on ${widget.pair.symbol}', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                const SizedBox(height: 16),
+                Row(children: [
+                  for (final d in ['above', 'below'])
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setSheet(() => direction = d),
+                        child: Container(
+                          margin: EdgeInsets.only(right: d == 'above' ? 10 : 0),
+                          height: 46, alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: direction == d ? AppColors.primary.withOpacity(0.14) : AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            border: Border.all(color: direction == d ? AppColors.primary : AppColors.border),
+                          ),
+                          child: Text(d == 'above' ? 'Rises above' : 'Falls below',
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: direction == d ? AppColors.primary : AppColors.textSecondary)),
+                        ),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  decoration: const InputDecoration(labelText: 'Target price'),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity, height: 52,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final target = double.tryParse(priceCtrl.text.trim());
+                      if (target == null || target <= 0) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await BackendApi.createAlert(symbol: widget.pair.symbol, direction: direction, targetPrice: target);
+                        Navigator.pop(ctx);
+                        messenger.showSnackBar(const SnackBar(content: Text('Alert set — we\'ll notify you')));
+                      } on ApiException catch (e) {
+                        messenger.showSnackBar(SnackBar(content: Text(
+                          e.code == 'alert_already_met' ? 'That target is already met — pick the other direction.' : e.message,
+                        )));
+                      } catch (_) {
+                        messenger.showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+                      }
+                    },
+                    child: Text('Set alert', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadChat() async {
     if (!kUseBackend) {
       setState(() => _chatAvailable = false);
@@ -104,6 +183,12 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
           ],
         ),
         actions: [
+          if (kUseBackend)
+            IconButton(
+              tooltip: 'Price alert',
+              icon: Icon(Icons.notifications_active_outlined, color: AppColors.textPrimary),
+              onPressed: _createAlert,
+            ),
           if (q != null)
             Padding(
               padding: const EdgeInsets.only(right: 16),
