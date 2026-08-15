@@ -93,9 +93,54 @@ class _SecurityScreenState extends State<SecurityScreen> {
                           child: Text('Set up 2FA', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
                         ),
                 ),
+                const SizedBox(height: 28),
+                Text('Password', style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _changePassword,
+                  icon: Icon(Icons.lock_reset_rounded, size: 19, color: AppColors.primary),
+                  label: Text('Change password', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.primary)),
+                ),
               ],
             ),
     );
+  }
+
+  Future<void> _changePassword() async {
+    final current = TextEditingController();
+    final next = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Change password', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: current, obscureText: true, style: GoogleFonts.inter(color: AppColors.textPrimary), decoration: const InputDecoration(hintText: 'Current password')),
+            const SizedBox(height: 12),
+            TextField(controller: next, obscureText: true, style: GoogleFonts.inter(color: AppColors.textPrimary), decoration: const InputDecoration(hintText: 'New password (min 8)')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textMuted))),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (next.text.length < 8) {
+      _snack('New password must be at least 8 characters');
+      return;
+    }
+    try {
+      await BackendApi.changePassword(current.text, next.text);
+      _snack('Password updated');
+    } on ApiException catch (e) {
+      _snack(e.code == 'invalid_credentials' ? 'Current password is incorrect' : e.message);
+    } catch (_) {
+      _snack('Could not reach the server');
+    }
   }
 
   Future<void> _startSetup() async {

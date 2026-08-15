@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import '../widgets/millimore_logo.dart';
 import 'account_type_screen.dart';
 import 'phone_login_screen.dart';
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 
 /// Clean, modern sign-in. A soft brand header (no chart animation) over a
@@ -166,20 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showForgotPassword() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text('Reset your password', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        content: Text(
-          'Reach out to support@millimore.app from your registered email and we\'ll help you reset your password.',
-          style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Got it', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.primary))),
-        ],
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
   }
 
   @override
