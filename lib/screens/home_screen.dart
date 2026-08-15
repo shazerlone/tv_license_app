@@ -153,13 +153,21 @@ class _FollowerHomeState extends State<FollowerHome> {
     try {
       final page = await BackendApi.traders(sort: 'copiers');
       final feed = await BackendApi.feed();
+      // Real source of truth for "who's live" — an actual active broadcast.
+      // Without this the seeded `trader.isLive` flag shows phantom live sessions.
+      List<Map<String, dynamic>> liveNow = const [];
+      try {
+        liveNow = await BackendApi.liveBroadcasts();
+      } catch (_) {}
       if (!mounted) return;
       final traders = page.items.map(Trader.fromApi).toList();
-      // Alert for followed traders that are currently live.
-      store.notifyLiveTraders(traders.where((t) => t.isLive && store.isSubscribed(t.id)));
+      // A trader is only shown live if there is at least one real live broadcast.
+      final anyoneLive = liveNow.isNotEmpty;
+      final live = anyoneLive ? traders.where((t) => t.isLive).toList() : <Trader>[];
+      store.notifyLiveTraders(live.where((t) => store.isSubscribed(t.id)));
       setState(() {
         _topCreators = traders.take(8).toList();
-        _liveTraders = traders.where((t) => t.isLive).toList();
+        _liveTraders = live;
         _feed = feed.map(Post.fromApi).toList();
         _loading = false;
       });

@@ -8,7 +8,7 @@ import '../models/trader.dart';
 import '../services/price_service.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
-import '../widgets/tradingview_chart.dart';
+import '../widgets/market_chart.dart';
 import 'trader_profile_screen.dart';
 import 'copy_trading_screen.dart';
 
@@ -25,8 +25,15 @@ class PairDetailScreen extends StatefulWidget {
 class _PairDetailScreenState extends State<PairDetailScreen> {
   Quote? _quote;
   Timer? _priceTimer;
-  String _interval = '60'; // 60=1H, D=1D, W=1W, M=1M
-  static const _timeframes = [('60', '1H'), ('D', '1D'), ('W', '1W'), ('M', '1M')];
+  int _tf = 0; // index into _timeframes
+  // (range, interval, label) for our own chart.
+  static const _timeframes = [
+    ('1d', '5m', '1D'),
+    ('5d', '30m', '1W'),
+    ('1mo', '1d', '1M'),
+    ('3mo', '1d', '3M'),
+    ('1y', '1wk', '1Y'),
+  ];
   List<Trader> _traders = const [];
   bool _tradersFiltered = false; // true when the list is specific to this pair
 
@@ -122,29 +129,29 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
-                for (final tf in _timeframes)
+                for (var i = 0; i < _timeframes.length; i++)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
-                      onTap: () => setState(() => _interval = tf.$1),
+                      onTap: () => setState(() => _tf = i),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                         decoration: BoxDecoration(
-                          color: _interval == tf.$1 ? AppColors.primary : AppColors.surface,
+                          color: _tf == i ? AppColors.primary : AppColors.surface,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _interval == tf.$1 ? AppColors.primary : AppColors.border),
+                          border: Border.all(color: _tf == i ? AppColors.primary : AppColors.border),
                         ),
-                        child: Text(tf.$2, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _interval == tf.$1 ? Colors.white : AppColors.textSecondary)),
+                        child: Text(_timeframes[i].$3, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _tf == i ? Colors.white : AppColors.textSecondary)),
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          // Live pro chart (rebuilds when the timeframe changes)
+          // Our own clean chart (no third-party chrome)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TradingViewChart(key: ValueKey(_interval), tvSymbol: widget.pair.tv, interval: _interval, height: 320),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 4),
+            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, height: 260),
           ),
           const SizedBox(height: 18),
           // Market stats
