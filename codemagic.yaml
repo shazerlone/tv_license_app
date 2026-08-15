@@ -18,6 +18,8 @@ workflows:
           plutil -insert NSPhotoLibraryUsageDescription -string "Attach a chart or setup image to your posts." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
+      - name: Generate branded app icon
+        script: dart run flutter_launcher_icons
       - name: Build debug APK
         script: flutter build apk --debug --dart-define=BUILD_SHA=${CM_COMMIT} --dart-define=BUILD_BRANCH=${CM_BRANCH}
     artifacts:
@@ -56,6 +58,8 @@ workflows:
           plutil -insert NSPhotoLibraryUsageDescription -string "Attach a chart or setup image to your posts." ios/Runner/Info.plist || true
       - name: Flutter packages get
         script: flutter pub get
+      - name: Generate branded app icon
+        script: dart run flutter_launcher_icons
       - name: Set up code signing
         script: |
           set -e
