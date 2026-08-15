@@ -60,6 +60,18 @@ workflows:
         script: |
           set -e
           keychain initialize
+          # 0) SUSTAINABLE SIGNING FOR UNLIMITED REBUILDS.
+          #    Each build mints a fresh distribution cert (its private key is
+          #    generated here). Apple caps you at 2 active distribution certs, so
+          #    without cleanup the ~3rd build fails with "maximum number of
+          #    certificates". Fix: revoke the old distribution certs + delete the
+          #    old App Store profiles first, so we stay permanently at 1 cert and
+          #    can build any number of times. Guarded with `|| true` so a cleanup
+          #    hiccup never fails the build.
+          app-store-connect certificates list --type IOS_DISTRIBUTION --json 2>/dev/null \
+            | python3 -c "import sys,json,subprocess; [subprocess.run(['app-store-connect','certificates','delete',c['id']],check=False) for c in (json.load(sys.stdin) or [])]" || true
+          app-store-connect profiles list --type IOS_APP_STORE --json 2>/dev/null \
+            | python3 -c "import sys,json,subprocess; [subprocess.run(['app-store-connect','profiles','delete',p['id']],check=False) for p in (json.load(sys.stdin) or [])]" || true
           # 1) Generate a private key on THIS machine.
           openssl genrsa -out /tmp/millimore_cert_key.pem 2048
           # 2) Create the Apple Distribution certificate FROM that key (so the
