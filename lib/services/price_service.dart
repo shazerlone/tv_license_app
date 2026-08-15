@@ -87,9 +87,9 @@ class PriceService {
     }
   }
 
-  /// A close-price series for a given range/interval — powers our own clean
-  /// chart (no third-party chart chrome). Returns null on failure.
-  static Future<List<double>?> series(TradingPair pair, {required String range, required String interval}) async {
+  /// OHLC candles for a range/interval — powers both our line and candlestick
+  /// charts (one fetch serves both). Returns null on failure.
+  static Future<List<Candle>?> candles(TradingPair pair, {required String range, required String interval}) async {
     final uri = Uri.parse(
         'https://query1.finance.yahoo.com/v8/finance/chart/${Uri.encodeComponent(pair.yahoo)}?interval=$interval&range=$range');
     try {
@@ -99,16 +99,34 @@ class PriceService {
       if (r.statusCode != 200) return null;
       final json = jsonDecode(r.body);
       final result = (json['chart']?['result'] as List?)?.firstOrNull;
-      final closes = ((result?['indicators']?['quote'] as List?)?.firstOrNull?['close'] as List?)
-          ?.whereType<num>()
-          .map((e) => e.toDouble())
-          .toList();
-      if (closes == null || closes.length < 2) return null;
-      return closes;
+      final q = (result?['indicators']?['quote'] as List?)?.firstOrNull as Map?;
+      if (q == null) return null;
+      List<double?> col(String k) => (q[k] as List?)?.map((e) => (e as num?)?.toDouble()).toList() ?? const [];
+      final o = col('open'), h = col('high'), l = col('low'), c = col('close');
+      final n = c.length;
+      final out = <Candle>[];
+      for (var i = 0; i < n; i++) {
+        final cc = c[i];
+        if (cc == null) continue; // skip gaps
+        out.add(Candle(
+          open: o.length > i ? (o[i] ?? cc) : cc,
+          high: h.length > i ? (h[i] ?? cc) : cc,
+          low: l.length > i ? (l[i] ?? cc) : cc,
+          close: cc,
+        ));
+      }
+      return out.length >= 2 ? out : null;
     } catch (_) {
       return null;
     }
   }
+}
+
+/// One OHLC candle.
+class Candle {
+  final double open, high, low, close;
+  const Candle({required this.open, required this.high, required this.low, required this.close});
+  bool get up => close >= open;
 }
 
 extension _FirstOrNull<E> on List<E> {

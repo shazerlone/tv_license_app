@@ -26,6 +26,7 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   Quote? _quote;
   Timer? _priceTimer;
   int _tf = 0; // index into _timeframes
+  bool _candle = true; // candlestick by default (line = false)
   // (range, interval, label) for our own chart.
   static const _timeframes = [
     ('1d', '5m', '1D'),
@@ -145,13 +146,18 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
                       ),
                     ),
                   ),
+                const Spacer(),
+                // Line / candle toggle
+                _ChartTypeButton(icon: Icons.show_chart_rounded, active: !_candle, onTap: () => setState(() => _candle = false)),
+                const SizedBox(width: 6),
+                _ChartTypeButton(icon: Icons.candlestick_chart_rounded, active: _candle, onTap: () => setState(() => _candle = true)),
               ],
             ),
           ),
           // Our own clean chart (no third-party chrome)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 12, 4),
-            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, height: 260),
+            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, candle: _candle, height: 260),
           ),
           const SizedBox(height: 18),
           // Market stats
@@ -356,6 +362,30 @@ class _TraderPairCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Small line/candle chart-type toggle button.
+class _ChartTypeButton extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  const _ChartTypeButton({required this.icon, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary.withOpacity(0.14) : AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: active ? AppColors.primary : AppColors.border),
+        ),
+        child: Icon(icon, size: 18, color: active ? AppColors.primary : AppColors.textMuted),
       ),
     );
   }
