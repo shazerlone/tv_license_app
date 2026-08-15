@@ -161,9 +161,14 @@ class _FollowerHomeState extends State<FollowerHome> {
       } catch (_) {}
       if (!mounted) return;
       final traders = page.items.map(Trader.fromApi).toList();
-      // A trader is only shown live if there is at least one real live broadcast.
-      final anyoneLive = liveNow.isNotEmpty;
-      final live = anyoneLive ? traders.where((t) => t.isLive).toList() : <Trader>[];
+      // Show live ONLY traders with a real active broadcast (matched by the
+      // traderId the backend now includes on GET /broadcasts/live). This is
+      // immune to any stale isLive flag.
+      final liveIds = liveNow
+          .map((b) => (b['traderId'] ?? b['creatorId'])?.toString())
+          .whereType<String>()
+          .toSet();
+      final live = traders.where((t) => liveIds.contains(t.id)).toList();
       store.notifyLiveTraders(live.where((t) => store.isSubscribed(t.id)));
       setState(() {
         _topCreators = traders.take(8).toList();

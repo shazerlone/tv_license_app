@@ -316,7 +316,11 @@ class _DepositSheetState extends State<_DepositSheet> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      // Backend fails closed while real crypto rails are being set up.
+      final msg = e.code == 'deposits_unavailable'
+          ? 'Deposits are being set up — please check back soon.'
+          : e.message;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);

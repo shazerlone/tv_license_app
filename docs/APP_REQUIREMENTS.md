@@ -324,25 +324,22 @@ _Maintained by the app session. Last updated: live-testing bug report (subscript
 
 The app faithfully renders whatever the API returns. In live testing it shows
 **seeded demo data**, which makes the product look broken. None of this is fixable
-in the app — it is server data. Required before launch:
+in the app — it is server data. Status tracked against backend M19 (`da95f5b`):
 
-1. **Wipe / gate the demo seed.** Fake creators (Kenji Nakamura, Marcus Sterling,
-   Elena Vos …), their live broadcasts, seeded broadcast stats (viewers/likes),
-   and pre-funded $10k wallets must NOT exist in production. Put the seed behind a
-   `SEED_DEMO=false` env (off in prod) and provide a migration/script to purge
-   existing seed rows from the live DB.
-2. **`trader.isLive` only from real broadcast start/end** — never seeded true.
-3. **`GET /broadcasts/live` must carry trader identity** — add
-   `{ traderId, name, username, photoUrl }` to each `BroadcastDto` so the app can
-   render live cards from real broadcasts (today it only has `creatorId`, which
-   the app cannot map to a trader). Once shipped, the app will render "Live now"
-   purely from real broadcasts.
-4. **Real crypto deposits.** Set `DEPOSIT_AUTO_CONFIRM=false` and integrate a real
-   crypto processor (generate a real address, confirm via webhook). No auto-credit
-   in prod. New users start at $0.
-5. **Real market data** on `GET /prices` + WS `prices` from a **licensed provider**
+1. ✅ **Wipe / gate the demo seed.** Seed now behind `SEED_DEMO` (off in prod) with
+   `npm run db:wipe-demo` to purge existing seed rows.
+2. ✅ **`trader.isLive` only from real broadcast start/end** — no longer seeded true.
+3. ✅ **`GET /broadcasts/live` carries trader identity** — `BroadcastDto` now includes
+   `{ traderId, name, username, photoUrl }`. **App synced:** home renders "Live now"
+   by matching `traderId`/`creatorId` from real broadcasts against loaded traders.
+4. ✅ **Real crypto deposits.** Auto-credit gated behind `DEPOSIT_AUTO_CONFIRM` (dev
+   only); real crypto via `POST /webhooks/deposits/crypto` (HMAC-SHA256, idempotent);
+   fails closed with `deposits_unavailable`. **App synced:** deposit sheet shows a
+   friendly "Deposits are being set up — please check back soon." on that code.
+5. 🟡 **Real market data** on `GET /prices` + WS `prices` from a **licensed provider**
    (the app's Yahoo fetch is a testing placeholder only — ToS-restricted, not
-   production-safe). Consider adding a backend `GET /candles?symbol=&range=&interval=`
-   so the app charts pull OHLC from the backend instead of Yahoo.
+   production-safe). Backend now throttles Twelve Data usage (`43426530`). Still
+   pending: a backend `GET /candles?symbol=&range=&interval=` so the app charts pull
+   OHLC from the backend instead of Yahoo.
 
-_Maintained by the app session. Production-readiness block added after live testing._
+_Maintained by the app session. M19 items 1–4 resolved; item 5 (licensed candles) open._
