@@ -169,8 +169,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _ledgerRow(Map<String, dynamic> e) {
     final amount = (e['amount'] as num?)?.toDouble() ?? 0;
-    final type = (e['type'] ?? 'transaction').toString();
-    final note = (e['note'] ?? '').toString();
+    final type = (e['type'] ?? e['kind'] ?? e['category'] ?? '').toString();
+    final note = (e['note'] ?? e['description'] ?? '').toString();
     final when = (e['createdAt'] ?? '').toString();
     final positive = amount >= 0;
     return Container(
@@ -189,7 +189,7 @@ class _WalletScreenState extends State<WalletScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_label(type), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                Text(_label(type, amount), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 if (note.isNotEmpty || when.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(note.isNotEmpty ? note : (when.length > 10 ? when.substring(0, 10) : when),
@@ -204,18 +204,41 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  String _label(String type) {
+  String _label(String type, double amount) {
     switch (type) {
       case 'deposit':
         return 'Deposit';
+      case 'withdrawal':
+      case 'withdrawal_hold':
       case 'payout':
-        return 'Payout';
+        return 'Withdrawal';
+      case 'withdrawal_refund':
+        return 'Withdrawal refund';
       case 'commission':
-        return 'Commission';
+      case 'commission_earned':
+        return 'Commission earned';
+      case 'referral_commission':
+        return 'Referral earnings';
+      case 'copy_allocate':
+        return 'Copy opened';
+      case 'copy_return':
+        return 'Copy closed';
+      case 'trade_pnl':
       case 'copy_pnl':
-        return 'Copy P&L';
+        return 'Trade P&L';
+      case 'platform_fee':
+        return 'Platform fee';
+      case 'adjustment':
+        return 'Adjustment';
+      case '':
+        // No type field — infer from the amount direction.
+        return amount >= 0 ? 'Deposit' : 'Withdrawal';
       default:
-        return type.replaceAll('_', ' ');
+        // Title-case a snake_case type, e.g. "copy_return" -> "Copy Return".
+        return type
+            .split('_')
+            .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+            .join(' ');
     }
   }
 

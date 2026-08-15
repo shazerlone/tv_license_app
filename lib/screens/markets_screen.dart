@@ -26,7 +26,6 @@ class _MarketsScreenState extends State<MarketsScreen> {
   final _cats = const ['Watchlist', 'Popular', 'Metals', 'Forex', 'Crypto', 'Indices'];
   String _cat = 'Popular';
 
-  final Map<String, Quote> _quotes = {};
   final Set<String> _favs = {};
   Timer? _timer;
   List<Trader> _topTraders = const [];
@@ -35,10 +34,11 @@ class _MarketsScreenState extends State<MarketsScreen> {
   void initState() {
     super.initState();
     _loadFavs();
-    _loadQuotes();
-    _loadMovers();
+    _loadAll();
     _loadTopTraders();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _loadQuotes());
+    // Gentle refresh — one pass every 30s (sequential fetch avoids a burst that
+    // Yahoo would rate-limit into empty prices).
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _loadAll());
   }
 
   @override
@@ -69,13 +69,19 @@ class _MarketsScreenState extends State<MarketsScreen> {
     return kPairs.where((p) => p.category == _cat).toList();
   }
 
-  // Top movers: quotes across all instruments, biggest |day %| first.
+  // One quote cache feeds the watchlist AND the movers. Fetched sequentially so
+  // we never fire 20 concurrent requests (which Yahoo throttles).
   final Map<String, Quote> _allQuotes = {};
-  Future<void> _loadMovers() async {
-    await Future.wait(kPairs.map((p) async {
+  bool _loading = false;
+  Future<void> _loadAll() async {
+    if (_loading) return;
+    _loading = true;
+    for (final p in kPairs) {
       final q = await PriceService.quote(p);
-      if (q != null && mounted) setState(() => _allQuotes[p.symbol] = q);
-    }));
+      if (!mounted) break;
+      if (q != null) setState(() => _allQuotes[p.symbol] = q);
+    }
+    _loading = false;
   }
 
   List<TradingPair> get _movers {
@@ -84,12 +90,6 @@ class _MarketsScreenState extends State<MarketsScreen> {
     return withChange.take(8).toList();
   }
 
-  Future<void> _loadQuotes() async {
-    await Future.wait(_visible.map((p) async {
-      final q = await PriceService.quote(p);
-      if (q != null && mounted) setState(() => _quotes[p.symbol] = q);
-    }));
-  }
 
   Future<void> _loadTopTraders() async {
     if (!kUseBackend) return;
@@ -106,7 +106,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async { await _loadQuotes(); await _loadTopTraders(); },
+          onRefresh: () async { await _loadAll(); await _loadTopTraders(); },
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
@@ -146,7 +146,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                       final c = _cats[i];
                       final active = c == _cat;
                       return GestureDetector(
-                        onTap: () { setState(() => _cat = c); _loadQuotes(); },
+                        onTap: () => setState(() => _cat = c),
                         child: Container(
                           alignment: Alignment.center,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -206,7 +206,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (_, i) => _WatchRow(
                         pair: _visible[i],
-                        quote: _quotes[_visible[i].symbol] ?? _allQuotes[_visible[i].symbol],
+                        quote: _allQuotes[_visible[i].symbol],
                         isFav: _favs.contains(_visible[i].symbol),
                         onToggleFav: () => _toggleFav(_visible[i].symbol),
                       ),

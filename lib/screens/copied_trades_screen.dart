@@ -18,7 +18,9 @@ class CopiedTradesScreen extends StatelessWidget {
     final store = AppStateScope.of(context);
     final hasData = store.hasAccount || store.positions.isNotEmpty;
 
-    return DefaultTabController(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: DefaultTabController(
       length: 2,
       child: SafeArea(
         child: Column(
@@ -66,6 +68,7 @@ class CopiedTradesScreen extends StatelessWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }
