@@ -3,6 +3,7 @@ import { CryptoModule } from '../common/crypto/crypto.module';
 import { WalletService } from './wallet.service';
 import { SettlementService } from './settlement.service';
 import { DepositsService } from './deposits.service';
+import { CryptoDepositService } from './crypto/crypto-deposit.service';
 import { PayoutMethodsService } from './payout-methods.service';
 import { TransactionsService } from './transactions.service';
 import { WalletController } from './wallet.controller';
@@ -22,6 +23,7 @@ import { PayoutMethodsController } from './payout-methods.controller';
     WalletService,
     SettlementService,
     DepositsService,
+    CryptoDepositService,
     PayoutMethodsService,
     TransactionsService,
   ],

@@ -4,9 +4,9 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { DepositsService } from './deposits.service';
 
 /**
- * Public crypto-processor webhook. Not behind JwtAuthGuard — the processor
- * authenticates via the HMAC signature over the raw body (verified in the
- * service against CRYPTO_WEBHOOK_SECRET). Point your provider's webhook here.
+ * Public crypto-processor webhook (IPN). Not behind JwtAuthGuard — the processor
+ * authenticates via the signature over the raw body (verified in the service /
+ * provider). Point your processor's webhook at POST /v1/webhooks/deposits/crypto.
  */
 @ApiExcludeController()
 @Controller('webhooks/deposits')
@@ -16,10 +16,10 @@ export class DepositsWebhookController {
   @Post('crypto')
   crypto(
     @Req() req: RawBodyRequest<Request>,
-    @Headers('x-signature') signature: string | undefined,
+    @Headers() headers: Record<string, string | undefined>,
     @Body() body: { depositId?: string; txRef?: string },
-  ): Promise<{ ok: true }> {
+  ): Promise<{ ok: true; status?: string }> {
     const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
-    return this.deposits.confirmViaWebhook(raw, signature, body ?? {});
+    return this.deposits.confirmViaWebhook(raw, headers ?? {}, body ?? {});
   }
 }

@@ -6,16 +6,16 @@ import { WalletService } from './wallet.service';
 import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
 import { CreateDepositDto, DepositDto, DepositMethodDto } from './dto/deposit.dto';
+import { CryptoDepositService } from './crypto/crypto-deposit.service';
 
 // Hard production safety gate: auto-crediting a deposit without real on-chain
 // confirmation is a DEV-ONLY convenience. It is OFF unless DEPOSIT_AUTO_CONFIRM
 // is explicitly "true", regardless of the admin PlatformSettings toggle — so a
 // misconfigured setting can never mint real balance in production.
 const DEPOSIT_AUTO_CONFIRM = process.env.DEPOSIT_AUTO_CONFIRM === 'true';
-// Real crypto processor (e.g. NOWPayments/Coinbase Commerce/BitPay or an HD
-// wallet service) that issues real deposit addresses and calls our webhook on
-// confirmation. Unset in dev; required before prod crypto deposits are enabled.
-const CRYPTO_DEPOSIT_PROVIDER = (process.env.CRYPTO_DEPOSIT_PROVIDER ?? '').trim();
+// Optional generic webhook secret for a custom processor (used only when no
+// first-class provider is configured). First-class providers (NOWPayments, …)
+// bring their own signature scheme via CryptoDepositService.
 const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET ?? '';
 
 /**
@@ -32,6 +32,7 @@ export class DepositsService {
     private readonly prisma: PrismaService,
     private readonly wallet: WalletService,
     private readonly settings: SettingsService,
+    private readonly crypto: CryptoDepositService,
   ) {}
 
   async methods(): Promise<DepositMethodDto[]> {
@@ -52,6 +53,8 @@ export class DepositsService {
       method: d.method,
       asset: d.asset,
       address: d.address,
+      payAmount: d.payAmount ?? null,
+      payCurrency: d.payCurrency ?? null,
       status: d.status,
       createdAt: d.createdAt.toISOString(),
       confirmedAt: d.confirmedAt?.toISOString() ?? null,
@@ -65,20 +68,28 @@ export class DepositsService {
   }
 
   /**
-   * Issue a deposit address. In production this must come from a real crypto
-   * processor; we NEVER hand out a fake address there (users would send real
-   * funds into the void). Dev/test (DEPOSIT_AUTO_CONFIRM=true) uses a mock.
+   * Issue a deposit payment for `depositId`. In production this comes from the
+   * configured crypto processor (real pay-to address + exact amount); we NEVER
+   * hand out a fake address there. Dev/test (DEPOSIT_AUTO_CONFIRM=true) uses a
+   * mock; with neither, deposits fail closed.
    */
-  private async depositAddress(asset: string): Promise<string> {
-    if (CRYPTO_DEPOSIT_PROVIDER) {
-      // TODO: call the configured processor to generate a real address.
-      // Left unwired until a provider + creds are chosen; fail closed for now.
-      throw new BadRequestException({
-        code: 'deposits_unavailable',
-        message: 'Crypto deposits are being set up. Please try again soon.',
-      });
+  private async issuePayment(
+    depositId: string,
+    amountUsd: number,
+    asset: string,
+  ): Promise<{ address: string; payAmount?: number; payCurrency?: string; providerRef?: string }> {
+    if (this.crypto.enabled) {
+      try {
+        return await this.crypto.createPayment(depositId, amountUsd, asset);
+      } catch (err) {
+        this.logger.warn(`crypto provider (${this.crypto.name}) createPayment failed: ${String(err)}`);
+        throw new BadRequestException({
+          code: 'deposits_unavailable',
+          message: 'Couldn’t start the deposit right now. Please try again shortly.',
+        });
+      }
     }
-    if (DEPOSIT_AUTO_CONFIRM) return this.mockAddress(asset); // dev/test only
+    if (DEPOSIT_AUTO_CONFIRM) return { address: this.mockAddress(asset) }; // dev/test only
     throw new BadRequestException({
       code: 'deposits_unavailable',
       message: 'Crypto deposits aren’t enabled yet. A payment processor is being connected.',
@@ -106,16 +117,21 @@ export class DepositsService {
       });
     }
     const asset = dto.asset ?? 'USDT';
-    const address = await this.depositAddress(asset); // refuses a fake address in prod
+    const id = genId('dep');
+    // order_id must equal our deposit id, so issue the payment first.
+    const pay = await this.issuePayment(id, amount, asset); // refuses a fake address in prod
     const deposit = await this.prisma.deposit.create({
       data: {
-        id: genId('dep'),
+        id,
         userId,
         amount,
         currency: 'USD',
         method,
         asset,
-        address,
+        address: pay.address,
+        payAmount: pay.payAmount ?? null,
+        payCurrency: pay.payCurrency ?? null,
+        providerRef: pay.providerRef ?? null,
         status: DepositStatus.pending,
       },
     });
@@ -130,27 +146,48 @@ export class DepositsService {
   }
 
   /**
-   * Confirm a deposit from a crypto-processor webhook. Verifies the HMAC-SHA256
-   * signature over the raw body with CRYPTO_WEBHOOK_SECRET before crediting, then
-   * confirms idempotently. Wire the chosen provider's webhook to this endpoint.
+   * Handle a crypto-processor webhook (IPN). Uses the configured provider's own
+   * signature scheme (e.g. NOWPayments HMAC-SHA512 over the sorted body); falls
+   * back to a generic HMAC-SHA256 x-signature over the raw body when only
+   * CRYPTO_WEBHOOK_SECRET is set (a custom processor). Idempotent — retries and
+   * the same event arriving twice never double-credit.
    */
-  async confirmViaWebhook(rawBody: string, signature: string | undefined, body: { depositId?: string; txRef?: string }): Promise<{ ok: true }> {
+  async confirmViaWebhook(
+    rawBody: string,
+    headers: Record<string, string | undefined>,
+    body: { depositId?: string; txRef?: string },
+  ): Promise<{ ok: true; status?: string }> {
+    // First-class provider (NOWPayments, …).
+    if (this.crypto.enabled) {
+      const r = this.crypto.verifyWebhook(rawBody, headers);
+      if (!r.ok) throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
+      if (!r.depositId) return { ok: true, status: 'ignored' };
+      if (r.status === 'confirmed') await this.confirm(r.depositId, r.txRef);
+      else if (r.status === 'failed') await this.failIfPending(r.depositId, `processor: ${this.crypto.name}`);
+      return { ok: true, status: r.status };
+    }
+
+    // Generic custom processor: HMAC-SHA256 over the raw body in x-signature.
     if (!CRYPTO_WEBHOOK_SECRET) {
       throw new UnauthorizedException({ code: 'webhook_not_configured', message: 'Deposit webhook is not configured.' });
     }
     const expected = createHmac('sha256', CRYPTO_WEBHOOK_SECRET).update(rawBody).digest('hex');
-    const provided = (signature ?? '').trim();
+    const provided = (headers['x-signature'] ?? '').trim();
     const ok =
       provided.length === expected.length &&
       timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-    if (!ok) {
-      throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
-    }
-    if (!body.depositId) {
-      throw new BadRequestException({ code: 'missing_deposit', message: 'depositId is required.' });
-    }
+    if (!ok) throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
+    if (!body.depositId) throw new BadRequestException({ code: 'missing_deposit', message: 'depositId is required.' });
     await this.confirm(body.depositId, body.txRef ?? `webhook:${Date.now()}`);
-    return { ok: true };
+    return { ok: true, status: 'confirmed' };
+  }
+
+  /** Mark a still-pending deposit failed (webhook reported failure/expiry). */
+  private async failIfPending(depositId: string, reason: string): Promise<void> {
+    await this.prisma.deposit.updateMany({
+      where: { id: depositId, status: DepositStatus.pending },
+      data: { status: DepositStatus.failed, reason },
+    });
   }
 
   /**

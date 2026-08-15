@@ -587,14 +587,18 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
 - **Deposits** (crypto live; others "coming soon")
   - `GET /deposits/methods` → `[{ id, label, active, comingSoon?, assets? }]`
     (crypto active; metatrader/card/bank `comingSoon`).
-  - `POST /deposits { amount, asset?, method? }` → `Deposit`. Auto-credit happens
-    **only** in dev/test (`DEPOSIT_AUTO_CONFIRM=true`). In production the wallet is
-    credited solely by the processor webhook (below) or admin approval. With no
-    processor configured and auto-confirm off, deposit creation **fails closed**
-    (`deposits_unavailable`) — no fake address is ever issued.
-  - `POST /webhooks/deposits/crypto` (public; no JWT) — the crypto processor calls
-    this on confirmation. Verifies HMAC-SHA256 of the raw body against
-    `CRYPTO_WEBHOOK_SECRET` (header `x-signature`), then credits once (idempotent).
+  - `POST /deposits { amount, asset?, method? }` → `Deposit` (adds `payAmount`,
+    `payCurrency` — the exact crypto amount/network to send). With a processor
+    configured (`CRYPTO_DEPOSIT_PROVIDER=nowpayments`) it creates a real payment
+    and returns the pay-to `address`. Auto-credit happens **only** in dev/test
+    (`DEPOSIT_AUTO_CONFIRM=true`); in production the wallet is credited solely by
+    the processor webhook or admin approval. With no processor and auto-confirm
+    off, creation **fails closed** (`deposits_unavailable`) — no fake address.
+  - `POST /webhooks/deposits/crypto` (public; no JWT) — the processor's IPN. For
+    NOWPayments, verifies HMAC-SHA512 of the sorted body (`x-nowpayments-sig`)
+    against `NOWPAYMENTS_IPN_SECRET`, maps `payment_status` (`finished`→credit,
+    `expired/failed`→fail), and credits the USD amount once (idempotent). A custom
+    processor can use a generic HMAC-SHA256 `x-signature` with `CRYPTO_WEBHOOK_SECRET`.
   - `GET /deposits` → my deposits.
 - **Copy funding & settlement** — `POST /copy/{traderId}/start` now debits the
   wallet by `amount` (`copy_allocate`; throws `insufficient_balance` if unfunded —

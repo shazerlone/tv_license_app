@@ -18,6 +18,8 @@ export class DepositDto {
   @ApiProperty({ example: 'crypto' }) method: string;
   @ApiPropertyOptional({ nullable: true, example: 'USDT' }) asset?: string | null;
   @ApiPropertyOptional({ nullable: true, example: 'TXyz…addr' }) address?: string | null;
+  @ApiPropertyOptional({ nullable: true, example: 249.9, description: 'Exact crypto amount to send.' }) payAmount?: number | null;
+  @ApiPropertyOptional({ nullable: true, example: 'usdttrc20', description: 'Processor pay currency/network.' }) payCurrency?: string | null;
   @ApiProperty({ enum: ['pending', 'confirmed', 'failed'] }) status: string;
   @ApiProperty({ example: '2026-08-02T12:00:00.000Z' }) createdAt: string;
   @ApiPropertyOptional({ nullable: true }) confirmedAt?: string | null;

@@ -239,6 +239,9 @@ model Deposit {
   asset       String? // e.g. "USDT", "BTC" for crypto
   address     String? // deposit address shown to the user (crypto)
   txRef       String? // on-chain tx / provider reference
+  providerRef String? // processor payment id (e.g. NOWPayments payment_id)
+  payAmount   Float? // exact crypto amount the user must send
+  payCurrency String? // processor pay currency, e.g. "usdttrc20"
   status      DepositStatus @default(pending)
   decisionBy  String? // admin who approved/rejected (manual mode)
   reason      String? // admin note / rejection reason

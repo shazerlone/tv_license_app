@@ -5897,6 +5897,18 @@
             "nullable": true,
             "example": "TXyz…addr"
           },
+          "payAmount": {
+            "type": "object",
+            "nullable": true,
+            "example": 249.9,
+            "description": "Exact crypto amount to send."
+          },
+          "payCurrency": {
+            "type": "object",
+            "nullable": true,
+            "example": "usdttrc20",
+            "description": "Processor pay currency/network."
+          },
           "status": {
             "type": "string",
             "enum": [
