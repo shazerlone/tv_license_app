@@ -273,7 +273,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
                 child: TextButton.icon(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PairDetailScreen(pair: _pair!))),
                   icon: Icon(Icons.show_chart_rounded, size: 18, color: AppColors.primary),
-                  label: Text('Open live chart & discussion', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  label: Text('Open live chart', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ),
               ),
             ],

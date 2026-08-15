@@ -2,12 +2,29 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../data/pairs.dart';
 
-/// A single live quote for an instrument.
+/// A single live quote for an instrument, plus the day/52-week stats a broker
+/// terminal shows.
 class Quote {
   final double price;
   final double? changePercent; // day change %, when available
   final String currency;
-  const Quote({required this.price, this.changePercent, this.currency = 'USD'});
+  final double? open;
+  final double? dayHigh;
+  final double? dayLow;
+  final double? prevClose;
+  final double? yearHigh;
+  final double? yearLow;
+  const Quote({
+    required this.price,
+    this.changePercent,
+    this.currency = 'USD',
+    this.open,
+    this.dayHigh,
+    this.dayLow,
+    this.prevClose,
+    this.yearHigh,
+    this.yearLow,
+  });
 }
 
 /// Fetches live market quotes directly from Yahoo Finance's public chart
@@ -34,6 +51,7 @@ class PriceService {
       if (price == null) return null;
       final prevClose = (meta['chartPreviousClose'] as num?)?.toDouble() ??
           (meta['previousClose'] as num?)?.toDouble();
+      double? d(String k) => (meta[k] as num?)?.toDouble();
       double? changePct;
       if (prevClose != null && prevClose != 0) {
         changePct = (price - prevClose) / prevClose * 100;
@@ -42,6 +60,12 @@ class PriceService {
         price: price,
         changePercent: changePct,
         currency: (meta['currency'] ?? 'USD').toString(),
+        open: d('regularMarketOpen') ?? d('open'),
+        dayHigh: d('regularMarketDayHigh'),
+        dayLow: d('regularMarketDayLow'),
+        prevClose: prevClose,
+        yearHigh: d('fiftyTwoWeekHigh'),
+        yearLow: d('fiftyTwoWeekLow'),
       );
     } catch (_) {
       return null;

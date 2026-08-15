@@ -8,7 +8,9 @@ import '../theme/app_theme.dart';
 class TradingViewChart extends StatefulWidget {
   final String tvSymbol;
   final double height;
-  const TradingViewChart({super.key, required this.tvSymbol, this.height = 320});
+  /// TradingView interval code: 60 (1H), D (1D), W (1W), etc.
+  final String interval;
+  const TradingViewChart({super.key, required this.tvSymbol, this.height = 320, this.interval = '60'});
 
   @override
   State<TradingViewChart> createState() => _TradingViewChartState();
@@ -24,7 +26,7 @@ class _TradingViewChartState extends State<TradingViewChart> {
     final theme = AppColors.isDark ? 'dark' : 'light';
     final sym = Uri.encodeComponent(widget.tvSymbol);
     final url =
-        'https://s.tradingview.com/widgetembed/?symbol=$sym&interval=60&theme=$theme&style=1&hidesidetoolbar=1&hidetoptoolbar=0&withdateranges=1&saveimage=0&locale=en';
+        'https://s.tradingview.com/widgetembed/?symbol=$sym&interval=${widget.interval}&theme=$theme&style=1&hidesidetoolbar=1&hidetoptoolbar=0&withdateranges=1&saveimage=0&locale=en';
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppColors.background)
