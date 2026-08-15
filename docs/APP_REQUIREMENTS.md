@@ -319,3 +319,30 @@ shared-state refresh) but the data/endpoints below are the blockers.
    `POST /pairs/{symbol}/chat { text }`. Reuses the existing WS envelope.
 
 _Maintained by the app session. Last updated: live-testing bug report (subscriptions, real-time wallet, trade/price/chat/photo needs)._
+
+## 🚨 PRODUCTION READINESS — clear demo/seed data (backend, blocking launch)
+
+The app faithfully renders whatever the API returns. In live testing it shows
+**seeded demo data**, which makes the product look broken. None of this is fixable
+in the app — it is server data. Required before launch:
+
+1. **Wipe / gate the demo seed.** Fake creators (Kenji Nakamura, Marcus Sterling,
+   Elena Vos …), their live broadcasts, seeded broadcast stats (viewers/likes),
+   and pre-funded $10k wallets must NOT exist in production. Put the seed behind a
+   `SEED_DEMO=false` env (off in prod) and provide a migration/script to purge
+   existing seed rows from the live DB.
+2. **`trader.isLive` only from real broadcast start/end** — never seeded true.
+3. **`GET /broadcasts/live` must carry trader identity** — add
+   `{ traderId, name, username, photoUrl }` to each `BroadcastDto` so the app can
+   render live cards from real broadcasts (today it only has `creatorId`, which
+   the app cannot map to a trader). Once shipped, the app will render "Live now"
+   purely from real broadcasts.
+4. **Real crypto deposits.** Set `DEPOSIT_AUTO_CONFIRM=false` and integrate a real
+   crypto processor (generate a real address, confirm via webhook). No auto-credit
+   in prod. New users start at $0.
+5. **Real market data** on `GET /prices` + WS `prices` from a **licensed provider**
+   (the app's Yahoo fetch is a testing placeholder only — ToS-restricted, not
+   production-safe). Consider adding a backend `GET /candles?symbol=&range=&interval=`
+   so the app charts pull OHLC from the backend instead of Yahoo.
+
+_Maintained by the app session. Production-readiness block added after live testing._
