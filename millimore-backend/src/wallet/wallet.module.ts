@@ -4,6 +4,7 @@ import { WalletService } from './wallet.service';
 import { SettlementService } from './settlement.service';
 import { DepositsService } from './deposits.service';
 import { CryptoDepositService } from './crypto/crypto-deposit.service';
+import { CryptoAddressService } from './crypto/crypto-address.service';
 import { PayoutMethodsService } from './payout-methods.service';
 import { TransactionsService } from './transactions.service';
 import { WalletController } from './wallet.controller';
@@ -24,6 +25,7 @@ import { PayoutMethodsController } from './payout-methods.controller';
     SettlementService,
     DepositsService,
     CryptoDepositService,
+    CryptoAddressService,
     PayoutMethodsService,
     TransactionsService,
   ],

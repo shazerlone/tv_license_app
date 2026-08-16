@@ -1,12 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { Deposit, DepositStatus, LedgerType } from '@prisma/client';
+import { Deposit, DepositStatus, KycStatus, LedgerType, Prisma } from '@prisma/client';
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from './wallet.service';
 import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
-import { CreateDepositDto, DepositDto, DepositMethodDto } from './dto/deposit.dto';
+import { CreateDepositDto, DepositDto, DepositMethodDto, DepositAddressDto } from './dto/deposit.dto';
 import { CryptoDepositService } from './crypto/crypto-deposit.service';
+import { CryptoAddressService } from './crypto/crypto-address.service';
+import { ChainDeposit, DepositNetwork } from './crypto/address-provider';
 
 // Hard production safety gate: auto-crediting a deposit without real on-chain
 // confirmation is a DEV-ONLY convenience. It is OFF unless DEPOSIT_AUTO_CONFIRM
@@ -33,6 +35,7 @@ export class DepositsService {
     private readonly wallet: WalletService,
     private readonly settings: SettingsService,
     private readonly crypto: CryptoDepositService,
+    private readonly addresses: CryptoAddressService,
   ) {
     this.logger.log(
       DEPOSIT_AUTO_CONFIRM
@@ -194,6 +197,80 @@ export class DepositsService {
       where: { id: depositId, status: DepositStatus.pending },
       data: { status: DepositStatus.failed, reason },
     });
+  }
+
+  // ── per-user deposit addresses (address-based provider, e.g. Tatum) ──────
+  /**
+   * The caller's USDT deposit addresses (one per supported network), issued
+   * lazily on first request. Requires KYC and a configured address provider.
+   */
+  async myAddresses(userId: string): Promise<DepositAddressDto[]> {
+    if (!this.addresses.enabled) {
+      throw new BadRequestException({ code: 'deposits_unavailable', message: 'Crypto deposits aren’t enabled yet.' });
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { kycStatus: true } });
+    if (user?.kycStatus !== KycStatus.verified) {
+      throw new BadRequestException({ code: 'kyc_required', message: 'Complete identity verification (KYC) to get a deposit address.' });
+    }
+    const out: DepositAddressDto[] = [];
+    for (const network of this.addresses.networks) {
+      out.push(await this.ensureAddress(userId, network));
+    }
+    return out;
+  }
+
+  private async ensureAddress(userId: string, network: DepositNetwork): Promise<DepositAddressDto> {
+    const existing = await this.prisma.depositAddress.findUnique({ where: { userId_network: { userId, network } } });
+    if (existing) return { network: existing.network, asset: existing.asset, address: existing.address };
+    const gen = await this.addresses.createAddress(userId, network);
+    try {
+      const row = await this.prisma.depositAddress.create({
+        data: { id: genId('da'), userId, network, asset: 'USDT', address: gen.address, providerRef: gen.providerRef, derivationIndex: gen.derivationIndex },
+      });
+      return { network: row.network, asset: row.asset, address: row.address };
+    } catch (e) {
+      // Concurrent create → unique(userId,network) violation: return the winner.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const row = await this.prisma.depositAddress.findUnique({ where: { userId_network: { userId, network } } });
+        if (row) return { network: row.network, asset: row.asset, address: row.address };
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Credit a confirmed on-chain deposit that landed on a user's address. Looks up
+   * the owning user by address, then reuses confirm() (idempotent). The unique
+   * txRef guard means the same tx can never credit twice.
+   */
+  async creditFromChainDeposit(d: ChainDeposit): Promise<{ credited: boolean }> {
+    if (!d.ok || !d.address || !d.network || !d.txRef || !d.amount || d.amount <= 0) return { credited: false };
+    const addr = await this.prisma.depositAddress.findFirst({ where: { network: d.network, address: d.address } });
+    if (!addr) {
+      this.logger.warn(`chain deposit to unknown address (${d.network}) ${d.address}`);
+      return { credited: false };
+    }
+    const amount = Math.round(d.amount * 100) / 100; // USDT ≈ USD 1:1
+    let depositId: string;
+    try {
+      const dep = await this.prisma.deposit.create({
+        data: { id: genId('dep'), userId: addr.userId, amount, currency: 'USD', method: 'crypto', asset: 'USDT', address: d.address, payCurrency: d.network, txRef: d.txRef, status: DepositStatus.pending },
+      });
+      depositId = dep.id;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return { credited: false }; // tx already processed
+      throw e;
+    }
+    await this.confirm(depositId, d.txRef);
+    return { credited: true };
+  }
+
+  /** Handle an address-provider deposit webhook (verify + credit). */
+  async handleChainWebhook(rawBody: string, headers: Record<string, string | undefined>): Promise<{ ok: true; credited: boolean }> {
+    const parsed = this.addresses.parseWebhook(rawBody, headers);
+    if (!parsed.ok) throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
+    const { credited } = await this.creditFromChainDeposit(parsed);
+    return { ok: true, credited };
   }
 
   /**

@@ -25,6 +25,13 @@ export class DepositDto {
   @ApiPropertyOptional({ nullable: true }) confirmedAt?: string | null;
 }
 
+/** A per-user crypto deposit address for one network. */
+export class DepositAddressDto {
+  @ApiProperty({ example: 'tron', enum: ['tron', 'ethereum', 'bsc'] }) network: string;
+  @ApiProperty({ example: 'USDT' }) asset: string;
+  @ApiProperty({ example: 'TXyz…addr' }) address: string;
+}
+
 /** POST /deposits body — crypto only for now. */
 export class CreateDepositDto {
   @ApiProperty({ example: 250, description: 'Amount to deposit in USD terms.' })

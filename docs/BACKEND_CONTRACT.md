@@ -599,6 +599,14 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
     against `NOWPAYMENTS_IPN_SECRET`, maps `payment_status` (`finished`→credit,
     `expired/failed`→fail), and credits the USD amount once (idempotent). A custom
     processor can use a generic HMAC-SHA256 `x-signature` with `CRYPTO_WEBHOOK_SECRET`.
+  - `GET /deposits/addresses` → `[{ network:"tron"|"ethereum"|"bsc", asset:"USDT",
+    address }]` — the caller's per-network deposit addresses, issued lazily after
+    KYC (errors: `kyc_required`, `deposits_unavailable` when no provider). Funds
+    sent to an address credit the owner's wallet automatically and are swept to
+    the master wallet by the processor (Tatum Gas Pump).
+  - `POST /webhooks/deposits/chain` (public; no JWT) — the address processor's
+    deposit notification; verified by the provider, then credits the owning wallet
+    once (deduped by on-chain tx hash — `Deposit.txRef` is unique).
   - `GET /deposits` → my deposits.
 - **Copy funding & settlement** — `POST /copy/{traderId}/start` now debits the
   wallet by `amount` (`copy_allocate`; throws `insufficient_balance` if unfunded —

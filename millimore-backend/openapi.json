@@ -1018,6 +1018,36 @@
         ]
       }
     },
+    "/v1/deposits/addresses": {
+      "get": {
+        "operationId": "DepositsController_addresses",
+        "summary": "My per-network USDT deposit addresses (issued after KYC)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepositAddressDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "wallet"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/wallet/payout-methods": {
       "get": {
         "operationId": "PayoutMethodsController_list",
@@ -5933,6 +5963,33 @@
           "method",
           "status",
           "createdAt"
+        ]
+      },
+      "DepositAddressDto": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "example": "tron",
+            "enum": [
+              "tron",
+              "ethereum",
+              "bsc"
+            ]
+          },
+          "asset": {
+            "type": "string",
+            "example": "USDT"
+          },
+          "address": {
+            "type": "string",
+            "example": "TXyz…addr"
+          }
+        },
+        "required": [
+          "network",
+          "asset",
+          "address"
         ]
       },
       "CreateDepositDto": {

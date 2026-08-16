@@ -22,4 +22,16 @@ export class DepositsWebhookController {
     const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
     return this.deposits.confirmViaWebhook(raw, headers ?? {}, body ?? {});
   }
+
+  // Address-based processor (Tatum Gas Pump, etc.): a deposit landed on a
+  // per-user address → verify + credit the owner's wallet.
+  @Post('chain')
+  chain(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers() headers: Record<string, string | undefined>,
+    @Body() body: unknown,
+  ): Promise<{ ok: true; credited: boolean }> {
+    const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
+    return this.deposits.handleChainWebhook(raw, headers ?? {});
+  }
 }

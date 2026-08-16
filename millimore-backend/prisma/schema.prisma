@@ -250,6 +250,7 @@ model Deposit {
   createdAt   DateTime      @default(now())
   confirmedAt DateTime?
 
+  @@unique([txRef]) // one credit per on-chain tx (nulls allowed) — dedupe guard
   @@index([userId, createdAt])
   @@index([status])
 }
@@ -779,6 +780,24 @@ model PasswordReset {
 
   @@index([userId])
   @@index([tokenHash])
+}
+
+/// A per-user, per-network crypto deposit address (issued after KYC). Funds sent
+/// here are credited to the user's wallet and auto-forwarded to the master wallet
+/// by the processor (Tatum Gas Pump). One address per (user, network).
+model DepositAddress {
+  id              String   @id // "da_..."
+  userId          String
+  network         String // "tron" | "ethereum" | "bsc"
+  asset           String   @default("USDT")
+  address         String
+  providerRef     String? // processor address id (e.g. Tatum gas-pump address)
+  derivationIndex Int? // HD index when applicable
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, network])
+  @@unique([network, address])
+  @@index([address])
 }
 
 /// A user's price alert on a symbol. One-shot: fires once when the live price
