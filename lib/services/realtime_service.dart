@@ -18,12 +18,17 @@ class RealtimeService {
   WsClient? _ws;
   final _broadcast = StreamController<Map<String, dynamic>>.broadcast();
   final _pair = StreamController<Map<String, dynamic>>.broadcast();
+  final _wallet = StreamController<Map<String, dynamic>>.broadcast();
 
   /// Broadcast-room events `{ ch:"broadcast:{id}", type, data }`.
   Stream<Map<String, dynamic>> get broadcastEvents => _broadcast.stream;
 
   /// Per-instrument community-chat events `{ ch:"pair:{symbol}", type, data }`.
   Stream<Map<String, dynamic>> get pairEvents => _pair.stream;
+
+  /// Wallet events `{ type:"wallet.deposit"|"payout.status", data }` — the
+  /// deposit-waiting screen listens to this for instant success.
+  Stream<Map<String, dynamic>> get walletEvents => _wallet.stream;
   bool get connected => _ws != null;
 
   void connect(String token) {
@@ -112,7 +117,22 @@ class RealtimeService {
           body: 'Tap to watch and copy in real time.',
           traderId: d['traderId']?.toString(), createdAt: now));
         break;
+      case 'wallet.deposit':
+        // Deposit credited on-chain — refresh balance and notify the funnel.
+        _store.loadWallet();
+        _store.loadCopyEngine();
+        _wallet.add({'type': 'wallet.deposit', 'data': d});
+        final amt = (d['amount'] as num?)?.toDouble();
+        _store.pushNotification(AppNotification(
+          id: id(), type: AppNotificationType.system,
+          title: 'Deposit received',
+          body: amt != null ? '+\$${amt.toStringAsFixed(2)} added to your balance' : 'Your deposit was credited.',
+          createdAt: now));
+        break;
       case 'payout.status':
+        // Rejected withdrawals refund the held balance — refresh either way.
+        _store.loadWallet();
+        _wallet.add({'type': 'payout.status', 'data': d});
         _store.pushNotification(AppNotification(
           id: id(), type: AppNotificationType.system,
           title: 'Payout ${d['status']}',
@@ -132,5 +152,6 @@ class RealtimeService {
     disconnect();
     _broadcast.close();
     _pair.close();
+    _wallet.close();
   }
 }

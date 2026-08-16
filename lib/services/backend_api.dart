@@ -324,6 +324,13 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null);
   }
 
+  /// Per-network USDT deposit addresses (issued after KYC). Throws ApiException
+  /// with code `kyc_required` or `deposits_unavailable` when not yet available.
+  static Future<List<Map<String, dynamic>>> depositAddresses() async {
+    final res = await _api.get('/deposits/addresses');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
   static Future<Map<String, dynamic>> createDeposit({required double amount, String? method, String? asset}) async {
     final res = await _api.post('/deposits', {'amount': amount, if (method != null) 'method': method, if (asset != null) 'asset': asset});
     return (res as Map).cast<String, dynamic>();
@@ -334,8 +341,13 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null);
   }
 
-  static Future<Map<String, dynamic>> requestPayout({required double amount, String? method, String? note}) async {
-    final res = await _api.post('/creator/payouts', {'amount': amount, if (method != null) 'method': method, if (note != null) 'note': note});
+  static Future<Map<String, dynamic>> requestPayout({required double amount, String? methodId, String? method, String? note}) async {
+    final res = await _api.post('/creator/payouts', {
+      'amount': amount,
+      if (methodId != null) 'methodId': methodId,
+      if (method != null) 'method': method,
+      if (note != null) 'note': note,
+    });
     return (res as Map).cast<String, dynamic>();
   }
 

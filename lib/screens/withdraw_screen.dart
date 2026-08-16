@@ -34,6 +34,10 @@ String friendlyWithdrawError(String code, String fallback) {
       return 'You\'ve reached today\'s withdrawal limit. Try again tomorrow.';
     case 'insufficient_balance':
       return 'Insufficient balance for this withdrawal.';
+    case 'withdrawal_method_mismatch':
+      return 'You can withdraw only to the method you deposited from.';
+    case 'account_restricted':
+      return 'Withdrawals are paused on your account — contact support.';
     default:
       return fallback;
   }
@@ -42,6 +46,7 @@ String friendlyWithdrawError(String code, String fallback) {
 class _WithdrawScreenState extends State<WithdrawScreen> {
   final _amount = TextEditingController();
   List<Map<String, dynamic>> _methods = const [];
+  Set<String> _fundedTypes = {}; // AML: method types the user deposited from
   String? _methodId;
   bool _loading = true;
   bool _submitting = false;
@@ -57,13 +62,28 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     }
   }
 
+  bool _allowed(Map<String, dynamic> m) => _fundedTypes.isEmpty || _fundedTypes.contains(m['type']?.toString());
+
   Future<void> _load() async {
     try {
-      final m = await BackendApi.payoutMethods();
+      final results = await Future.wait([
+        BackendApi.payoutMethods(),
+        BackendApi.deposits().catchError((_) => <Map<String, dynamic>>[]),
+      ]);
+      final m = results[0];
+      final deposits = results[1];
+      // AML same-source: funded method types = types of confirmed deposits.
+      final funded = <String>{
+        for (final d in deposits)
+          if (d['status'] == 'confirmed') (d['method'] ?? 'crypto').toString(),
+      };
       if (!mounted) return;
       setState(() {
         _methods = m;
-        _methodId = m.isNotEmpty ? m.first['id'].toString() : null;
+        _fundedTypes = funded;
+        // Default to the first *allowed* method.
+        final firstAllowed = m.where(_allowed).toList();
+        _methodId = firstAllowed.isNotEmpty ? firstAllowed.first['id'].toString() : null;
         _loading = false;
       });
     } catch (_) {
@@ -102,7 +122,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     }
     setState(() => _submitting = true);
     try {
-      await BackendApi.requestPayout(amount: amount, method: _methodId);
+      await BackendApi.requestPayout(amount: amount, methodId: _methodId);
       if (!mounted) return;
       Navigator.pop(context, true);
       _toast('Payout requested — pending approval');
@@ -138,7 +158,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                 TextField(
                   controller: _amount,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   decoration: const InputDecoration(prefixText: '\$ ', hintText: '0.00'),
                 ),
                 const SizedBox(height: 24),
@@ -168,36 +188,48 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   ..._methods.map((m) {
                     final id = m['id'].toString();
                     final active = _methodId == id;
-                    return GestureDetector(
-                      onTap: () => setState(() => _methodId = id),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: active ? AppColors.primary.withOpacity(0.05) : AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: active ? AppColors.primary : AppColors.border, width: active ? 1.5 : 1),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(m['type'] == 'bank' ? Icons.account_balance_rounded : Icons.currency_bitcoin_rounded, size: 20, color: AppColors.primary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(m['label'].toString(), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                                  Text(m['masked'].toString(), style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-                                ],
+                    final allowed = _allowed(m);
+                    return Opacity(
+                      opacity: allowed ? 1 : 0.5,
+                      child: GestureDetector(
+                        onTap: allowed
+                            ? () => setState(() => _methodId = id)
+                            : () => _toast('You can withdraw only to the method you deposited from (${_fundedTypes.join(', ')}).'),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(13),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.primary.withOpacity(0.05) : AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: active ? AppColors.primary : AppColors.border, width: active ? 1.5 : 1),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(m['type'] == 'bank' ? Icons.account_balance_rounded : Icons.currency_bitcoin_rounded, size: 20, color: AppColors.primary),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(m['label'].toString(), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                    Text(allowed ? m['masked'].toString() : 'Locked — not your deposit source', style: GoogleFonts.inter(fontSize: 12, color: allowed ? AppColors.textMuted : AppColors.red)),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Icon(active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, size: 20, color: active ? AppColors.primary : AppColors.border),
-                          ],
+                              Icon(!allowed ? Icons.lock_outline_rounded : (active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded), size: 20, color: active ? AppColors.primary : AppColors.border),
+                            ],
+                          ),
                         ),
                       ),
                     );
                   }),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    Icon(Icons.shield_outlined, size: 13, color: AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('For your security, funds can only be withdrawn to the same method they were deposited from.', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted, height: 1.35))),
+                  ]),
+                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _submitting ? null : _submit,
                     child: _submitting

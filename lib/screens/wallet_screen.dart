@@ -3,13 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
 import '../config.dart';
+import '../models/copy_models.dart';
 import '../state/app_state.dart';
 import '../services/backend_api.dart';
-import '../services/api_client.dart';
 import 'payout_methods_screen.dart';
 import 'kyc_screen.dart';
+import 'deposit_flow_screen.dart';
+import 'withdraw_screen.dart';
 
-/// Wallet: balance, transaction ledger, and add-funds (milestone 6).
+/// Wallet home — compact, exchange-grade: balance, margin, deposit / withdraw,
+/// and a grouped transaction timeline. Rebuilt per APP_WALLET_GUIDE.md §2.
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
@@ -19,9 +22,9 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   double _balance = 0;
-  double _leverage = 1;
   String _currency = 'USD';
-  List<Map<String, dynamic>> _ledger = const [];
+  PortfolioSummary? _summary;
+  List<Map<String, dynamic>> _txns = const [];
   bool _loading = true;
 
   @override
@@ -39,7 +42,10 @@ class _WalletScreenState extends State<WalletScreen> {
     setState(() => _loading = true);
     try {
       final w = await BackendApi.wallet();
-      // Unified transactions (deposits, trades, fees, commissions, withdrawals).
+      PortfolioSummary? summary;
+      try {
+        summary = await BackendApi.portfolioSummary();
+      } catch (_) {}
       List<Map<String, dynamic>> l;
       try {
         l = await BackendApi.walletTransactions();
@@ -49,9 +55,9 @@ class _WalletScreenState extends State<WalletScreen> {
       if (!mounted) return;
       setState(() {
         _balance = (w['balance'] as num?)?.toDouble() ?? 0;
-        _leverage = (w['leverage'] as num?)?.toDouble() ?? 1;
         _currency = (w['currency'] ?? 'USD').toString();
-        _ledger = l;
+        _summary = summary;
+        _txns = l;
         _loading = false;
       });
     } catch (_) {
@@ -60,7 +66,26 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
-  String _money(double v) => '\$${v.toStringAsFixed(2)}';
+  String _money(double v) {
+    final neg = v < 0;
+    final s = v.abs().toStringAsFixed(2);
+    final parts = s.split('.');
+    final buf = StringBuffer();
+    for (var i = 0; i < parts[0].length; i++) {
+      if (i > 0 && (parts[0].length - i) % 3 == 0) buf.write(',');
+      buf.write(parts[0][i]);
+    }
+    return '${neg ? '-' : ''}\$${buf.toString()}.${parts[1]}';
+  }
+
+  Future<void> _afterFlow() async {
+    await _load();
+    if (mounted) {
+      final store = AppStateScope.of(context);
+      store.loadWallet();
+      store.loadCopyEngine();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,136 +97,280 @@ class _WalletScreenState extends State<WalletScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF0B1120)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
-                      boxShadow: [BoxShadow(color: const Color(0xFF1E3A8A).withOpacity(0.35), blurRadius: 28, offset: const Offset(0, 14), spreadRadius: -12)],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Wallet balance', style: GoogleFonts.inter(fontSize: 13, color: Colors.white.withOpacity(0.65))),
-                        const SizedBox(height: 8),
-                        Text(_money(_balance), style: GoogleFonts.inter(fontSize: 36, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -1)),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text(_currency, style: GoogleFonts.inter(fontSize: 12.5, color: Colors.white.withOpacity(0.55))),
-                            if (_leverage > 1) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-                                child: Text('${_leverage.toStringAsFixed(0)}x leverage', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.85))),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _openDeposit(),
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Add funds'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
-                    child: Column(
-                      children: [
-                        _walletRow(Icons.account_balance_rounded, 'Payout methods', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayoutMethodsScreen()))),
-                        const Divider(height: 1),
-                        _walletRow(Icons.verified_user_outlined, 'Identity verification', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycScreen())), last: true),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 26),
-                  Text('Transactions', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  const SizedBox(height: 10),
-                  if (_ledger.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 30),
-                      child: Column(children: [
-                        Icon(Icons.account_balance_wallet_outlined, size: 42, color: AppColors.textMuted.withOpacity(0.5)),
-                        const SizedBox(height: 12),
-                        Text('No transactions yet', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                        const SizedBox(height: 4),
-                        Text('Add funds to start copying traders.', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-                      ]),
-                    )
-                  else
-                    ..._ledger.map(_ledgerRow),
+                  _balanceCard(),
+                  const SizedBox(height: 12),
+                  _actions(),
+                  const SizedBox(height: 18),
+                  _quickLinks(),
+                  const SizedBox(height: 22),
+                  Text('Transactions', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  const SizedBox(height: 8),
+                  if (_txns.isEmpty) _empty() else ..._grouped(),
                 ],
               ),
             ),
     );
   }
 
-  Widget _walletRow(IconData icon, String label, VoidCallback onTap, {bool last = false}) {
+  Widget _balanceCard() {
+    final s = _summary;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF111C33)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: [BoxShadow(color: const Color(0xFF1E3A8A).withOpacity(0.28), blurRadius: 22, offset: const Offset(0, 10), spreadRadius: -10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Available balance', style: GoogleFonts.inter(fontSize: 12, color: Colors.white.withOpacity(0.62))),
+          const SizedBox(height: 4),
+          Text(_money(_balance), style: GoogleFonts.inter(fontSize: 27, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.6)),
+          if (s != null) ...[
+            const SizedBox(height: 12),
+            Container(height: 1, color: Colors.white.withOpacity(0.1)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _mini('Free margin', _money(s.freeMargin)),
+                _miniDiv(),
+                _mini('Used margin', _money(s.usedMargin)),
+                _miniDiv(),
+                _mini('Equity', _money(s.equity)),
+              ],
+            ),
+            if (s.openPnl != 0) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                Text('Open P/L  ', style: GoogleFonts.inter(fontSize: 11.5, color: Colors.white.withOpacity(0.55))),
+                Text('${s.openPnl >= 0 ? '+' : ''}${_money(s.openPnl)}',
+                    style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.w700, color: s.openPnl >= 0 ? const Color(0xFF4ADE80) : const Color(0xFFF87171))),
+              ]),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _mini(String label, String value) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 10, color: Colors.white.withOpacity(0.55))),
+            const SizedBox(height: 2),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          ],
+        ),
+      );
+
+  Widget _miniDiv() => Container(width: 1, height: 26, color: Colors.white.withOpacity(0.1), margin: const EdgeInsets.symmetric(horizontal: 10));
+
+  Widget _actions() {
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositFlowScreen()));
+                _afterFlow();
+              },
+              icon: const Icon(Icons.arrow_downward_rounded, size: 18),
+              label: Text('Deposit', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: SizedBox(
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => WithdrawScreen(balance: _balance)));
+                _afterFlow();
+              },
+              icon: Icon(Icons.arrow_upward_rounded, size: 18, color: AppColors.primary),
+              label: Text('Withdraw', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.primary)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quickLinks() {
+    return Container(
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+      child: Column(
+        children: [
+          _linkRow(Icons.account_balance_wallet_outlined, 'Payout methods', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayoutMethodsScreen()))),
+          Divider(height: 1, color: AppColors.border),
+          _linkRow(Icons.verified_user_outlined, 'Identity verification', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycScreen())), last: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _linkRow(IconData icon, String label, VoidCallback onTap, {bool last = false}) {
     return InkWell(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      borderRadius: BorderRadius.vertical(top: last ? Radius.zero : const Radius.circular(14), bottom: last ? const Radius.circular(14) : Radius.zero),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.textSecondary),
-            const SizedBox(width: 14),
-            Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-            Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+            Icon(icon, size: 19, color: AppColors.textSecondary),
+            const SizedBox(width: 13),
+            Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+            Icon(Icons.chevron_right_rounded, size: 19, color: AppColors.textMuted),
           ],
         ),
       ),
     );
   }
 
-  Widget _ledgerRow(Map<String, dynamic> e) {
+  Widget _empty() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Column(children: [
+        Icon(Icons.receipt_long_outlined, size: 40, color: AppColors.textMuted.withOpacity(0.5)),
+        const SizedBox(height: 12),
+        Text('No transactions yet', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        const SizedBox(height: 4),
+        Text('Deposit to start copying traders.', style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
+      ]),
+    );
+  }
+
+  /// Group transactions by calendar day with a light header, exchange-style.
+  List<Widget> _grouped() {
+    final out = <Widget>[];
+    String? lastDay;
+    for (final e in _txns) {
+      final when = (e['createdAt'] ?? '').toString();
+      final day = _dayLabel(when);
+      if (day != lastDay) {
+        out.add(Padding(
+          padding: EdgeInsets.only(top: lastDay == null ? 0 : 14, bottom: 6, left: 2),
+          child: Text(day, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+        ));
+        lastDay = day;
+      }
+      out.add(_txnRow(e));
+    }
+    return out;
+  }
+
+  String _dayLabel(String iso) {
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return 'Earlier';
+    final now = DateTime.now();
+    final d = DateTime(dt.year, dt.month, dt.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final diff = today.difference(d).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[dt.month - 1]} ${dt.day}${dt.year == now.year ? '' : ', ${dt.year}'}';
+  }
+
+  Widget _txnRow(Map<String, dynamic> e) {
     final amount = (e['amount'] as num?)?.toDouble() ?? 0;
-    final type = (e['type'] ?? e['kind'] ?? e['category'] ?? '').toString();
-    final note = (e['note'] ?? e['description'] ?? '').toString();
+    final type = (e['type'] ?? e['kind'] ?? '').toString();
+    final status = (e['status'] ?? 'completed').toString();
+    final title = (e['title'] ?? '').toString();
     final when = (e['createdAt'] ?? '').toString();
     final positive = amount >= 0;
+    final pending = status == 'pending';
+    final rejected = status == 'rejected' || status == 'failed';
+    final meta = _meta(type);
+    final amountColor = rejected ? AppColors.textMuted : (positive ? AppColors.green : AppColors.red);
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
       child: Row(
         children: [
           Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(color: (positive ? AppColors.green : AppColors.red).withOpacity(0.12), shape: BoxShape.circle),
-            child: Icon(positive ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, size: 18, color: positive ? AppColors.green : AppColors.red),
+            width: 34, height: 34,
+            decoration: BoxDecoration(color: meta.$2.withOpacity(0.12), shape: BoxShape.circle),
+            child: Icon(meta.$1, size: 17, color: meta.$2),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_label(type, amount), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                if (note.isNotEmpty || when.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(note.isNotEmpty ? note : (when.length > 10 ? when.substring(0, 10) : when),
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-                ],
+                Text(title.isNotEmpty ? title : _label(type, amount), style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Row(children: [
+                  Text(_time(when), style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+                  if (pending) ...[
+                    const SizedBox(width: 6),
+                    _tag('Pending', AppColors.primary),
+                  ] else if (rejected) ...[
+                    const SizedBox(width: 6),
+                    _tag(status == 'failed' ? 'Failed' : 'Rejected', AppColors.red),
+                  ],
+                ]),
               ],
             ),
           ),
-          Text('${positive ? '+' : ''}${_money(amount)}', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800, color: positive ? AppColors.green : AppColors.red)),
+          Text('${positive ? '+' : ''}${_money(amount)}',
+              style: GoogleFonts.robotoMono(fontSize: 13.5, fontWeight: FontWeight.w700, color: amountColor, decoration: rejected ? TextDecoration.lineThrough : null)),
         ],
       ),
     );
+  }
+
+  Widget _tag(String text, Color c) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+        child: Text(text, style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w700, color: c)),
+      );
+
+  String _time(String iso) {
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '';
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m ${dt.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  /// (icon, color) per transaction type.
+  (IconData, Color) _meta(String type) {
+    switch (type) {
+      case 'deposit':
+        return (Icons.arrow_downward_rounded, AppColors.green);
+      case 'withdrawal':
+      case 'withdrawal_hold':
+      case 'payout':
+        return (Icons.arrow_upward_rounded, AppColors.red);
+      case 'withdrawal_refund':
+      case 'copy_return':
+        return (Icons.undo_rounded, AppColors.primary);
+      case 'commission':
+      case 'commission_earned':
+      case 'referral_commission':
+        return (Icons.stars_rounded, AppColors.green);
+      case 'copy_allocate':
+        return (Icons.content_copy_rounded, AppColors.primary);
+      case 'trade_pnl':
+      case 'copy_pnl':
+      case 'trade':
+        return (Icons.show_chart_rounded, AppColors.primary);
+      case 'platform_fee':
+      case 'fee':
+        return (Icons.receipt_rounded, AppColors.slate);
+      default:
+        return (Icons.swap_horiz_rounded, AppColors.slate);
+    }
   }
 
   String _label(String type, double amount) {
@@ -231,160 +400,9 @@ class _WalletScreenState extends State<WalletScreen> {
       case 'adjustment':
         return 'Adjustment';
       case '':
-        // No type field — infer from the amount direction.
         return amount >= 0 ? 'Deposit' : 'Withdrawal';
       default:
-        // Title-case a snake_case type, e.g. "copy_return" -> "Copy Return".
-        return type
-            .split('_')
-            .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-            .join(' ');
+        return type.split('_').map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
     }
-  }
-
-  Future<void> _openDeposit() async {
-    final done = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _DepositSheet(),
-    );
-    if (done == true) {
-      _load();
-      // Refresh the SHARED wallet/portfolio state so the home dashboard header
-      // and copy screens update in real time (not just this screen).
-      if (mounted) {
-        final store = AppStateScope.of(context);
-        store.loadWallet();
-        store.loadCopyEngine();
-      }
-    }
-  }
-}
-
-class _DepositSheet extends StatefulWidget {
-  const _DepositSheet();
-  @override
-  State<_DepositSheet> createState() => _DepositSheetState();
-}
-
-class _DepositSheetState extends State<_DepositSheet> {
-  final _amount = TextEditingController();
-  List<Map<String, dynamic>> _methods = const [];
-  String? _method;
-  bool _loading = true;
-  bool _submitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMethods();
-  }
-
-  Future<void> _loadMethods() async {
-    try {
-      final m = await BackendApi.depositMethods();
-      if (!mounted) return;
-      setState(() {
-        _methods = m.where((x) => x['comingSoon'] != true).toList();
-        _method = _methods.isNotEmpty ? _methods.first['id'].toString() : null;
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final amount = double.tryParse(_amount.text.trim());
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
-      return;
-    }
-    setState(() => _submitting = true);
-    try {
-      await BackendApi.createDeposit(amount: amount, method: _method);
-      if (!mounted) return;
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deposit initiated')));
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      // Backend fails closed while real crypto rails are being set up.
-      final msg = e.code == 'deposits_unavailable'
-          ? 'Deposits are being set up — please check back soon.'
-          : e.message;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(color: AppColors.background, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 20),
-            Text('Add funds', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _amount,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              decoration: const InputDecoration(hintText: '0.00', prefixText: '\$ '),
-            ),
-            const SizedBox(height: 16),
-            if (_loading)
-              const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: AppLoader())
-            else if (_methods.isNotEmpty) ...[
-              Text('Method', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8, runSpacing: 8,
-                children: _methods.map((m) {
-                  final id = m['id'].toString();
-                  final active = _method == id;
-                  return GestureDetector(
-                    onTap: () => setState(() => _method = id),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: active ? AppColors.primary : AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: active ? AppColors.primary : AppColors.border),
-                      ),
-                      child: Text(m['label'].toString(), style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: active ? Colors.white : AppColors.textPrimary)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-            const SizedBox(height: 22),
-            ElevatedButton(
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Continue'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
