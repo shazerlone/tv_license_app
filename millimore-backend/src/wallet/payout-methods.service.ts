@@ -86,6 +86,12 @@ export class PayoutMethodsService {
     return !!m;
   }
 
+  /** The method's type ("crypto" | "bank"), or null if not owned. */
+  async typeOf(userId: string, id: string): Promise<string | null> {
+    const m = await this.prisma.payoutMethod.findFirst({ where: { id, userId }, select: { type: true } });
+    return m?.type ?? null;
+  }
+
   async count(userId: string): Promise<number> {
     return this.prisma.payoutMethod.count({ where: { userId } });
   }

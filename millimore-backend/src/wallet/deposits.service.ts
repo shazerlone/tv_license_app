@@ -44,6 +44,17 @@ export class DepositsService {
     );
   }
 
+  /** Distinct methods the user has actually funded from (confirmed deposits).
+   *  Drives the AML same-source withdrawal rule. */
+  async fundedMethods(userId: string): Promise<string[]> {
+    const rows = await this.prisma.deposit.findMany({
+      where: { userId, status: DepositStatus.confirmed },
+      select: { method: true },
+      distinct: ['method'],
+    });
+    return rows.map((r) => r.method);
+  }
+
   async methods(): Promise<DepositMethodDto[]> {
     const s = await this.settings.get();
     return [

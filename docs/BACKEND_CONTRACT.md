@@ -621,10 +621,15 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
 - **Creator earnings** — `GET /creator/earnings` is now real: `{ balance,
   currency, pending, lifetimeEarned, history[] }` (wallet-backed). `GET
   /creator/stats.earnings` = lifetime commission earned.
-- **Withdrawals** — `POST /creator/payouts { amount, method?, note? }` holds funds
+- **Withdrawals** — `POST /creator/payouts { amount, methodId, note? }` holds funds
   immediately (debits wallet); `GET /creator/payouts` lists mine. Admin: `GET
   /admin/payouts?status=&cursor=`, `POST /admin/payouts/{id}/approve`,
   `POST /admin/payouts/{id}/reject` (refunds the held funds).
+  Gates: account not frozen; min/max per tx; daily cap; KYC; owned method; and the
+  **AML same-source rule** — the withdrawal method type must match a method the
+  user has deposited from (crypto-in → crypto-out, bank-in → bank-out). Mismatch is
+  rejected with `withdrawal_method_mismatch`. Users with no deposit history (pure
+  earners) are unconstrained.
 - **Admin metrics** — `GET /admin/metrics` is now real live aggregates:
   `{ dau, mau, liveNow, streamsToday, totalUsers, creators, gmv, copyVolume,
   depositsTotal, walletLiabilities, platformRevenue, pendingPayouts,

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WalletService } from '../wallet/wallet.service';
 import { PayoutMethodsService } from '../wallet/payout-methods.service';
+import { DepositsService } from '../wallet/deposits.service';
 import { SettingsService } from '../settings/settings.service';
 import { genId } from '../common/ids';
 import { encodeCursor, decodeCursor, Paginated } from '../common/dto/pagination.dto';
@@ -27,6 +28,7 @@ export class PayoutsService {
     private readonly notifications: NotificationsService,
     private readonly wallet: WalletService,
     private readonly methods: PayoutMethodsService,
+    private readonly deposits: DepositsService,
     private readonly settings: SettingsService,
   ) {}
 
@@ -92,6 +94,18 @@ export class PayoutsService {
     // Gate 4: a saved payout method the user owns.
     if (!(await this.methods.ownsMethod(userId, dto.methodId))) {
       throw new BadRequestException({ code: 'invalid_payout_method', message: 'Select a saved withdrawal method.' });
+    }
+
+    // Gate 5: AML same-source rule — funds must return to a method the user
+    // actually deposited from (crypto in → crypto out, bank in → bank out). Pure
+    // earners with no deposits are unconstrained. Flagged + rejected on mismatch.
+    const methodType = await this.methods.typeOf(userId, dto.methodId); // "crypto" | "bank"
+    const funded = await this.deposits.fundedMethods(userId); // e.g. ["crypto"]
+    if (funded.length > 0 && methodType && !funded.includes(methodType)) {
+      throw new BadRequestException({
+        code: 'withdrawal_method_mismatch',
+        message: `For anti-money-laundering, withdrawals must return to a method you deposited from. You funded via ${funded.join(', ')} — please withdraw to ${funded.join(' or ')}.`,
+      });
     }
 
     return this.prisma.$transaction(async (tx) => {
