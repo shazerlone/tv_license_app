@@ -16,4 +16,9 @@ export class SetupController {
   wallet(@Query('chain') chain: string, @Query('token') token: string) {
     return this.setup.generateWallet(chain, token);
   }
+
+  @Get('test-addresses')
+  testAddresses(@Query('token') token: string) {
+    return this.setup.testAddresses(token);
+  }
 }

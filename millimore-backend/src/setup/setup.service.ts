@@ -1,4 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { CryptoAddressService } from '../wallet/crypto/crypto-address.service';
+import { DepositNetwork } from '../wallet/crypto/address-provider';
 
 /**
  * ONE-TIME master-wallet generator. Locked behind WALLET_SETUP_TOKEN (unset =
@@ -40,5 +42,31 @@ export class SetupService {
       mnemonic: json.mnemonic,
       warning: 'SAVE the mnemonic OFFLINE now (it controls all funds). Put ONLY the xpub in env. Then unset WALLET_SETUP_TOKEN and redeploy.',
     };
+  }
+
+  /**
+   * Diagnostic: mint a real deposit address on each configured network via the
+   * live provider (proves the API key + xpubs + derivation work) without needing
+   * a KYC user, app, or coins. Locked behind WALLET_SETUP_TOKEN. Returns per-
+   * network address or a per-network error so failures are easy to read.
+   */
+  async testAddresses(token: string): Promise<{ provider: string; results: Record<string, string> }> {
+    const setupToken = process.env.WALLET_SETUP_TOKEN?.trim();
+    if (!setupToken) throw new ForbiddenException({ code: 'setup_disabled', message: 'Set WALLET_SETUP_TOKEN to enable this test.' });
+    if (!token || token !== setupToken) throw new ForbiddenException({ code: 'bad_setup_token', message: 'Invalid setup token.' });
+
+    const svc = new CryptoAddressService();
+    if (!svc.enabled) throw new BadRequestException({ code: 'provider_disabled', message: 'No address provider configured (CRYPTO_ADDRESS_PROVIDER).' });
+
+    const results: Record<string, string> = {};
+    for (const network of svc.networks as DepositNetwork[]) {
+      try {
+        const gen = await svc.createAddress('setup-test-user', network, 999_000 + Math.floor(Math.random() * 999));
+        results[network] = gen.address;
+      } catch (e) {
+        results[network] = `ERROR: ${(e as Error).message.split('\n')[0]}`;
+      }
+    }
+    return { provider: svc.name, results };
   }
 }
