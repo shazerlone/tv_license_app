@@ -41,4 +41,9 @@ export class SetupController {
   tatumDebug(@Query('token') token: string) {
     return this.setup.tatumDebug(token);
   }
+
+  @Get('rescan')
+  rescan(@Query('token') token: string) {
+    return this.setup.rescan(token);
+  }
 }

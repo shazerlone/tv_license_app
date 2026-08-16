@@ -288,6 +288,26 @@ export class DepositsService {
     return DepositsService.recentWebhooks;
   }
 
+  /**
+   * Reconciliation: scan a user's on-chain addresses for USDT deposits and credit
+   * any not yet processed (idempotent via unique txRef). Catches deposits that
+   * arrived before a subscription existed or whose webhook was missed.
+   */
+  async rescan(userId: string): Promise<Array<Record<string, unknown>>> {
+    const addrs = await this.prisma.depositAddress.findMany({ where: { userId } });
+    const results: Array<Record<string, unknown>> = [];
+    for (const a of addrs) {
+      const { transfers, raw } = await this.addresses.fetchDeposits(a.address, a.network as DepositNetwork);
+      let credited = 0;
+      for (const t of transfers) {
+        const r = await this.creditFromChainDeposit({ ok: true, network: a.network as DepositNetwork, address: a.address, amount: t.amount, txRef: t.txRef });
+        if (r.credited) credited++;
+      }
+      results.push({ network: a.network, address: a.address, found: transfers.length, credited, raw });
+    }
+    return results;
+  }
+
   /** Handle an address-provider deposit webhook (verify + credit). */
   async handleChainWebhook(rawBody: string, headers: Record<string, string | undefined>): Promise<{ ok: true; credited: boolean }> {
     const parsed = await this.addresses.parseWebhook(rawBody, headers);

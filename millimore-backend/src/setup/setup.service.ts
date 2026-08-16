@@ -121,6 +121,14 @@ export class SetupService {
     return { recent: this.deposits.recentChainWebhooks() };
   }
 
+  /** Scan the test user's addresses for on-chain USDT deposits and credit them. */
+  async rescan(token: string) {
+    this.assertSetup(token);
+    const results = await this.deposits.rescan(TEST_USER_ID);
+    const w = await this.prisma.wallet.findUnique({ where: { userId: TEST_USER_ID }, select: { balance: true } });
+    return { userId: TEST_USER_ID, walletBalance: w?.balance ?? 0, results };
+  }
+
   /**
    * Ask Tatum directly what it has registered + attempt a fresh subscription,
    * returning the RAW responses so we can see exactly why webhooks aren't firing

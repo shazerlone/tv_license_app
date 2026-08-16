@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { ChainDeposit, DepositAddressProvider, DepositNetwork, DEPOSIT_NETWORKS, NewAddress } from './address-provider';
+import { ChainDeposit, DepositAddressProvider, DepositNetwork, DEPOSIT_NETWORKS, IncomingTransfer, NewAddress } from './address-provider';
 
 const API_BASE = 'https://api.tatum.io';
 
@@ -84,6 +84,38 @@ export class TatumProvider implements DepositAddressProvider {
         attr: { address, chain: this.subChain(network), url: this.webhookUrl },
       }),
     });
+  }
+
+  /**
+   * Reconciliation: read incoming USDT transfers already on-chain for an address.
+   * TRON uses the TRC-20 account endpoint; EVM chains are added later. Returns the
+   * raw provider response too, so field-shape surprises are visible.
+   */
+  async fetchDeposits(address: string, network: DepositNetwork): Promise<{ transfers: IncomingTransfer[]; raw?: unknown }> {
+    if (network !== 'tron') {
+      return { transfers: [], raw: { note: `rescan not yet implemented for ${network}` } };
+    }
+    const r = await fetch(`${API_BASE}/v3/tron/transaction/account/${address}/trc20?onlyTo=true`, {
+      headers: { 'x-api-key': this.apiKey },
+    });
+    const raw = (await r.json().catch(() => null)) as unknown;
+    const list: any[] = Array.isArray(raw)
+      ? raw
+      : ((raw as any)?.transactions ?? (raw as any)?.data ?? []);
+    const transfers: IncomingTransfer[] = [];
+    for (const t of list) {
+      const to = t.to ?? t.toAddress ?? t.to_address;
+      if (to && to !== address) continue; // incoming only
+      const info = t.tokenInfo ?? t.token_info ?? {};
+      const symbol = String(info.symbol ?? t.symbol ?? '').toUpperCase();
+      if (symbol && symbol !== 'USDT') continue;
+      const decimals = Number(info.decimals ?? t.decimals ?? 6);
+      const value = Number(t.value ?? t.amount ?? 0);
+      const amount = value / Math.pow(10, decimals);
+      const txRef = t.txID ?? t.txId ?? t.transaction_id ?? t.hash;
+      if (txRef && amount > 0) transfers.push({ txRef: String(txRef), amount });
+    }
+    return { transfers, raw };
   }
 
   parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ChainDeposit {

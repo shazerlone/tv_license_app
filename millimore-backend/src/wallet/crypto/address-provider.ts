@@ -22,6 +22,11 @@ export interface ChainDeposit {
  * per-user address per network and notifies us via webhook when funds arrive,
  * auto-forwarding them to the master wallet. Swappable behind CryptoAddressService.
  */
+export interface IncomingTransfer {
+  txRef: string;
+  amount: number; // USDT amount
+}
+
 export interface DepositAddressProvider {
   readonly name: string;
   readonly networks: DepositNetwork[];
@@ -32,4 +37,6 @@ export interface DepositAddressProvider {
     rawBody: string,
     headers: Record<string, string | undefined>,
   ): ChainDeposit | Promise<ChainDeposit>;
+  /** Reconciliation: fetch incoming USDT transfers already on-chain for an address. */
+  fetchDeposits?(address: string, network: DepositNetwork): Promise<{ transfers: IncomingTransfer[]; raw?: unknown }>;
 }

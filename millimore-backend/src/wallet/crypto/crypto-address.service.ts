@@ -61,4 +61,9 @@ export class CryptoAddressService {
     if (!this.provider) return { ok: false };
     return this.provider.parseWebhook(rawBody, headers);
   }
+
+  async fetchDeposits(address: string, network: DepositNetwork) {
+    if (!this.provider?.fetchDeposits) return { transfers: [], raw: { note: 'provider has no rescan support' } };
+    return this.provider.fetchDeposits(address, network);
+  }
 }
