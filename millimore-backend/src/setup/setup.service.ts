@@ -145,24 +145,27 @@ export class SetupService {
       out.existingSubscriptions = { error: (e as Error).message };
     }
 
-    // Attempt a fresh subscription for the test user's TRON address and surface
-    // the raw response (the error message tells us the exact problem).
-    const addr = await this.prisma.depositAddress.findFirst({ where: { userId: TEST_USER_ID, network: 'tron' } });
-    const tronChain = (process.env.TATUM_NETWORK ?? 'testnet').toLowerCase() === 'mainnet' ? 'tron-mainnet' : 'tron-testnet';
-    if (addr && webhookUrl) {
+    // (Re)subscribe ALL of the test user's addresses so any network's faucet works.
+    const testnet = (process.env.TATUM_NETWORK ?? 'testnet').toLowerCase() !== 'mainnet';
+    const subChain: Record<string, string> = testnet
+      ? { tron: 'tron-testnet', bsc: 'bsc-testnet', ethereum: 'ethereum-sepolia' }
+      : { tron: 'tron-mainnet', bsc: 'bsc-mainnet', ethereum: 'ethereum-mainnet' };
+    const addrs = await this.prisma.depositAddress.findMany({ where: { userId: TEST_USER_ID } });
+    const subs: Record<string, unknown> = {};
+    for (const a of addrs) {
+      if (!webhookUrl) { subs[a.network] = { skipped: 'no PUBLIC_BASE_URL' }; continue; }
       try {
         const r = await fetch('https://api.tatum.io/v4/subscription', {
           method: 'POST',
           headers: { 'x-api-key': key, 'content-type': 'application/json' },
-          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: addr.address, chain: tronChain, url: webhookUrl } }),
+          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: a.address, chain: subChain[a.network], url: webhookUrl } }),
         });
-        out.subscriptionCreateTron = { status: r.status, address: addr.address, body: await r.json().catch(() => null) };
+        subs[a.network] = { status: r.status, address: a.address, body: await r.json().catch(() => null) };
       } catch (e) {
-        out.subscriptionCreateTron = { error: (e as Error).message };
+        subs[a.network] = { error: (e as Error).message };
       }
-    } else {
-      out.subscriptionCreateTron = { skipped: !addr ? 'no test tron address (run /v1/setup/test-deposit first)' : 'no webhookUrl (PUBLIC_BASE_URL unset)' };
     }
+    out.subscriptions = subs;
     return out;
   }
 }
