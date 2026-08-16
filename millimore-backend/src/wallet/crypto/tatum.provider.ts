@@ -81,14 +81,7 @@ export class TatumProvider implements DepositAddressProvider {
       headers: { 'x-api-key': this.apiKey, 'content-type': 'application/json' },
       body: JSON.stringify({
         type: 'ADDRESS_EVENT',
-        attr: {
-          address,
-          chain: this.subChain(network),
-          url: this.webhookUrl,
-          // Register our HMAC secret so Tatum signs every webhook (x-payload-hash).
-          // No dashboard step needed — this is set per subscription.
-          ...(this.hmacSecret ? { hmacSecret: this.hmacSecret } : {}),
-        },
+        attr: { address, chain: this.subChain(network), url: this.webhookUrl },
       }),
     });
   }

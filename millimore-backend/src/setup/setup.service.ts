@@ -154,7 +154,7 @@ export class SetupService {
         const r = await fetch('https://api.tatum.io/v4/subscription', {
           method: 'POST',
           headers: { 'x-api-key': key, 'content-type': 'application/json' },
-          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: addr.address, chain: tronChain, url: webhookUrl, ...(hmac ? { hmacSecret: hmac } : {}) } }),
+          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: addr.address, chain: tronChain, url: webhookUrl } }),
         });
         out.subscriptionCreateTron = { status: r.status, address: addr.address, body: await r.json().catch(() => null) };
       } catch (e) {
