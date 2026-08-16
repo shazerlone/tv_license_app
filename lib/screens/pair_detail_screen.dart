@@ -27,6 +27,7 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   Timer? _priceTimer;
   int _tf = 0; // index into _timeframes
   bool _candle = true; // candlestick by default (line = false)
+  bool _showMa = false; // moving-average overlay tool
   // (range, interval, label) for our own chart.
   static const _timeframes = [
     ('1d', '5m', '1D'),
@@ -87,6 +88,15 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
 
   String _fmt(double? v) => v == null ? '—' : (v >= 100 ? v.toStringAsFixed(2) : v.toStringAsFixed(4));
 
+  String _tfLabel(String short) => switch (short) {
+        '1D' => '1 Day',
+        '1W' => '1 Week',
+        '1M' => '1 Month',
+        '3M' => '3 Months',
+        '1Y' => '1 Year',
+        _ => short,
+      };
+
   @override
   Widget build(BuildContext context) {
     final q = _quote;
@@ -125,28 +135,45 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
       ),
       body: ListView(
         children: [
-          // Timeframe selector
+          // Chart toolbar: timeframe dropdown + tools + line/candle toggle
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 6),
             child: Row(
               children: [
-                for (var i = 0; i < _timeframes.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tf = i),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: _tf == i ? AppColors.primary : AppColors.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _tf == i ? AppColors.primary : AppColors.border),
-                        ),
-                        child: Text(_timeframes[i].$3, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _tf == i ? Colors.white : AppColors.textSecondary)),
+                // Timeframe dropdown
+                PopupMenuButton<int>(
+                  initialValue: _tf,
+                  onSelected: (i) => setState(() => _tf = i),
+                  color: AppColors.surfaceHigh,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  itemBuilder: (_) => [
+                    for (var i = 0; i < _timeframes.length; i++)
+                      PopupMenuItem(
+                        value: i,
+                        child: Text(_tfLabel(_timeframes[i].$3),
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: _tf == i ? AppColors.primary : AppColors.textPrimary)),
                       ),
+                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
                     ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.access_time_rounded, size: 15, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(_tfLabel(_timeframes[_tf].$3), style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textMuted),
+                    ]),
                   ),
+                ),
                 const Spacer(),
+                // MA overlay tool
+                _ChartTypeButton(icon: Icons.timeline_rounded, active: _showMa, onTap: () => setState(() => _showMa = !_showMa)),
+                const SizedBox(width: 6),
                 // Line / candle toggle
                 _ChartTypeButton(icon: Icons.show_chart_rounded, active: !_candle, onTap: () => setState(() => _candle = false)),
                 const SizedBox(width: 6),
@@ -156,13 +183,13 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
           ),
           // Our own clean chart (no third-party chrome) — pinch to zoom, drag to pan.
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 12, 2),
-            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, candle: _candle, height: 340),
+            padding: const EdgeInsets.fromLTRB(20, 2, 12, 2),
+            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, candle: _candle, showMa: _showMa, height: 340),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Center(
-              child: Text('Pinch to zoom · drag to pan · double-tap to reset',
+              child: Text('Pinch to zoom · drag to pan · double-tap to reset · ${_showMa ? "MA 20 on" : "tap ∿ for MA"}',
                   style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.textMuted)),
             ),
           ),

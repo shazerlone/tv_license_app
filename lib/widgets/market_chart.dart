@@ -5,15 +5,25 @@ import '../data/pairs.dart';
 import '../services/price_service.dart';
 
 /// A clean, native price chart — our own rendering, no third-party chrome.
-/// Supports a line/area view and a candlestick view from one OHLC fetch, and
-/// is pinch-to-zoom + drag-to-pan (like a real broker terminal).
+/// Supports a line/area view and a candlestick view from one OHLC fetch, is
+/// pinch-to-zoom + drag-to-pan (like a real broker terminal), and can overlay a
+/// moving average plus a live price line.
 class MarketChart extends StatefulWidget {
   final TradingPair pair;
   final String range;
   final String interval;
   final bool candle; // false = line/area, true = candlesticks
+  final bool showMa; // overlay a 20-period moving average
   final double height;
-  const MarketChart({super.key, required this.pair, required this.range, required this.interval, this.candle = false, this.height = 260});
+  const MarketChart({
+    super.key,
+    required this.pair,
+    required this.range,
+    required this.interval,
+    this.candle = false,
+    this.showMa = false,
+    this.height = 260,
+  });
 
   @override
   State<MarketChart> createState() => _MarketChartState();
@@ -27,8 +37,7 @@ class _MarketChartState extends State<MarketChart> {
   // _count shrinks on zoom-in; _start slides on pan. Both re-derive on new data.
   double _start = 0;
   double _count = 0;
-  double _width = 0; // plot width captured at layout, for px→candle math
-  double _startAtGestureBegin = 0;
+  double _width = 0; // plot width captured at layout, for px->candle math
 
   @override
   void initState() {
@@ -39,7 +48,7 @@ class _MarketChartState extends State<MarketChart> {
   @override
   void didUpdateWidget(MarketChart old) {
     super.didUpdateWidget(old);
-    // Only refetch when the data set changes (not on a mode toggle).
+    // Only refetch when the data set changes (not on a mode/overlay toggle).
     if (old.range != widget.range || old.interval != widget.interval || old.pair.symbol != widget.pair.symbol) {
       setState(() => _loading = true);
       _load();
@@ -52,31 +61,23 @@ class _MarketChartState extends State<MarketChart> {
     setState(() {
       _data = s;
       _loading = false;
-      // Reset the viewport to show everything for the new range.
       _count = (s?.length ?? 0).toDouble();
       _start = 0;
     });
   }
 
-  void _onScaleStart(ScaleStartDetails d) {
-    _startAtGestureBegin = _start;
-  }
-
   void _onScaleUpdate(ScaleUpdateDetails d, int total) {
     final slot = _width <= 0 || _count <= 0 ? 1.0 : _width / _count;
     setState(() {
-      // Pan: horizontal drag moves the window (drag right → look back in time).
       if (d.pointerCount <= 1) {
         _start = (_start - d.focalPointDelta.dx / slot);
       }
-      // Zoom: pinch scales the number of visible candles around the focal point.
-      if (d.scale != 1.0) {
+      if (d.scale != 1.0 && _width > 0) {
         final focalCandle = _start + (d.localFocalPoint.dx / _width) * _count;
         final newCount = (_count / d.scale).clamp(12.0, total.toDouble());
         _start = focalCandle - (d.localFocalPoint.dx / _width) * newCount;
         _count = newCount;
       }
-      // Keep the window inside the data.
       _start = _start.clamp(0.0, (total - _count).clamp(0.0, total.toDouble()));
     });
   }
@@ -88,58 +89,125 @@ class _MarketChartState extends State<MarketChart> {
       return SizedBox(height: widget.height, child: Center(child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.primary)));
     }
     if (data == null || data.length < 2) {
-      return SizedBox(height: widget.height, child: Center(child: Text('Chart unavailable', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted))));
+      return SizedBox(
+        height: widget.height,
+        child: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.show_chart_rounded, size: 30, color: AppColors.textMuted),
+            const SizedBox(height: 8),
+            Text('Chart data unavailable', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+            const SizedBox(height: 2),
+            Text('Try another timeframe', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+          ]),
+        ),
+      );
     }
     final total = data.length;
     if (_count <= 0) _count = total.toDouble();
-    return SizedBox(
-      height: widget.height,
-      child: LayoutBuilder(
-        builder: (context, c) {
-          const rightPad = 52.0;
-          _width = c.maxWidth - rightPad;
-          final startI = _start.floor().clamp(0, total - 2);
-          final endI = (_start + _count).ceil().clamp(startI + 2, total);
-          final visible = data.sublist(startI, endI);
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onScaleStart: _onScaleStart,
-            onScaleUpdate: (d) => _onScaleUpdate(d, total),
-            onDoubleTap: () => setState(() {
-              _count = total.toDouble();
-              _start = 0;
-            }),
-            child: CustomPaint(
-              painter: _ChartPainter(
-                data: visible,
-                candle: widget.candle,
-                up: AppColors.green,
-                down: AppColors.red,
-                grid: AppColors.border,
-                labelStyle: GoogleFonts.robotoMono(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+    final startI = _start.floor().clamp(0, total - 2);
+    final endI = (_start + _count).ceil().clamp(startI + 2, total);
+    final visible = data.sublist(startI, endI);
+
+    // Readout for the visible window (updates as you zoom/pan).
+    double vHi = -double.infinity, vLo = double.infinity;
+    for (final c in visible) {
+      if (c.high > vHi) vHi = c.high;
+      if (c.low < vLo) vLo = c.low;
+    }
+    final last = visible.last.close;
+    final first = visible.first.close;
+    final chg = first == 0 ? 0.0 : (last - first) / first * 100;
+    final up = chg >= 0;
+    String f(double v) => v >= 100 ? v.toStringAsFixed(2) : v.toStringAsFixed(4);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Live readout strip
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
+          child: Row(
+            children: [
+              Text(f(last), style: GoogleFonts.robotoMono(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: (up ? AppColors.green : AppColors.red).withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
+                child: Text('${up ? '+' : ''}${chg.toStringAsFixed(2)}%',
+                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: up ? AppColors.green : AppColors.red)),
               ),
-              child: const SizedBox.expand(),
-            ),
-          );
-        },
-      ),
+              const Spacer(),
+              _miniStat('H', f(vHi)),
+              const SizedBox(width: 12),
+              _miniStat('L', f(vLo)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: widget.height,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              const rightPad = 52.0;
+              _width = c.maxWidth - rightPad;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onScaleUpdate: (d) => _onScaleUpdate(d, total),
+                onDoubleTap: () => setState(() {
+                  _count = total.toDouble();
+                  _start = 0;
+                }),
+                child: CustomPaint(
+                  painter: _ChartPainter(
+                    data: visible,
+                    candle: widget.candle,
+                    showMa: widget.showMa,
+                    up: AppColors.green,
+                    down: AppColors.red,
+                    grid: AppColors.border,
+                    maColor: AppColors.primary,
+                    labelStyle: GoogleFonts.robotoMono(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                    lastPillStyle: GoogleFonts.robotoMono(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
+
+  Widget _miniStat(String k, String v) => Row(children: [
+        Text('$k ', style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.textMuted)),
+        Text(v, style: GoogleFonts.robotoMono(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+      ]);
 }
 
 class _ChartPainter extends CustomPainter {
   final List<Candle> data;
   final bool candle;
-  final Color up, down, grid;
+  final bool showMa;
+  final Color up, down, grid, maColor;
   final TextStyle labelStyle;
-  _ChartPainter({required this.data, required this.candle, required this.up, required this.down, required this.grid, required this.labelStyle});
+  final TextStyle lastPillStyle;
+  _ChartPainter({
+    required this.data,
+    required this.candle,
+    required this.showMa,
+    required this.up,
+    required this.down,
+    required this.grid,
+    required this.maColor,
+    required this.labelStyle,
+    required this.lastPillStyle,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     const rightPad = 52.0;
     final chartW = size.width - rightPad;
 
-    // Scale: candles use high/low extremes, line uses closes.
     double min = double.infinity, max = -double.infinity;
     for (final c in data) {
       final lo = candle ? c.low : c.close;
@@ -215,11 +283,56 @@ class _ChartPainter extends CustomPainter {
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
-      final lastY = yAt(data.last.close);
-      canvas.drawCircle(Offset((data.length - 1) * dx, lastY), 4, Paint()..color = color);
     }
+
+    // Moving-average overlay (20-period simple MA on closes).
+    if (showMa && data.length >= 5) {
+      const period = 20;
+      final dx = chartW / (data.length - 1);
+      final maPath = Path();
+      var started = false;
+      double sum = 0;
+      for (var i = 0; i < data.length; i++) {
+        sum += data[i].close;
+        if (i >= period) sum -= data[i - period].close;
+        final w = i < period ? i + 1 : period;
+        final ma = sum / w;
+        final x = i * dx, y = yAt(ma);
+        if (!started) {
+          maPath.moveTo(x, y);
+          started = true;
+        } else {
+          maPath.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(
+        maPath,
+        Paint()
+          ..color = maColor.withOpacity(0.9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6,
+      );
+    }
+
+    // Live price line + pill at the last close.
+    final lastV = data.last.close;
+    final ly = yAt(lastV);
+    final lineColor = data.last.close >= data.first.close ? up : down;
+    final dashPaint = Paint()
+      ..color = lineColor.withOpacity(0.7)
+      ..strokeWidth = 1;
+    for (double x = 0; x < chartW; x += 8) {
+      canvas.drawLine(Offset(x, ly), Offset(x + 4, ly), dashPaint);
+    }
+    final pill = TextPainter(
+      text: TextSpan(text: lastV >= 100 ? lastV.toStringAsFixed(2) : lastV.toStringAsFixed(4), style: lastPillStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final pillRect = Rect.fromLTWH(chartW + 4, ly - pill.height / 2 - 3, rightPad - 4, pill.height + 6);
+    canvas.drawRRect(RRect.fromRectAndRadius(pillRect, const Radius.circular(3)), Paint()..color = lineColor);
+    pill.paint(canvas, Offset(chartW + 6, ly - pill.height / 2));
   }
 
   @override
-  bool shouldRepaint(_ChartPainter old) => old.data != data || old.candle != candle;
+  bool shouldRepaint(_ChartPainter old) => old.data != data || old.candle != candle || old.showMa != showMa;
 }

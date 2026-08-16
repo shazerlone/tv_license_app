@@ -13,8 +13,8 @@ class TradingPair {
 
 const List<TradingPair> kPairs = [
   // Metals
-  TradingPair('XAU/USD', 'Gold', 'Metals', 'GC=F', 'OANDA:XAUUSD'),
-  TradingPair('XAG/USD', 'Silver', 'Metals', 'SI=F', 'OANDA:XAGUSD'),
+  TradingPair('XAU/USD', 'Gold', 'Metals', 'XAUUSD=X', 'OANDA:XAUUSD'),
+  TradingPair('XAG/USD', 'Silver', 'Metals', 'XAGUSD=X', 'OANDA:XAGUSD'),
   // Forex majors
   TradingPair('EUR/USD', 'Euro / Dollar', 'Forex', 'EURUSD=X', 'FX:EURUSD'),
   TradingPair('GBP/USD', 'Pound / Dollar', 'Forex', 'GBPUSD=X', 'FX:GBPUSD'),
