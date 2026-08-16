@@ -20,6 +20,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "db:seed": "ts-node prisma/seed.ts",
     "db:wipe-demo": "ts-node scripts/wipe-demo.ts",
+    "db:backfill-addresses": "ts-node scripts/backfill-deposit-addresses.ts",
     "openapi:gen": "ts-node scripts/generate-openapi.ts",
     "test": "jest"
   },

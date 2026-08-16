@@ -9,6 +9,7 @@ import { CreateDepositDto, DepositDto, DepositMethodDto, DepositAddressDto } fro
 import { CryptoDepositService } from './crypto/crypto-deposit.service';
 import { CryptoAddressService } from './crypto/crypto-address.service';
 import { ChainDeposit, DepositNetwork } from './crypto/address-provider';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // Hard production safety gate: auto-crediting a deposit without real on-chain
 // confirmation is a DEV-ONLY convenience. It is OFF unless DEPOSIT_AUTO_CONFIRM
@@ -36,6 +37,7 @@ export class DepositsService {
     private readonly settings: SettingsService,
     private readonly crypto: CryptoDepositService,
     private readonly addresses: CryptoAddressService,
+    private readonly notifications: NotificationsService,
   ) {
     this.logger.log(
       DEPOSIT_AUTO_CONFIRM
@@ -310,6 +312,13 @@ export class DepositsService {
       });
       await this.maybePayReferralBonus(tx, d.userId);
       return d;
+    });
+    // Reached only when a previously-pending deposit was just credited (the
+    // already-confirmed case returns early above). Real-time confirmation so the
+    // app's "waiting for deposit" screen updates instantly (push + in-app + WS).
+    await this.notifications.pushEvent(updated.userId, 'wallet.deposit', 'Deposit received', {
+      body: `Your ${updated.asset ?? 'crypto'} deposit of $${updated.amount.toFixed(2)} has been credited.`,
+      data: { depositId: updated.id, amount: updated.amount, asset: updated.asset, txRef: updated.txRef },
     });
     return this.toDto(updated);
   }
