@@ -4,11 +4,22 @@ import { ChainDeposit, DepositAddressProvider, DepositNetwork, DEPOSIT_NETWORKS,
 
 const API_BASE = 'https://api.tatum.io';
 
-// Our network → Tatum chain path (v3 address derivation) and v4 subscription chain.
-// Testnet vs mainnet is decided by the API key's environment, so the path is the
-// same in both; if Tatum requires testnet-specific chain names for v4 subs, set
-// TATUM_SUB_CHAIN_<NET> to override.
+// v3 address-derivation path uses the short chain name.
 const CHAIN_PATH: Record<DepositNetwork, string> = { tron: 'tron', ethereum: 'ethereum', bsc: 'bsc' };
+// v4 subscriptions require NETWORK-QUALIFIED chain names (tron-testnet, etc.).
+const SUB_CHAIN: Record<'testnet' | 'mainnet', Record<DepositNetwork, string>> = {
+  testnet: { tron: 'tron-testnet', bsc: 'bsc-testnet', ethereum: 'ethereum-sepolia' },
+  mainnet: { tron: 'tron-mainnet', bsc: 'bsc-mainnet', ethereum: 'ethereum-mainnet' },
+};
+
+/** Map a (possibly network-qualified) Tatum chain back to our base network. */
+export function baseNetwork(chain: string): DepositNetwork | undefined {
+  const c = (chain ?? '').toLowerCase();
+  if (c.includes('tron')) return 'tron';
+  if (c.includes('bsc')) return 'bsc';
+  if (c.includes('ethereum') || c === 'eth') return 'ethereum';
+  return undefined;
+}
 
 /**
  * Tatum address-based deposit provider (docs.tatum.io). Derives a per-user USDT
@@ -40,7 +51,10 @@ export class TatumProvider implements DepositAddressProvider {
   }
 
   private subChain(network: DepositNetwork): string {
-    return process.env[`TATUM_SUB_CHAIN_${network.toUpperCase()}`]?.trim() || CHAIN_PATH[network];
+    const override = process.env[`TATUM_SUB_CHAIN_${network.toUpperCase()}`]?.trim();
+    if (override) return override;
+    const env = (process.env.TATUM_NETWORK ?? 'testnet').toLowerCase() === 'mainnet' ? 'mainnet' : 'testnet';
+    return SUB_CHAIN[env][network];
   }
 
   async createAddress(userId: string, network: DepositNetwork, index: number): Promise<NewAddress> {
@@ -99,9 +113,8 @@ export class TatumProvider implements DepositAddressProvider {
       return provided.length === exp.length && timingSafeEqual(Buffer.from(provided), Buffer.from(exp));
     });
     if (!ok) return { ok: false };
-    // ADDRESS_EVENT payload (field names verified on first live testnet webhook).
-    const chain = String(b.chain ?? '').toLowerCase();
-    const network = (DEPOSIT_NETWORKS as readonly string[]).includes(chain) ? (chain as DepositNetwork) : undefined;
+    // ADDRESS_EVENT payload (chain may be network-qualified, e.g. tron-testnet).
+    const network = baseNetwork(String(b.chain ?? ''));
     const asset = String(b.asset ?? b.currency ?? '').toUpperCase();
     const type = String(b.type ?? b.txType ?? '').toLowerCase();
     const amount = Math.abs(Number(b.amount ?? 0));

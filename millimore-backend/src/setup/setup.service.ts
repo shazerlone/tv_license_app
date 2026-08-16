@@ -148,12 +148,13 @@ export class SetupService {
     // Attempt a fresh subscription for the test user's TRON address and surface
     // the raw response (the error message tells us the exact problem).
     const addr = await this.prisma.depositAddress.findFirst({ where: { userId: TEST_USER_ID, network: 'tron' } });
+    const tronChain = (process.env.TATUM_NETWORK ?? 'testnet').toLowerCase() === 'mainnet' ? 'tron-mainnet' : 'tron-testnet';
     if (addr && webhookUrl) {
       try {
         const r = await fetch('https://api.tatum.io/v4/subscription', {
           method: 'POST',
           headers: { 'x-api-key': key, 'content-type': 'application/json' },
-          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: addr.address, chain: 'tron', url: webhookUrl, ...(hmac ? { hmacSecret: hmac } : {}) } }),
+          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: addr.address, chain: tronChain, url: webhookUrl, ...(hmac ? { hmacSecret: hmac } : {}) } }),
         });
         out.subscriptionCreateTron = { status: r.status, address: addr.address, body: await r.json().catch(() => null) };
       } catch (e) {
