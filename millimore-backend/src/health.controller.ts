@@ -20,6 +20,24 @@ export class HealthController {
         seedDemo: process.env.SEED_DEMO === 'true',
         cryptoProvider: (process.env.CRYPTO_DEPOSIT_PROVIDER ?? '').trim() || 'none',
       },
+      // Deposit-funnel readiness so a monitor can verify the gate without auth.
+      // addressProvider !== "none" means GET /deposits/addresses will issue
+      // addresses to KYC-verified users (else it returns deposits_unavailable).
+      deposits: this.depositStatus(),
+    };
+  }
+
+  private depositStatus() {
+    const ap = (process.env.CRYPTO_ADDRESS_PROVIDER ?? '').trim().toLowerCase();
+    const isProd = process.env.NODE_ENV === 'production';
+    let addressProvider = 'none';
+    if (ap === 'tatum' && process.env.TATUM_API_KEY) addressProvider = 'tatum';
+    else if (ap === 'mock' && !isProd) addressProvider = 'mock';
+    const live = addressProvider !== 'none';
+    return {
+      addressProvider,
+      networks: live ? ['tron', 'ethereum', 'bsc'] : [],
+      gate: live ? 'ready' : 'coming_soon',
     };
   }
 }
