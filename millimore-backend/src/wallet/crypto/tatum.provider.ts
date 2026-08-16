@@ -67,21 +67,22 @@ export class TatumProvider implements DepositAddressProvider {
       headers: { 'x-api-key': this.apiKey, 'content-type': 'application/json' },
       body: JSON.stringify({
         type: 'ADDRESS_EVENT',
-        attr: { address, chain: this.subChain(network), url: this.webhookUrl },
+        attr: {
+          address,
+          chain: this.subChain(network),
+          url: this.webhookUrl,
+          // Register our HMAC secret so Tatum signs every webhook (x-payload-hash).
+          // No dashboard step needed — this is set per subscription.
+          ...(this.hmacSecret ? { hmacSecret: this.hmacSecret } : {}),
+        },
       }),
     });
   }
 
   parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ChainDeposit {
     if (!this.hmacSecret) return { ok: false }; // fail closed
-    // Tatum signs notifications: x-payload-hash = base64(HMAC-SHA512(body, secret)).
     const provided = (headers['x-payload-hash'] ?? '').trim();
-    const expected = createHmac('sha512', this.hmacSecret).update(rawBody).digest('base64');
-    const ok =
-      !!provided &&
-      provided.length === expected.length &&
-      timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-    if (!ok) return { ok: false };
+    if (!provided) return { ok: false };
 
     let b: Record<string, unknown>;
     try {
@@ -89,6 +90,15 @@ export class TatumProvider implements DepositAddressProvider {
     } catch {
       return { ok: false };
     }
+    // Tatum: x-payload-hash = base64(HMAC-SHA512(payload, secret)) over the compact
+    // JSON. Accept either the raw bytes we received or the canonical re-stringify,
+    // so whitespace/transport differences don't cause false rejects.
+    const candidates = [rawBody, JSON.stringify(b)];
+    const ok = candidates.some((c) => {
+      const exp = createHmac('sha512', this.hmacSecret).update(c).digest('base64');
+      return provided.length === exp.length && timingSafeEqual(Buffer.from(provided), Buffer.from(exp));
+    });
+    if (!ok) return { ok: false };
     // ADDRESS_EVENT payload (field names verified on first live testnet webhook).
     const chain = String(b.chain ?? '').toLowerCase();
     const network = (DEPOSIT_NETWORKS as readonly string[]).includes(chain) ? (chain as DepositNetwork) : undefined;
