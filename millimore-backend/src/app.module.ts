@@ -36,6 +36,7 @@ import { YoutubeModule } from './youtube/youtube.module';
 import { PairsModule } from './pairs/pairs.module';
 import { MailModule } from './mail/mail.module';
 import { AlertsModule } from './alerts/alerts.module';
+import { SetupModule } from './setup/setup.module';
 import { HealthController } from './health.controller';
 
 // Single-origin: if the admin's static export exists (built into admin/out),
@@ -88,6 +89,7 @@ const staticModules = existsSync(ADMIN_DIR)
     PairsModule,
     MailModule,
     AlertsModule,
+    SetupModule,
     CopyModule,
     RealtimeModule,
     UploadsModule,
