@@ -26,6 +26,7 @@ class _WalletScreenState extends State<WalletScreen> {
   PortfolioSummary? _summary;
   List<Map<String, dynamic>> _txns = const [];
   bool _loading = true;
+  bool _depositsReady = false; // from GET /health deposits.gate == "ready"
 
   @override
   void initState() {
@@ -46,6 +47,14 @@ class _WalletScreenState extends State<WalletScreen> {
       try {
         summary = await BackendApi.portfolioSummary();
       } catch (_) {}
+      // Readiness signal: only enable the deposit funnel when the backend gate
+      // is "ready" (real address provider live), per the deposit spec.
+      bool ready = false;
+      try {
+        final h = await BackendApi.health();
+        final dep = (h['deposits'] as Map?)?.cast<String, dynamic>();
+        ready = (dep?['gate'] ?? '').toString() == 'ready';
+      } catch (_) {}
       List<Map<String, dynamic>> l;
       try {
         l = await BackendApi.walletTransactions();
@@ -58,6 +67,7 @@ class _WalletScreenState extends State<WalletScreen> {
         _currency = (w['currency'] ?? 'USD').toString();
         _summary = summary;
         _txns = l;
+        _depositsReady = ready;
         _loading = false;
       });
     } catch (_) {
@@ -177,12 +187,17 @@ class _WalletScreenState extends State<WalletScreen> {
           child: SizedBox(
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositFlowScreen()));
-                _afterFlow();
-              },
-              icon: const Icon(Icons.arrow_downward_rounded, size: 18),
-              label: Text('Deposit', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+              onPressed: _depositsReady
+                  ? () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositFlowScreen()));
+                      _afterFlow();
+                    }
+                  : () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Deposits are launching soon — check back shortly.')),
+                      ),
+              style: _depositsReady ? null : ElevatedButton.styleFrom(backgroundColor: AppColors.slate),
+              icon: Icon(_depositsReady ? Icons.arrow_downward_rounded : Icons.lock_clock_outlined, size: 18),
+              label: Text(_depositsReady ? 'Deposit' : 'Deposit soon', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ),
         ),

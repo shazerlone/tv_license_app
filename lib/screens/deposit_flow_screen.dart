@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../state/app_state.dart';
 import '../services/backend_api.dart';
@@ -237,6 +241,12 @@ class _AddressScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: _CopyButton(value: address.address, wide: true)),
+            const SizedBox(width: 10),
+            Expanded(child: _SaveQrButton(address: address)),
+          ]),
+          const SizedBox(height: 12),
           _WarnStrip(text: 'Send only USDT on ${address.networkLabel}. Other assets or networks will be lost.'),
           const SizedBox(height: 16),
           const _HowToDeposit(),
@@ -261,28 +271,75 @@ class _AddressScreen extends StatelessWidget {
 
 class _CopyButton extends StatefulWidget {
   final String value;
-  const _CopyButton({required this.value});
+  final bool wide;
+  const _CopyButton({required this.value, this.wide = false});
   @override
   State<_CopyButton> createState() => _CopyButtonState();
 }
 
 class _CopyButtonState extends State<_CopyButton> {
   bool _done = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.value));
+    HapticFeedback.mediumImpact();
+    if (!mounted) return;
+    setState(() => _done = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address copied'), duration: Duration(seconds: 1)));
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _done = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: () async {
-        await Clipboard.setData(ClipboardData(text: widget.value));
-        HapticFeedback.mediumImpact();
-        if (!mounted) return;
-        setState(() => _done = true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address copied'), duration: Duration(seconds: 1)));
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) setState(() => _done = false);
-        });
-      },
-      icon: Icon(_done ? Icons.check_rounded : Icons.copy_rounded, size: 16, color: _done ? AppColors.green : AppColors.primary),
-      label: Text(_done ? 'Copied' : 'Copy', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _done ? AppColors.green : AppColors.primary)),
+    final icon = Icon(_done ? Icons.check_rounded : Icons.copy_rounded, size: 16, color: _done ? AppColors.green : AppColors.primary);
+    final label = Text(_done ? 'Copied' : 'Copy address', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _done ? AppColors.green : AppColors.primary));
+    if (!widget.wide) {
+      return TextButton.icon(onPressed: _copy, icon: icon, label: Text(_done ? 'Copied' : 'Copy', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _done ? AppColors.green : AppColors.primary)));
+    }
+    return OutlinedButton.icon(onPressed: _copy, style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)), icon: icon, label: label);
+  }
+}
+
+/// Renders the QR to a PNG and opens the share sheet (Save Image / send).
+class _SaveQrButton extends StatelessWidget {
+  final _DepositAddress address;
+  const _SaveQrButton({required this.address});
+
+  Future<void> _save(BuildContext context) async {
+    try {
+      final painter = QrPainter(
+        data: address.address,
+        version: QrVersions.auto,
+        gapless: true,
+        eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF0F172A)),
+        dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF0F172A)),
+      );
+      final image = await painter.toImageData(720, format: ui.ImageByteFormat.png);
+      if (image == null) throw 'render failed';
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/millimore_usdt_${address.network}.png');
+      await file.writeAsBytes(image.buffer.asUint8List());
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'My Millimore USDT deposit address (${address.networkLabel}):\n${address.address}',
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save the QR — the address is copied instead.')));
+        await Clipboard.setData(ClipboardData(text: address.address));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () => _save(context),
+      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+      icon: Icon(Icons.qr_code_rounded, size: 16, color: AppColors.primary),
+      label: Text('Save QR', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
     );
   }
 }

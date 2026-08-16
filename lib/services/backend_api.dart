@@ -331,6 +331,13 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null);
   }
 
+  /// Backend readiness. `deposits.gate` is "ready" | "coming_soon" — only turn
+  /// the deposit funnel on when it's "ready".
+  static Future<Map<String, dynamic>> health() async {
+    final res = await _api.get('/health');
+    return (res as Map).cast<String, dynamic>();
+  }
+
   static Future<Map<String, dynamic>> createDeposit({required double amount, String? method, String? asset}) async {
     final res = await _api.post('/deposits', {'amount': amount, if (method != null) 'method': method, if (asset != null) 'asset': asset});
     return (res as Map).cast<String, dynamic>();
