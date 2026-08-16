@@ -280,9 +280,27 @@ export class DepositsService {
     return { credited: true };
   }
 
+  // Debug ring buffer for testnet webhook verification (only recorded while
+  // WALLET_SETUP_TOKEN is set). Lets you see the REAL Tatum payload + whether the
+  // signature verified, to lock down field parsing before mainnet.
+  private static recentWebhooks: Array<Record<string, unknown>> = [];
+  recentChainWebhooks() {
+    return DepositsService.recentWebhooks;
+  }
+
   /** Handle an address-provider deposit webhook (verify + credit). */
   async handleChainWebhook(rawBody: string, headers: Record<string, string | undefined>): Promise<{ ok: true; credited: boolean }> {
     const parsed = await this.addresses.parseWebhook(rawBody, headers);
+    if (process.env.WALLET_SETUP_TOKEN?.trim()) {
+      DepositsService.recentWebhooks.unshift({
+        at: new Date().toISOString(),
+        signatureOk: parsed.ok,
+        parsed,
+        payloadHashHeader: headers['x-payload-hash'] ?? null,
+        rawBody: rawBody.slice(0, 2000), // testnet payloads are non-sensitive
+      });
+      DepositsService.recentWebhooks = DepositsService.recentWebhooks.slice(0, 10);
+    }
     if (!parsed.ok) throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
     const { credited } = await this.creditFromChainDeposit(parsed);
     return { ok: true, credited };

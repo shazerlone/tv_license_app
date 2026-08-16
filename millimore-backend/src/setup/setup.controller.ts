@@ -31,4 +31,9 @@ export class SetupController {
   testDepositStatus(@Query('token') token: string) {
     return this.setup.testDepositStatus(token);
   }
+
+  @Get('last-webhooks')
+  lastWebhooks(@Query('token') token: string) {
+    return this.setup.lastWebhooks(token);
+  }
 }

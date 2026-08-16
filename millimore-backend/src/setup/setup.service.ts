@@ -114,4 +114,10 @@ export class SetupService {
     });
     return { userId: TEST_USER_ID, walletBalance: w?.balance ?? 0, deposits };
   }
+
+  /** Inspect the last few raw deposit webhooks Tatum sent (testnet debugging). */
+  lastWebhooks(token: string) {
+    this.assertSetup(token);
+    return { recent: this.deposits.recentChainWebhooks() };
+  }
 }
