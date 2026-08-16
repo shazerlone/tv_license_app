@@ -1,6 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { KycStatus, Role } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { DepositsService } from '../wallet/deposits.service';
 import { CryptoAddressService } from '../wallet/crypto/crypto-address.service';
 import { DepositNetwork } from '../wallet/crypto/address-provider';
+
+const TEST_USER_ID = 'u_setup_deposit_test';
 
 /**
  * ONE-TIME master-wallet generator. Locked behind WALLET_SETUP_TOKEN (unset =
@@ -13,14 +18,19 @@ import { DepositNetwork } from '../wallet/crypto/address-provider';
 export class SetupService {
   private readonly logger = new Logger('SetupService');
 
-  async generateWallet(chain: string, token: string): Promise<{ chain: string; xpub: string; mnemonic: string; warning: string }> {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly deposits: DepositsService,
+  ) {}
+
+  private assertSetup(token: string) {
     const setupToken = process.env.WALLET_SETUP_TOKEN?.trim();
-    if (!setupToken) {
-      throw new ForbiddenException({ code: 'setup_disabled', message: 'Wallet setup is disabled. Set WALLET_SETUP_TOKEN to enable it temporarily.' });
-    }
-    if (!token || token !== setupToken) {
-      throw new ForbiddenException({ code: 'bad_setup_token', message: 'Invalid setup token.' });
-    }
+    if (!setupToken) throw new ForbiddenException({ code: 'setup_disabled', message: 'Set WALLET_SETUP_TOKEN to enable setup endpoints.' });
+    if (!token || token !== setupToken) throw new ForbiddenException({ code: 'bad_setup_token', message: 'Invalid setup token.' });
+  }
+
+  async generateWallet(chain: string, token: string): Promise<{ chain: string; xpub: string; mnemonic: string; warning: string }> {
+    this.assertSetup(token);
     const c = (chain ?? '').toLowerCase();
     if (c !== 'ethereum' && c !== 'tron') {
       throw new BadRequestException({ code: 'bad_chain', message: 'chain must be "ethereum" or "tron".' });
@@ -51,10 +61,7 @@ export class SetupService {
    * network address or a per-network error so failures are easy to read.
    */
   async testAddresses(token: string): Promise<{ provider: string; results: Record<string, string> }> {
-    const setupToken = process.env.WALLET_SETUP_TOKEN?.trim();
-    if (!setupToken) throw new ForbiddenException({ code: 'setup_disabled', message: 'Set WALLET_SETUP_TOKEN to enable this test.' });
-    if (!token || token !== setupToken) throw new ForbiddenException({ code: 'bad_setup_token', message: 'Invalid setup token.' });
-
+    this.assertSetup(token);
     const svc = new CryptoAddressService();
     if (!svc.enabled) throw new BadRequestException({ code: 'provider_disabled', message: 'No address provider configured (CRYPTO_ADDRESS_PROVIDER).' });
 
@@ -68,5 +75,43 @@ export class SetupService {
       }
     }
     return { provider: svc.name, results };
+  }
+
+  /** Set up a dedicated KYC-verified test user and persist their real deposit
+   *  addresses (subscribed to webhooks). Send testnet USDT to one, then poll
+   *  testDepositStatus to watch it credit. */
+  async testDepositSetup(token: string) {
+    this.assertSetup(token);
+    await this.prisma.user.upsert({
+      where: { id: TEST_USER_ID },
+      update: { kycStatus: KycStatus.verified },
+      create: { id: TEST_USER_ID, name: 'Deposit Test', username: 'deposit_test', role: Role.follower, kycStatus: KycStatus.verified },
+    });
+    await this.prisma.wallet.upsert({
+      where: { userId: TEST_USER_ID },
+      update: {},
+      create: { id: 'w_setup_deposit_test', userId: TEST_USER_ID, balance: 0, currency: 'USD' },
+    });
+    const addresses = await this.deposits.myAddresses(TEST_USER_ID); // persists + subscribes
+    const w = await this.prisma.wallet.findUnique({ where: { userId: TEST_USER_ID }, select: { balance: true } });
+    return {
+      userId: TEST_USER_ID,
+      walletBalance: w?.balance ?? 0,
+      addresses,
+      next: 'Send a small amount of testnet USDT to one of these addresses, then open /v1/setup/test-deposit/status?token=… to watch it credit.',
+    };
+  }
+
+  /** Poll the test user's balance + recent deposits after sending testnet funds. */
+  async testDepositStatus(token: string) {
+    this.assertSetup(token);
+    const w = await this.prisma.wallet.findUnique({ where: { userId: TEST_USER_ID }, select: { balance: true } });
+    const deposits = await this.prisma.deposit.findMany({
+      where: { userId: TEST_USER_ID },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { amount: true, status: true, asset: true, payCurrency: true, txRef: true, createdAt: true },
+    });
+    return { userId: TEST_USER_ID, walletBalance: w?.balance ?? 0, deposits };
   }
 }

@@ -21,4 +21,14 @@ export class SetupController {
   testAddresses(@Query('token') token: string) {
     return this.setup.testAddresses(token);
   }
+
+  @Get('test-deposit')
+  testDeposit(@Query('token') token: string) {
+    return this.setup.testDepositSetup(token);
+  }
+
+  @Get('test-deposit/status')
+  testDepositStatus(@Query('token') token: string) {
+    return this.setup.testDepositStatus(token);
+  }
 }
