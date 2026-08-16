@@ -13,10 +13,10 @@ export class MockAddressProvider implements DepositAddressProvider {
 
   constructor(private readonly webhookSecret: string) {}
 
-  async createAddress(userId: string, network: DepositNetwork): Promise<NewAddress> {
+  async createAddress(userId: string, network: DepositNetwork, index: number): Promise<NewAddress> {
     const h = createHash('sha256').update(`${network}:${userId}`).digest('hex');
     const prefix = network === 'tron' ? 'T' : '0x';
-    return { address: `MOCK_${prefix}${h.slice(0, 34)}`, providerRef: `mock_${h.slice(0, 12)}` };
+    return { address: `MOCK_${prefix}${h.slice(0, 34)}`, providerRef: `mock_${h.slice(0, 12)}`, derivationIndex: index };
   }
 
   parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ChainDeposit {

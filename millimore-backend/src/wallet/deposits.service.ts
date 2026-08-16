@@ -235,7 +235,9 @@ export class DepositsService {
   private async ensureAddress(userId: string, network: DepositNetwork): Promise<DepositAddressDto> {
     const existing = await this.prisma.depositAddress.findUnique({ where: { userId_network: { userId, network } } });
     if (existing) return { network: existing.network, asset: existing.asset, address: existing.address };
-    const gen = await this.addresses.createAddress(userId, network);
+    // Unique HD derivation index per network (count of existing addresses).
+    const index = await this.prisma.depositAddress.count({ where: { network } });
+    const gen = await this.addresses.createAddress(userId, network, index);
     try {
       const row = await this.prisma.depositAddress.create({
         data: { id: genId('da'), userId, network, asset: 'USDT', address: gen.address, providerRef: gen.providerRef, derivationIndex: gen.derivationIndex },
@@ -280,7 +282,7 @@ export class DepositsService {
 
   /** Handle an address-provider deposit webhook (verify + credit). */
   async handleChainWebhook(rawBody: string, headers: Record<string, string | undefined>): Promise<{ ok: true; credited: boolean }> {
-    const parsed = this.addresses.parseWebhook(rawBody, headers);
+    const parsed = await this.addresses.parseWebhook(rawBody, headers);
     if (!parsed.ok) throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
     const { credited } = await this.creditFromChainDeposit(parsed);
     return { ok: true, credited };

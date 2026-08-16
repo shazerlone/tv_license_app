@@ -27,7 +27,8 @@ async function main() {
       const exists = await prisma.depositAddress.findUnique({ where: { userId_network: { userId: u.id, network } } });
       if (exists) continue;
       try {
-        const gen = await svc.createAddress(u.id, network);
+        const index = await prisma.depositAddress.count({ where: { network } });
+        const gen = await svc.createAddress(u.id, network, index);
         await prisma.depositAddress.create({
           data: { id: genId('da'), userId: u.id, network, asset: 'USDT', address: gen.address, providerRef: gen.providerRef, derivationIndex: gen.derivationIndex },
         });

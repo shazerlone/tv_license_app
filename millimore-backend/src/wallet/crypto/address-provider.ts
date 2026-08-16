@@ -25,7 +25,11 @@ export interface ChainDeposit {
 export interface DepositAddressProvider {
   readonly name: string;
   readonly networks: DepositNetwork[];
-  createAddress(userId: string, network: DepositNetwork): Promise<NewAddress>;
-  /** Verify + normalize an inbound deposit webhook. */
-  parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ChainDeposit;
+  /** `index` is a unique HD derivation index per network (managed by the caller). */
+  createAddress(userId: string, network: DepositNetwork, index: number): Promise<NewAddress>;
+  /** Verify + normalize an inbound deposit webhook. May be async (network I/O). */
+  parseWebhook(
+    rawBody: string,
+    headers: Record<string, string | undefined>,
+  ): ChainDeposit | Promise<ChainDeposit>;
 }
