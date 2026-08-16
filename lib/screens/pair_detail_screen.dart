@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../config.dart';
 import '../data/pairs.dart';
 import '../models/trader.dart';
+import '../models/indicator_config.dart';
 import '../services/price_service.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
@@ -27,7 +28,7 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   Timer? _priceTimer;
   int _tf = 0; // index into _timeframes
   bool _candle = true; // candlestick by default (line = false)
-  bool _showMa = false; // moving-average overlay tool
+  final IndicatorConfig _ind = IndicatorConfig(); // active indicators + inputs
   // (range, interval, label) for our own chart.
   static const _timeframes = [
     ('1d', '5m', '1D'),
@@ -171,8 +172,8 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
                   ),
                 ),
                 const Spacer(),
-                // MA overlay tool
-                _ChartTypeButton(icon: Icons.timeline_rounded, active: _showMa, onTap: () => setState(() => _showMa = !_showMa)),
+                // Indicators panel
+                _IndicatorButton(count: _ind.activeCount, onTap: _openIndicators),
                 const SizedBox(width: 6),
                 // Line / candle toggle
                 _ChartTypeButton(icon: Icons.show_chart_rounded, active: !_candle, onTap: () => setState(() => _candle = false)),
@@ -184,12 +185,19 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
           // Our own clean chart (no third-party chrome) — pinch to zoom, drag to pan.
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 2, 12, 2),
-            child: MarketChart(pair: widget.pair, range: _timeframes[_tf].$1, interval: _timeframes[_tf].$2, candle: _candle, showMa: _showMa, height: 340),
+            child: MarketChart(
+              pair: widget.pair,
+              range: _timeframes[_tf].$1,
+              interval: _timeframes[_tf].$2,
+              candle: _candle,
+              indicators: _ind,
+              height: 340 + _ind.subPaneCount * 88.0,
+            ),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Center(
-              child: Text('Pinch to zoom · drag to pan · double-tap to reset · ${_showMa ? "MA 20 on" : "tap ∿ for MA"}',
+              child: Text('Pinch to zoom · drag to pan · double-tap to reset',
                   style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.textMuted)),
             ),
           ),
@@ -262,6 +270,78 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
           ],
         ),
       );
+
+  /// Compact indicators panel: toggle MA / EMA / RSI / MACD and edit inputs.
+  Future<void> _openIndicators() async {
+    final draft = _ind.copy();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(color: AppColors.background, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                Text('Indicators', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                const SizedBox(height: 4),
+                Text('Overlay moving averages, or add RSI / MACD panes.', style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
+                const SizedBox(height: 14),
+                _IndicatorRow(
+                  name: 'Moving Average (SMA)', color: AppColors.primary,
+                  on: draft.maOn, onToggle: (v) => setSheet(() => draft.maOn = v),
+                  inputs: [_IndInput('Period', draft.maPeriod, (v) => setSheet(() => draft.maPeriod = v))],
+                ),
+                _IndicatorRow(
+                  name: 'Exponential MA (EMA)', color: AppColors.purple,
+                  on: draft.emaOn, onToggle: (v) => setSheet(() => draft.emaOn = v),
+                  inputs: [_IndInput('Period', draft.emaPeriod, (v) => setSheet(() => draft.emaPeriod = v))],
+                ),
+                _IndicatorRow(
+                  name: 'RSI', color: AppColors.primary,
+                  on: draft.rsiOn, onToggle: (v) => setSheet(() => draft.rsiOn = v),
+                  inputs: [_IndInput('Length', draft.rsiPeriod, (v) => setSheet(() => draft.rsiPeriod = v))],
+                ),
+                _IndicatorRow(
+                  name: 'MACD', color: AppColors.purple,
+                  on: draft.macdOn, onToggle: (v) => setSheet(() => draft.macdOn = v),
+                  inputs: [
+                    _IndInput('Fast', draft.macdFast, (v) => setSheet(() => draft.macdFast = v)),
+                    _IndInput('Slow', draft.macdSlow, (v) => setSheet(() => draft.macdSlow = v)),
+                    _IndInput('Signal', draft.macdSignal, (v) => setSheet(() => draft.macdSignal = v)),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity, height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _ind.maOn = draft.maOn; _ind.maPeriod = draft.maPeriod;
+                        _ind.emaOn = draft.emaOn; _ind.emaPeriod = draft.emaPeriod;
+                        _ind.rsiOn = draft.rsiOn; _ind.rsiPeriod = draft.rsiPeriod;
+                        _ind.macdOn = draft.macdOn; _ind.macdFast = draft.macdFast;
+                        _ind.macdSlow = draft.macdSlow; _ind.macdSignal = draft.macdSignal;
+                      });
+                    },
+                    child: Text('Apply', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _createAlert() async {
     final priceCtrl = TextEditingController(text: _quote != null ? _fmt(_quote!.price) : '');
@@ -390,6 +470,105 @@ class _TraderPairCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Toolbar button that opens the indicators panel, with an active-count badge.
+class _IndicatorButton extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _IndicatorButton({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = count > 0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary.withOpacity(0.14) : AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: active ? AppColors.primary : AppColors.border),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.tune_rounded, size: 16, color: active ? AppColors.primary : AppColors.textMuted),
+          const SizedBox(width: 5),
+          Text(active ? 'Indicators · $count' : 'Indicators',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: active ? AppColors.primary : AppColors.textSecondary)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// One indicator row in the panel: a switch + inline numeric inputs.
+class _IndicatorRow extends StatelessWidget {
+  final String name;
+  final Color color;
+  final bool on;
+  final ValueChanged<bool> onToggle;
+  final List<_IndInput> inputs;
+  const _IndicatorRow({required this.name, required this.color, required this.on, required this.onToggle, required this.inputs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? color.withOpacity(0.5) : AppColors.border)),
+      child: Row(
+        children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(name, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+          if (on)
+            for (final inp in inputs)
+              Padding(padding: const EdgeInsets.only(left: 6), child: inp),
+          const SizedBox(width: 4),
+          Transform.scale(
+            scale: 0.82,
+            child: Switch(
+              value: on,
+              activeColor: color,
+              onChanged: onToggle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A tiny labelled +/- numeric stepper for an indicator input.
+class _IndInput extends StatelessWidget {
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+  const _IndInput(this.label, this.value, this.onChanged);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 8.5, color: AppColors.textMuted)),
+        const SizedBox(height: 1),
+        Container(
+          decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.border)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            _stepBtn(Icons.remove, () => onChanged((value - 1).clamp(1, 400))),
+            SizedBox(width: 22, child: Text('$value', textAlign: TextAlign.center, style: GoogleFonts.robotoMono(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+            _stepBtn(Icons.add, () => onChanged((value + 1).clamp(1, 400))),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _stepBtn(IconData icon, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        child: Padding(padding: const EdgeInsets.all(4), child: Icon(icon, size: 13, color: AppColors.textSecondary)),
+      );
 }
 
 /// Small line/candle chart-type toggle button.
