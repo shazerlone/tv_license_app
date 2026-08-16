@@ -33,7 +33,13 @@ export class DepositsService {
     private readonly wallet: WalletService,
     private readonly settings: SettingsService,
     private readonly crypto: CryptoDepositService,
-  ) {}
+  ) {
+    this.logger.log(
+      DEPOSIT_AUTO_CONFIRM
+        ? '⚠️  Deposits: AUTO-CONFIRM ON (dev only — wallet credited without on-chain payment)'
+        : `Deposits: auto-confirm OFF — credited only by ${this.crypto.enabled ? `${this.crypto.name} webhook` : 'webhook/admin'}`,
+    );
+  }
 
   async methods(): Promise<DepositMethodDto[]> {
     const s = await this.settings.get();

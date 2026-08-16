@@ -4,7 +4,7 @@
     "/v1/health": {
       "get": {
         "operationId": "HealthController_health",
-        "summary": "Liveness probe",
+        "summary": "Liveness probe + safety-mode readout (verifies what is actually deployed)",
         "parameters": [],
         "responses": {
           "200": {

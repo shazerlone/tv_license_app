@@ -179,6 +179,10 @@ async function seedDemo() {
     create: { id: 'led_seed_priya', userId: 'u_priya', type: 'deposit', amount: 10000, balanceAfter: 10000, currency: 'USD', refId: 'dep_seed_priya', note: 'Seed deposit' },
   });
 
+  // Dev convenience: allow instant deposit auto-confirm in demo mode (still also
+  // requires DEPOSIT_AUTO_CONFIRM=true in the env — never affects production).
+  await prisma.platformSettings.update({ where: { id: 'platform' }, data: { depositAutoConfirm: true } }).catch(() => undefined);
+
   // KYC-verify demo users + default leverage so the full flow works in test mode.
   await prisma.user.updateMany({ where: { id: { in: ['u_priya', 'u_marcus'] } }, data: { kycStatus: 'verified', kycProvider: 'manual', leverage: 100 } });
 

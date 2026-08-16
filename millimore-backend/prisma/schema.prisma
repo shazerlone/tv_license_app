@@ -273,7 +273,7 @@ model PlatformSettings {
   minWithdrawal            Float    @default(10)
   maxWithdrawalPerTx       Float    @default(25000)
   maxWithdrawalPerDay      Float    @default(50000)
-  depositAutoConfirm       Boolean  @default(true)
+  depositAutoConfirm       Boolean  @default(false) // prod-safe; dev demo seed enables it
   kycRequiredForWithdrawal Boolean  @default(true)
   cryptoEnabled            Boolean  @default(true)
   cardEnabled              Boolean  @default(false)
