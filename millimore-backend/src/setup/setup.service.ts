@@ -120,4 +120,48 @@ export class SetupService {
     this.assertSetup(token);
     return { recent: this.deposits.recentChainWebhooks() };
   }
+
+  /**
+   * Ask Tatum directly what it has registered + attempt a fresh subscription,
+   * returning the RAW responses so we can see exactly why webhooks aren't firing
+   * (bad URL, unsupported chain name, testnet mismatch, etc.).
+   */
+  async tatumDebug(token: string) {
+    this.assertSetup(token);
+    const key = process.env.TATUM_API_KEY?.trim();
+    const base = (process.env.PUBLIC_BASE_URL ?? '').trim().replace(/\/+$/, '');
+    const webhookUrl = base ? `${base}/v1/webhooks/deposits/chain` : null;
+    const hmac = process.env.TATUM_HMAC_SECRET?.trim() || '';
+    const out: Record<string, unknown> = {
+      config: { publicBaseUrl: base || null, webhookUrl, network: process.env.TATUM_NETWORK || 'per-key', hmacSet: !!hmac },
+    };
+    if (!key) return { ...out, error: 'TATUM_API_KEY not set' };
+
+    // What does Tatum currently have?
+    try {
+      const r = await fetch('https://api.tatum.io/v4/subscription?pageSize=50', { headers: { 'x-api-key': key } });
+      out.existingSubscriptions = { status: r.status, body: await r.json().catch(() => null) };
+    } catch (e) {
+      out.existingSubscriptions = { error: (e as Error).message };
+    }
+
+    // Attempt a fresh subscription for the test user's TRON address and surface
+    // the raw response (the error message tells us the exact problem).
+    const addr = await this.prisma.depositAddress.findFirst({ where: { userId: TEST_USER_ID, network: 'tron' } });
+    if (addr && webhookUrl) {
+      try {
+        const r = await fetch('https://api.tatum.io/v4/subscription', {
+          method: 'POST',
+          headers: { 'x-api-key': key, 'content-type': 'application/json' },
+          body: JSON.stringify({ type: 'ADDRESS_EVENT', attr: { address: addr.address, chain: 'tron', url: webhookUrl, ...(hmac ? { hmacSecret: hmac } : {}) } }),
+        });
+        out.subscriptionCreateTron = { status: r.status, address: addr.address, body: await r.json().catch(() => null) };
+      } catch (e) {
+        out.subscriptionCreateTron = { error: (e as Error).message };
+      }
+    } else {
+      out.subscriptionCreateTron = { skipped: !addr ? 'no test tron address (run /v1/setup/test-deposit first)' : 'no webhookUrl (PUBLIC_BASE_URL unset)' };
+    }
+    return out;
+  }
 }

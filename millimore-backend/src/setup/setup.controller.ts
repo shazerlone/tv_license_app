@@ -36,4 +36,9 @@ export class SetupController {
   lastWebhooks(@Query('token') token: string) {
     return this.setup.lastWebhooks(token);
   }
+
+  @Get('tatum-debug')
+  tatumDebug(@Query('token') token: string) {
+    return this.setup.tatumDebug(token);
+  }
 }
