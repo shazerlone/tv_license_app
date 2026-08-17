@@ -301,6 +301,10 @@ export class TatumProvider implements DepositAddressProvider {
     const amount = Math.abs(Number(b.value ?? b.amount ?? 0));
     const address = typeof b.to === 'string' ? b.to : typeof b.address === 'string' ? b.address : undefined;
     const txRef = (b.txId as string) || (b.hash as string) || (b.txHash as string) || undefined;
-    return { ok: true, sigOk, network, address, amount, asset, txRef };
+    // Detected-but-unconfirmed (mempool) vs in-block. Tatum flags a mempool tx with
+    // `mempool:true`; an in-block event carries a blockNumber. Anything else we
+    // treat as confirmed (the common case where the event only fires once in-block).
+    const confirmed = b.mempool === true ? false : true;
+    return { ok: true, sigOk, network, address, amount, asset, txRef, confirmed };
   }
 }

@@ -609,7 +609,14 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
     signature credits from the payload, otherwise the address is re-read on-chain
     from an authoritative indexer and only confirmed USDT is credited. Idempotent
     (deduped by on-chain tx hash — `Deposit.txRef` is unique).
-  - `GET /deposits` → my deposits.
+  - **Pending visibility** — the instant a tx is DETECTED (webhook), a `Deposit`
+    row is created with `status:"pending"` (+ `amount`, `payCurrency`, `createdAt`),
+    so `GET /deposits` shows it live while it confirms; a `wallet.deposit.pending`
+    WS `user` event `{ depositId, amount, asset, payCurrency, txRef, status }` fires
+    on first detection. On confirmations it transitions `pending → confirmed` and
+    emits `wallet.deposit` (with push). Detected deposits are never silently
+    dropped — the pending row persists until confirmed.
+  - `GET /deposits` → my deposits (includes pending rows).
 - **Treasury / auto-sweep (admin)** — credited USDT is consolidated off each
   per-user address into the master wallet. Non-custodial: signing is delegated to
   Tatum KMS (`signatureId`); the mnemonic never touches the server. Gated by

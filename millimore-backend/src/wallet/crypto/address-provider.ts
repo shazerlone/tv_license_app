@@ -17,6 +17,7 @@ export interface ChainDeposit {
   amount?: number; // amount received (in whole units, e.g. USDT)
   asset?: string; // token symbol, e.g. "USDT" / "ETH"
   txRef?: string; // on-chain tx hash (dedupe key)
+  confirmed?: boolean; // false = detected but still unconfirmed (mempool); undefined = treat as confirmed
 }
 
 /**

@@ -256,34 +256,67 @@ export class DepositsService {
   }
 
   /**
-   * Credit a confirmed on-chain deposit that landed on a user's address. Looks up
-   * the owning user by address, then reuses confirm() (idempotent). The unique
-   * txRef guard means the same tx can never credit twice.
+   * Record + (when confirmed) credit an on-chain deposit that landed on a user's
+   * address. A pending Deposit row is created the instant the tx is DETECTED — so
+   * `GET /deposits` and the wallet timeline show it live while it confirms — and is
+   * transitioned pending → confirmed once confirmations arrive. Idempotent by the
+   * unique txRef: repeat webhooks (detect → confirm) never duplicate or double-credit.
+   * `d.confirmed === false` means detected-but-unconfirmed: record pending, don't credit yet.
    */
-  async creditFromChainDeposit(d: ChainDeposit): Promise<{ credited: boolean }> {
-    if (!d.ok || !d.address || !d.network || !d.txRef || !d.amount || d.amount <= 0) return { credited: false };
+  async creditFromChainDeposit(d: ChainDeposit): Promise<{ credited: boolean; recorded: boolean }> {
+    if (!d.ok || !d.address || !d.network || !d.txRef || !d.amount || d.amount <= 0) return { credited: false, recorded: false };
     const addr = await this.prisma.depositAddress.findFirst({ where: { network: d.network, address: d.address } });
     if (!addr) {
       this.logger.warn(`chain deposit to unknown address (${d.network}) ${d.address}`);
-      return { credited: false };
+      return { credited: false, recorded: false };
     }
-    const amount = Math.round(d.amount * 100) / 100; // USDT ≈ USD 1:1
-    let depositId: string;
-    try {
-      const dep = await this.prisma.deposit.create({
-        data: { id: genId('dep'), userId: addr.userId, amount, currency: 'USD', method: 'crypto', asset: 'USDT', address: d.address, payCurrency: d.network, txRef: d.txRef, status: DepositStatus.pending },
-      });
-      depositId = dep.id;
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return { credited: false }; // tx already processed
-      throw e;
-    }
+
+    const depositId = await this.ensurePendingDeposit(addr.userId, d);
+    if (!depositId) return { credited: false, recorded: false }; // already confirmed earlier
+
+    // Detected but not yet confirmed → leave it pending (visible in the app), credit later.
+    if (d.confirmed === false) return { credited: false, recorded: true };
+
     await this.confirm(depositId, d.txRef);
     // Auto-sweep the just-credited funds to the master wallet (no-op unless
     // SWEEP_ENABLED + Gas Pump + KMS are configured). Fire-and-forget: a sweep
     // failure must never fail the deposit credit.
     this.sweep.triggerAfterDeposit(addr.userId, d.network, d.address);
-    return { credited: true };
+    return { credited: true, recorded: true };
+  }
+
+  /**
+   * Upsert a pending Deposit row for a detected on-chain tx (idempotent by txRef).
+   * Returns the deposit id to (still) act on, or null if it was already confirmed.
+   * Emits `wallet.deposit.pending` on the WS user channel the first time a tx is
+   * seen, so the app shows live "deposit detected" progress before confirmation.
+   */
+  private async ensurePendingDeposit(userId: string, d: ChainDeposit): Promise<string | null> {
+    const existing = await this.prisma.deposit.findFirst({ where: { txRef: d.txRef! }, select: { id: true, status: true } });
+    if (existing) return existing.status === DepositStatus.confirmed ? null : existing.id;
+
+    const amount = Math.round(d.amount! * 100) / 100; // USDT ≈ USD 1:1
+    let dep;
+    try {
+      dep = await this.prisma.deposit.create({
+        data: { id: genId('dep'), userId, amount, currency: 'USD', method: 'crypto', asset: 'USDT', address: d.address, payCurrency: d.network, txRef: d.txRef, status: DepositStatus.pending },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const again = await this.prisma.deposit.findFirst({ where: { txRef: d.txRef! }, select: { id: true, status: true } });
+        return again ? (again.status === DepositStatus.confirmed ? null : again.id) : null;
+      }
+      throw e;
+    }
+    // WS-only nudge (no push — the confirmation sends the push). The app also polls
+    // GET /deposits every ~10s and will render this pending row regardless.
+    await this.notifications
+      .pushEvent(userId, 'wallet.deposit.pending', 'Deposit detected', {
+        push: false,
+        data: { depositId: dep.id, amount: dep.amount, asset: 'USDT', payCurrency: d.network, txRef: d.txRef, status: 'pending' },
+      })
+      .catch(() => undefined);
+    return dep.id;
   }
 
   // Debug ring buffer for testnet webhook verification (only recorded while
@@ -340,9 +373,10 @@ export class DepositsService {
     // Only USDT deposits are credited; ignore native-coin gas top-ups etc.
     if (parsed.asset && parsed.asset.toUpperCase() !== 'USDT') return { ok: true, credited: false };
 
-    // Trusted (signed) path: credit directly from the verified payload.
+    // Trusted (signed) path: record the pending row now, credit from the verified
+    // payload once confirmed (parsed.confirmed === false keeps it visibly pending).
     if (verified) {
-      const { credited } = await this.creditFromChainDeposit({ ok: true, network: parsed.network, address: parsed.address, amount: parsed.amount, txRef: parsed.txRef });
+      const { credited } = await this.creditFromChainDeposit({ ok: true, network: parsed.network, address: parsed.address, amount: parsed.amount, txRef: parsed.txRef, confirmed: parsed.confirmed });
       return { ok: true, credited };
     }
 
