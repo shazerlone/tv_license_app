@@ -142,37 +142,46 @@ export class TatumProvider implements DepositAddressProvider {
     return { transfers, raw: raws };
   }
 
+  /**
+   * Parse + signature-check a Tatum v4 ADDRESS_EVENT webhook. Field shapes are
+   * taken from a REAL delivered payload:
+   *   { to, value:"0.05", currency:"ETH", txId, chain:"ethereum-sepolia",
+   *     tokenMetadata:{ type, symbol, decimals } }
+   * `value` is already human-decimal (NOT base units). The recipient is `to`.
+   *
+   * We only VERIFY the signature here (sigOk); the crediting-trust decision is the
+   * caller's, so an unsigned/mis-signed webhook can fall back to an authoritative
+   * on-chain re-check instead of crediting a possibly-forged payload. `ok` means
+   * "valid JSON we understood", not "trusted".
+   */
   parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ChainDeposit {
-    if (!this.hmacSecret) return { ok: false }; // fail closed
-    const provided = (headers['x-payload-hash'] ?? '').trim();
-    if (!provided) return { ok: false };
-
-    let b: Record<string, unknown>;
+    let b: Record<string, any>;
     try {
       b = JSON.parse(rawBody);
     } catch {
       return { ok: false };
     }
-    // Tatum: x-payload-hash = base64(HMAC-SHA512(payload, secret)) over the compact
-    // JSON. Accept either the raw bytes we received or the canonical re-stringify,
-    // so whitespace/transport differences don't cause false rejects.
-    const candidates = [rawBody, JSON.stringify(b)];
-    const ok = candidates.some((c) => {
-      const exp = createHmac('sha512', this.hmacSecret).update(c).digest('base64');
-      return provided.length === exp.length && timingSafeEqual(Buffer.from(provided), Buffer.from(exp));
-    });
-    if (!ok) return { ok: false };
-    // ADDRESS_EVENT payload (chain may be network-qualified, e.g. tron-testnet).
+
+    // Signature: x-payload-hash = base64(HMAC-SHA512(payload, secret)). Tatum signs
+    // only when an HMAC secret is configured in the dashboard; if none arrives we
+    // report sigOk:false and let the caller re-verify on-chain.
+    let sigOk = false;
+    const provided = (headers['x-payload-hash'] ?? '').trim();
+    if (this.hmacSecret && provided) {
+      const candidates = [rawBody, JSON.stringify(b)];
+      sigOk = candidates.some((c) => {
+        const exp = createHmac('sha512', this.hmacSecret).update(c).digest('base64');
+        return provided.length === exp.length && timingSafeEqual(Buffer.from(provided), Buffer.from(exp));
+      });
+    }
+
     const network = baseNetwork(String(b.chain ?? ''));
-    const asset = String(b.asset ?? b.currency ?? '').toUpperCase();
-    const type = String(b.type ?? b.txType ?? '').toLowerCase();
-    const amount = Math.abs(Number(b.amount ?? 0));
-    const address = typeof b.address === 'string' ? b.address : undefined;
-    const txRef = (b.txId as string) || (b.hash as string) || undefined;
-    // Only credit incoming USDT of positive value (else return verified-but-empty,
-    // which creditFromChainDeposit safely ignores).
-    if (type && type !== 'incoming' && type !== 'native' && type !== 'token') return { ok: true };
-    if (asset && asset !== 'USDT') return { ok: true };
-    return { ok: true, network, address, amount, txRef };
+    const meta = (b.tokenMetadata ?? {}) as Record<string, any>;
+    const asset = String(b.currency ?? meta.symbol ?? b.asset ?? '').toUpperCase();
+    // v4 `value` is already whole-unit decimal (e.g. "0.05", "1000").
+    const amount = Math.abs(Number(b.value ?? b.amount ?? 0));
+    const address = typeof b.to === 'string' ? b.to : typeof b.address === 'string' ? b.address : undefined;
+    const txRef = (b.txId as string) || (b.hash as string) || (b.txHash as string) || undefined;
+    return { ok: true, sigOk, network, address, amount, asset, txRef };
   }
 }

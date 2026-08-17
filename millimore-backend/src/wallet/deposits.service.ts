@@ -308,22 +308,50 @@ export class DepositsService {
     return results;
   }
 
-  /** Handle an address-provider deposit webhook (verify + credit). */
+  /**
+   * Handle an address-provider deposit webhook. The webhook is treated as an
+   * UNTRUSTED trigger: if its signature verifies (HMAC secret set in the provider
+   * dashboard) we credit straight from the payload; otherwise we don't trust the
+   * amount and instead re-read the address on-chain from an authoritative indexer
+   * and credit only what's actually there. Either way crediting is idempotent by
+   * unique txRef, so retries and overlapping rescans can never double-credit.
+   */
   async handleChainWebhook(rawBody: string, headers: Record<string, string | undefined>): Promise<{ ok: true; credited: boolean }> {
     const parsed = await this.addresses.parseWebhook(rawBody, headers);
+    const verified = parsed.sigOk ?? parsed.ok; // providers that don't sign fall back to `ok`
     if (process.env.WALLET_SETUP_TOKEN?.trim()) {
       DepositsService.recentWebhooks.unshift({
         at: new Date().toISOString(),
-        signatureOk: parsed.ok,
+        signatureOk: verified,
         parsed,
         payloadHashHeader: headers['x-payload-hash'] ?? null,
         rawBody: rawBody.slice(0, 2000), // testnet payloads are non-sensitive
       });
       DepositsService.recentWebhooks = DepositsService.recentWebhooks.slice(0, 10);
     }
-    if (!parsed.ok) throw new UnauthorizedException({ code: 'bad_signature', message: 'Invalid webhook signature.' });
-    const { credited } = await this.creditFromChainDeposit(parsed);
-    return { ok: true, credited };
+    if (!parsed.ok) throw new BadRequestException({ code: 'bad_payload', message: 'Unparseable webhook payload.' });
+
+    // Only USDT deposits are credited; ignore native-coin gas top-ups etc.
+    if (parsed.asset && parsed.asset.toUpperCase() !== 'USDT') return { ok: true, credited: false };
+
+    // Trusted (signed) path: credit directly from the verified payload.
+    if (verified) {
+      const { credited } = await this.creditFromChainDeposit({ ok: true, network: parsed.network, address: parsed.address, amount: parsed.amount, txRef: parsed.txRef });
+      return { ok: true, credited };
+    }
+
+    // Untrusted path: re-verify on-chain and credit only confirmed transfers.
+    if (parsed.network && parsed.address) {
+      const { transfers } = await this.addresses.fetchDeposits(parsed.address, parsed.network);
+      let credited = false;
+      for (const t of transfers) {
+        const r = await this.creditFromChainDeposit({ ok: true, network: parsed.network, address: parsed.address, amount: t.amount, txRef: t.txRef });
+        if (r.credited) credited = true;
+      }
+      if (!credited) this.logger.warn(`unsigned/unverified webhook for ${parsed.network} ${parsed.address}: no on-chain USDT to credit`);
+      return { ok: true, credited };
+    }
+    return { ok: true, credited: false };
   }
 
   /**

@@ -10,10 +10,12 @@ export interface NewAddress {
 
 /** A normalized on-chain deposit event, extracted from a processor webhook. */
 export interface ChainDeposit {
-  ok: boolean; // signature verified
+  ok: boolean; // payload parsed (valid JSON we understand)
+  sigOk?: boolean; // HMAC signature verified (undefined = provider doesn't sign)
   network?: DepositNetwork;
   address?: string; // the deposit address that received funds
-  amount?: number; // USDT amount received
+  amount?: number; // amount received (in whole units, e.g. USDT)
+  asset?: string; // token symbol, e.g. "USDT" / "ETH"
   txRef?: string; // on-chain tx hash (dedupe key)
 }
 
