@@ -605,9 +605,29 @@ in above it later). MetaAPI is intentionally parked behind the same bridge seam.
     sent to an address credit the owner's wallet automatically and are swept to
     the master wallet by the processor (Tatum Gas Pump).
   - `POST /webhooks/deposits/chain` (public; no JWT) — the address processor's
-    deposit notification; verified by the provider, then credits the owning wallet
-    once (deduped by on-chain tx hash — `Deposit.txRef` is unique).
+    deposit notification. Treated as an **untrusted trigger**: a verified HMAC
+    signature credits from the payload, otherwise the address is re-read on-chain
+    from an authoritative indexer and only confirmed USDT is credited. Idempotent
+    (deduped by on-chain tx hash — `Deposit.txRef` is unique).
   - `GET /deposits` → my deposits.
+- **Treasury / auto-sweep (admin)** — credited USDT is consolidated off each
+  per-user address into the master wallet. Non-custodial: signing is delegated to
+  Tatum KMS (`signatureId`); the mnemonic never touches the server. Gated by
+  `SWEEP_ENABLED` + Gas Pump address mode (`CRYPTO_ADDRESS_MODE=gaspump`) + KMS.
+  Modes: `batch` (scheduled consolidation, default) or `instant`. Per-network
+  floors (`SWEEP_MIN_USDT_{TRON,ETHEREUM,BSC}`; defaults 1/50/5) skip uneconomical
+  sweeps. Admin endpoints (perms `treasury.read` / `treasury.sweep`):
+  - `GET /admin/treasury/summary` → `{ addresses, totals:{ deposited, swept,
+    unswept, currency }, sweeps:{ pending, failed }, byNetwork[], sweepConfig:{
+    active, mode } }`.
+  - `GET /admin/treasury/addresses?network=&filter=all|unswept|failed&cursor=` →
+    per-address `{ user, network, address, deposited, swept, unswept, lastSweep }`.
+  - `GET /admin/treasury/sweeps?status=` → sweep audit trail.
+  - `POST /admin/treasury/reconcile` → live on-chain balances for funded addresses.
+  - `POST /admin/treasury/sweep` → run a consolidation batch now.
+  - `POST /admin/treasury/addresses/{id}/sweep` → sweep one address.
+  - `/health` exposes `sweep:{ active, enabled, mode, addressMode, kmsSignatureId,
+    gpMaster }` so deployment config is verifiable without auth.
 - **Copy funding & settlement** — `POST /copy/{traderId}/start` now debits the
   wallet by `amount` (`copy_allocate`; throws `insufficient_balance` if unfunded —
   the "deposit first" flow). `accountId` is now optional (a broker hint).

@@ -15,6 +15,7 @@ const NAV = [
   { href: '/creators', label: 'Creator queue', icon: Icons.queue, perm: 'creators.approve' },
   { href: '/transactions', label: 'Transactions', icon: Icons.spark, perm: 'payouts.approve' },
   { href: '/payouts', label: 'Payouts', icon: Icons.approved, perm: 'payouts.approve' },
+  { href: '/treasury', label: 'Treasury', icon: Icons.spark, perm: 'treasury.read' },
   { href: '/kyc', label: 'KYC', icon: Icons.approved, perm: 'kyc.decide' },
   { href: '/referrals', label: 'Referrals', icon: Icons.spark, perm: 'referrals.read' },
   { href: '/support', label: 'Support', icon: Icons.queue, perm: 'support.write' },

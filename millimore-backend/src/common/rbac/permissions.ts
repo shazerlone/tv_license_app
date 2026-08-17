@@ -12,6 +12,8 @@ export const PERMISSIONS = [
   'wallet.adjust', // manual balance credit/debit
   'creators.approve',
   'payouts.approve', // deposits + withdrawals decisions
+  'treasury.read', // crypto treasury / sweep tracker (read)
+  'treasury.sweep', // trigger consolidation sweeps
   'kyc.decide',
   'referrals.read',
   'support.write',
@@ -30,7 +32,7 @@ const ALL: Permission[] = [...PERMISSIONS];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   superadmin: ALL,
-  finance: ['analytics.read', 'traders.read', 'users.read', 'wallet.adjust', 'payouts.approve', 'referrals.read'],
+  finance: ['analytics.read', 'traders.read', 'users.read', 'wallet.adjust', 'payouts.approve', 'treasury.read', 'treasury.sweep', 'referrals.read'],
   compliance: ['users.read', 'traders.read', 'kyc.decide', 'payouts.approve', 'audit.read'],
   support: ['users.read', 'traders.read', 'support.write', 'announcements.write'],
   analyst: ['analytics.read', 'traders.read', 'users.read', 'referrals.read', 'audit.read'],

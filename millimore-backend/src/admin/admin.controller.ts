@@ -24,6 +24,7 @@ import { AdminService } from './admin.service';
 import { AnalyticsService } from './analytics.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { DepositsService } from '../wallet/deposits.service';
+import { TreasuryService } from '../wallet/treasury.service';
 import { TransactionsService } from '../wallet/transactions.service';
 import { SettingsService } from '../settings/settings.service';
 import { KycService } from '../kyc/kyc.service';
@@ -63,6 +64,7 @@ export class AdminController {
     private readonly analytics: AnalyticsService,
     private readonly payouts: PayoutsService,
     private readonly deposits: DepositsService,
+    private readonly treasury: TreasuryService,
     private readonly transactions: TransactionsService,
     private readonly settings: SettingsService,
     private readonly kyc: KycService,
@@ -391,6 +393,61 @@ export class AdminController {
     await this.kyc.setStatus(userId, KycStatus.rejected, dto.reason ?? 'Rejected');
     await this.audit.record(user.userId, 'kyc.reject', 'kyc', userId, { reason: dto.reason });
     return { ok: true };
+  }
+
+  // ── crypto treasury / sweep tracker ────────────────────────────────
+  @Get('treasury/summary')
+  @ApiOperation({ summary: 'Treasury totals: deposited, swept, unswept + per-network' })
+  @RequirePermissions('treasury.read')
+  treasurySummary() {
+    return this.treasury.summary();
+  }
+
+  @Get('treasury/addresses')
+  @ApiOperation({ summary: 'Per-address deposited/swept/unswept + last sweep status' })
+  @RequirePermissions('treasury.read')
+  treasuryAddresses(
+    @Query('network') network?: string,
+    @Query('filter') filter?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.treasury.addresses_({ network, filter, limit: limit ? Number(limit) : undefined, cursor });
+  }
+
+  @Get('treasury/sweeps')
+  @ApiOperation({ summary: 'Sweep audit trail' })
+  @RequirePermissions('treasury.read')
+  treasurySweeps(@Query('status') status?: string, @Query('limit') limit?: string) {
+    return this.treasury.sweeps({ status, limit: limit ? Number(limit) : undefined });
+  }
+
+  @Post('treasury/reconcile')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Read live on-chain balances for funded addresses (truth)' })
+  @RequirePermissions('treasury.read')
+  treasuryReconcile(@Query('limit') limit?: string) {
+    return this.treasury.reconcile(limit ? Number(limit) : undefined);
+  }
+
+  @Post('treasury/sweep')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Run a consolidation batch now (sweep all funded addresses)' })
+  @RequirePermissions('treasury.sweep')
+  async treasurySweepNow(@CurrentUser() user: AuthUser) {
+    const res = await this.treasury.sweepNow();
+    await this.audit.record(user.userId, 'treasury.sweep_batch', 'treasury', 'all', { swept: res.swept, scanned: res.scanned });
+    return res;
+  }
+
+  @Post('treasury/addresses/:id/sweep')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sweep a single deposit address to the master' })
+  @RequirePermissions('treasury.sweep')
+  async treasurySweepOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    const res = await this.treasury.sweepOne(id);
+    await this.audit.record(user.userId, 'treasury.sweep_one', 'treasury', id, { status: res.status });
+    return res;
   }
 
   // ── audit trail ────────────────────────────────────────────────────
