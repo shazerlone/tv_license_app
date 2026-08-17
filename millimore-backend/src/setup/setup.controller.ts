@@ -46,4 +46,9 @@ export class SetupController {
   rescan(@Query('token') token: string) {
     return this.setup.rescan(token);
   }
+
+  @Get('sweep')
+  sweep(@Query('token') token: string) {
+    return this.setup.sweepTest(token);
+  }
 }

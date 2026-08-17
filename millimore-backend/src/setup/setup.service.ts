@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger } from '@ne
 import { KycStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DepositsService } from '../wallet/deposits.service';
+import { SweepService } from '../wallet/crypto/sweep.service';
 import { CryptoAddressService } from '../wallet/crypto/crypto-address.service';
 import { DepositNetwork } from '../wallet/crypto/address-provider';
 
@@ -21,6 +22,7 @@ export class SetupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly deposits: DepositsService,
+    private readonly sweep: SweepService,
   ) {}
 
   private assertSetup(token: string) {
@@ -127,6 +129,25 @@ export class SetupService {
     const results = await this.deposits.rescan(TEST_USER_ID);
     const w = await this.prisma.wallet.findUnique({ where: { userId: TEST_USER_ID }, select: { balance: true } });
     return { userId: TEST_USER_ID, walletBalance: w?.balance ?? 0, results };
+  }
+
+  /** Manually sweep the test user's deposit addresses to the master wallet. Returns
+   *  the raw provider responses so the Gas Pump / KMS field shapes can be locked
+   *  down on testnet before mainnet. No-op unless sweep is fully configured. */
+  async sweepTest(token: string) {
+    this.assertSetup(token);
+    const results = await this.sweep.sweepUser(TEST_USER_ID);
+    return {
+      userId: TEST_USER_ID,
+      enabled: this.sweep.enabled,
+      config: {
+        sweepEnabled: process.env.SWEEP_ENABLED === 'true',
+        addressMode: process.env.CRYPTO_ADDRESS_MODE ?? 'hd',
+        kmsSignatureIdSet: !!(process.env.TATUM_KMS_SIGNATURE_ID ?? '').trim(),
+        gpMasterSet: !!(process.env.TATUM_GP_MASTER ?? process.env.TATUM_GP_MASTER_TRON ?? '').trim(),
+      },
+      results,
+    };
   }
 
   /**

@@ -1,11 +1,21 @@
 import { Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { ChainDeposit, DepositAddressProvider, DepositNetwork, DEPOSIT_NETWORKS, IncomingTransfer, NewAddress } from './address-provider';
+import { ChainDeposit, DepositAddressProvider, DepositNetwork, DEPOSIT_NETWORKS, IncomingTransfer, NewAddress, SweepResult } from './address-provider';
 
 const API_BASE = 'https://api.tatum.io';
 
 // v3 address-derivation path uses the short chain name.
 const CHAIN_PATH: Record<DepositNetwork, string> = { tron: 'tron', ethereum: 'ethereum', bsc: 'bsc' };
+// Gas Pump chain identifiers (uppercase base symbol).
+const GP_CHAIN: Record<DepositNetwork, string> = { tron: 'TRON', ethereum: 'ETH', bsc: 'BSC' };
+// Default USDT contract per network. Testnet contracts differ — override via
+// TATUM_USDT_CONTRACT_{TRON,ETHEREUM,BSC}. The TRON value below is Nile testnet
+// USDT (seen in a real deposit); mainnet is TR7NHq…. EVM defaults are mainnet.
+const USDT_CONTRACT: Record<DepositNetwork, string> = {
+  tron: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+  ethereum: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+  bsc: '0x55d398326f99059fF775485246999027B3197955',
+};
 // v4 subscriptions require NETWORK-QUALIFIED chain names (tron-testnet, etc.).
 const SUB_CHAIN: Record<'testnet' | 'mainnet', Record<DepositNetwork, string>> = {
   testnet: { tron: 'tron-testnet', bsc: 'bsc-testnet', ethereum: 'ethereum-sepolia' },
@@ -57,7 +67,27 @@ export class TatumProvider implements DepositAddressProvider {
     return SUB_CHAIN[env][network];
   }
 
+  /** Address model: 'hd' = plain xpub derivation; 'gaspump' = Tatum Gas Pump
+   *  addresses owned by the master (required for auto-sweep). */
+  private addressMode(): 'hd' | 'gaspump' {
+    return (process.env.CRYPTO_ADDRESS_MODE ?? 'hd').toLowerCase() === 'gaspump' ? 'gaspump' : 'hd';
+  }
+
+  private gpMaster(network: DepositNetwork): string | undefined {
+    return (process.env[`TATUM_GP_MASTER_${network.toUpperCase()}`] ?? process.env.TATUM_GP_MASTER)?.trim();
+  }
+
   async createAddress(userId: string, network: DepositNetwork, index: number): Promise<NewAddress> {
+    const addr = this.addressMode() === 'gaspump'
+      ? await this.createGasPumpAddress(network, index)
+      : await this.createHdAddress(network, index);
+    // Register a webhook subscription so incoming deposits notify us. Best-effort:
+    // a subscription failure shouldn't block handing the user their address.
+    await this.subscribe(addr.address, network).catch((e) => this.logger.warn(`subscribe failed for ${addr.address}: ${String(e)}`));
+    return addr;
+  }
+
+  private async createHdAddress(network: DepositNetwork, index: number): Promise<NewAddress> {
     const xpub = this.xpubFor(network);
     if (!xpub) throw new Error(`no xpub configured for ${network} (set TATUM_XPUB_*)`);
     const res = await fetch(`${API_BASE}/v3/${CHAIN_PATH[network]}/address/${xpub}/${index}`, {
@@ -65,10 +95,25 @@ export class TatumProvider implements DepositAddressProvider {
     });
     const json = (await res.json().catch(() => ({}))) as { address?: string; message?: string };
     if (!res.ok || !json.address) throw new Error(`tatum address gen failed: ${res.status} ${json.message ?? ''}`.trim());
-    // Register a webhook subscription so incoming deposits notify us. Best-effort:
-    // a subscription failure shouldn't block handing the user their address.
-    await this.subscribe(json.address, network).catch((e) => this.logger.warn(`subscribe failed for ${json.address}: ${String(e)}`));
-    return { address: json.address, derivationIndex: index };
+    return { address: json.address, derivationIndex: index, providerRef: 'hd' };
+  }
+
+  /** Precalculate a Gas Pump address at `index` owned by the master. Deterministic
+   *  and cheap — the slave contract is deployed lazily at first sweep (master pays
+   *  gas via KMS). Requires TATUM_GP_MASTER_{network}. */
+  private async createGasPumpAddress(network: DepositNetwork, index: number): Promise<NewAddress> {
+    const owner = this.gpMaster(network);
+    if (!owner) throw new Error(`no gas-pump master for ${network} (set TATUM_GP_MASTER_${network.toUpperCase()})`);
+    const res = await fetch(`${API_BASE}/v3/gas-pump`, {
+      method: 'POST',
+      headers: { 'x-api-key': this.apiKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ chain: GP_CHAIN[network], owner, from: index, to: index }),
+    });
+    const json = (await res.json().catch(() => ({}))) as any;
+    // Response shape varies (array of addresses, or { address }); accept both.
+    const address = Array.isArray(json) ? json[0] : (json.address ?? json.addresses?.[0]);
+    if (!res.ok || !address) throw new Error(`tatum gas-pump gen failed: ${res.status} ${json?.message ?? ''}`.trim());
+    return { address: String(address), derivationIndex: index, providerRef: 'gaspump' };
   }
 
   private async subscribe(address: string, network: DepositNetwork): Promise<void> {
@@ -154,6 +199,80 @@ export class TatumProvider implements DepositAddressProvider {
    * on-chain re-check instead of crediting a possibly-forged payload. `ok` means
    * "valid JSON we understood", not "trusted".
    */
+  private usdtContract(network: DepositNetwork): string {
+    return (process.env[`TATUM_USDT_CONTRACT_${network.toUpperCase()}`] ?? USDT_CONTRACT[network]).trim();
+  }
+
+  /** Current USDT balance on an address. TRON reads TronGrid's TRC-20 balances;
+   *  EVM chains are added when EVM sweep lands. */
+  async usdtBalance(address: string, network: DepositNetwork): Promise<{ balance: number; raw?: unknown }> {
+    if (network !== 'tron') return { balance: 0, raw: { note: `balance not implemented for ${network}` } };
+    const testnet = (process.env.TATUM_NETWORK ?? 'testnet').toLowerCase() !== 'mainnet';
+    const base = (process.env.TRON_RPC_BASE?.trim() || (testnet ? 'https://nile.trongrid.io' : 'https://api.trongrid.io')).replace(/\/+$/, '');
+    const apiKey = process.env.TRONGRID_API_KEY?.trim();
+    const headers: Record<string, string> = apiKey ? { 'TRON-PRO-API-KEY': apiKey } : {};
+    const contract = this.usdtContract('tron');
+    try {
+      const r = await fetch(`${base}/v1/accounts/${address}`, { headers });
+      const raw = (await r.json().catch(() => null)) as any;
+      const rec = raw?.data?.[0];
+      let balance = 0;
+      for (const t of rec?.trc20 ?? []) {
+        // trc20 entries are { "<contract>": "<rawBalance>" }
+        const rawBal = t?.[contract];
+        if (rawBal != null) balance += Number(rawBal) / 1e6;
+      }
+      return { balance, raw };
+    } catch (e) {
+      return { balance: 0, raw: { error: (e as Error).message } };
+    }
+  }
+
+  get canSweep(): boolean {
+    return this.addressMode() === 'gaspump' && !!(process.env.TATUM_KMS_SIGNATURE_ID ?? '').trim();
+  }
+
+  /**
+   * Consolidate USDT from a Gas Pump deposit address to the master wallet.
+   * Non-custodial: Tatum builds the tx and Tatum KMS signs it via signatureId —
+   * no private key on this server. The master pays gas. Returns the raw provider
+   * response so field shapes can be locked down on testnet before mainnet.
+   */
+  async sweep(address: string, network: DepositNetwork, index: number): Promise<SweepResult> {
+    if (!this.canSweep) return { status: 'skipped', reason: 'sweep not configured (need CRYPTO_ADDRESS_MODE=gaspump + TATUM_KMS_SIGNATURE_ID)' };
+    const signatureId = (process.env.TATUM_KMS_SIGNATURE_ID ?? '').trim();
+    const master = this.gpMaster(network);
+    if (!master) return { status: 'skipped', reason: `no gas-pump master for ${network}` };
+    const contract = this.usdtContract(network);
+    const path = (process.env.TATUM_SWEEP_PATH ?? '/v3/blockchain/sc/custodial/transfer').trim();
+    // Best-effort Gas Pump "transfer from custodial address" body. Field names are
+    // verified on testnet via /setup/sweep (raw returned); override the path/body
+    // via env if Tatum's contract differs for the chain.
+    const body: Record<string, unknown> = {
+      chain: GP_CHAIN[network],
+      custodialAddress: address,
+      contractType: 0, // 0 = fungible/ERC-20/TRC-20
+      tokenAddress: contract,
+      recipient: master,
+      amount: '0', // 0 = sweep full balance for many Tatum custodial impls; overridden below when needed
+      signatureId,
+    };
+    if (network === 'tron') body.feeLimit = Number(process.env.TATUM_TRON_FEE_LIMIT ?? 100);
+    try {
+      const r = await fetch(`${API_BASE}${path}`, {
+        method: 'POST',
+        headers: { 'x-api-key': this.apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const raw = (await r.json().catch(() => null)) as any;
+      const txRef = raw?.txId ?? raw?.txHash ?? raw?.signatureId ?? undefined;
+      if (!r.ok) return { status: 'failed', reason: `tatum sweep ${r.status}: ${raw?.message ?? ''}`.trim(), raw };
+      return { status: 'broadcast', txRef, raw };
+    } catch (e) {
+      return { status: 'failed', reason: (e as Error).message };
+    }
+  }
+
   parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ChainDeposit {
     let b: Record<string, any>;
     try {

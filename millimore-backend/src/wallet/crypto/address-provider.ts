@@ -29,6 +29,14 @@ export interface IncomingTransfer {
   amount: number; // USDT amount
 }
 
+/** Result of a consolidation sweep of a deposit address to the master wallet. */
+export interface SweepResult {
+  status: 'broadcast' | 'skipped' | 'failed';
+  txRef?: string; // on-chain tx hash / Tatum signatureId reference
+  reason?: string; // why skipped/failed
+  raw?: unknown; // provider response, for testnet iteration
+}
+
 export interface DepositAddressProvider {
   readonly name: string;
   readonly networks: DepositNetwork[];
@@ -41,4 +49,14 @@ export interface DepositAddressProvider {
   ): ChainDeposit | Promise<ChainDeposit>;
   /** Reconciliation: fetch incoming USDT transfers already on-chain for an address. */
   fetchDeposits?(address: string, network: DepositNetwork): Promise<{ transfers: IncomingTransfer[]; raw?: unknown }>;
+  /** Current on-chain USDT balance sitting on an address (whole units). */
+  usdtBalance?(address: string, network: DepositNetwork): Promise<{ balance: number; raw?: unknown }>;
+  /** True when this provider can consolidate (sweep) deposit addresses to a master. */
+  readonly canSweep?: boolean;
+  /**
+   * Consolidate the USDT on a deposit address to the master wallet. Non-custodial:
+   * the provider delegates signing to a KMS (signatureId) — no private key here.
+   * `index` is the address's HD/gas-pump derivation index.
+   */
+  sweep?(address: string, network: DepositNetwork, index: number): Promise<SweepResult>;
 }

@@ -66,4 +66,18 @@ export class CryptoAddressService {
     if (!this.provider?.fetchDeposits) return { transfers: [], raw: { note: 'provider has no rescan support' } };
     return this.provider.fetchDeposits(address, network);
   }
+
+  get canSweep(): boolean {
+    return !!this.provider?.canSweep;
+  }
+
+  async usdtBalance(address: string, network: DepositNetwork) {
+    if (!this.provider?.usdtBalance) return { balance: 0, raw: { note: 'provider has no balance support' } };
+    return this.provider.usdtBalance(address, network);
+  }
+
+  async sweep(address: string, network: DepositNetwork, index: number) {
+    if (!this.provider?.sweep) return { status: 'skipped' as const, reason: 'provider has no sweep support' };
+    return this.provider.sweep(address, network, index);
+  }
 }

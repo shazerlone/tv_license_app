@@ -847,3 +847,27 @@ model CreatorApplication {
   @@index([status])
   @@index([userId])
 }
+
+/// Auto-sweep (consolidation) of a user's deposit address to the master wallet.
+/// Non-custodial: signing is delegated to Tatum KMS via signatureId — the
+/// mnemonic never touches this server. One row per sweep attempt; the unique
+/// (network,address,status=pending) guard prevents overlapping in-flight sweeps.
+model Sweep {
+  id          String   @id // "swp_..."
+  userId      String
+  network     String // "tron" | "ethereum" | "bsc"
+  fromAddress String
+  toAddress   String
+  asset       String   @default("USDT")
+  amount      Float // whole units swept (best-effort; on-chain is source of truth)
+  txRef       String? // on-chain tx hash once broadcast
+  signatureId String? // Tatum KMS signature id used to sign
+  status      String   @default("pending") // pending | broadcast | confirmed | failed
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([network, fromAddress])
+  @@index([status])
+}

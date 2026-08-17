@@ -9,6 +9,7 @@ import { CreateDepositDto, DepositDto, DepositMethodDto, DepositAddressDto } fro
 import { CryptoDepositService } from './crypto/crypto-deposit.service';
 import { CryptoAddressService } from './crypto/crypto-address.service';
 import { ChainDeposit, DepositNetwork } from './crypto/address-provider';
+import { SweepService } from './crypto/sweep.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 // Hard production safety gate: auto-crediting a deposit without real on-chain
@@ -38,6 +39,7 @@ export class DepositsService {
     private readonly crypto: CryptoDepositService,
     private readonly addresses: CryptoAddressService,
     private readonly notifications: NotificationsService,
+    private readonly sweep: SweepService,
   ) {
     this.logger.log(
       DEPOSIT_AUTO_CONFIRM
@@ -277,6 +279,10 @@ export class DepositsService {
       throw e;
     }
     await this.confirm(depositId, d.txRef);
+    // Auto-sweep the just-credited funds to the master wallet (no-op unless
+    // SWEEP_ENABLED + Gas Pump + KMS are configured). Fire-and-forget: a sweep
+    // failure must never fail the deposit credit.
+    this.sweep.triggerAfterDeposit(addr.userId, d.network, d.address);
     return { credited: true };
   }
 

@@ -24,7 +24,19 @@ export class HealthController {
       // addressProvider !== "none" means GET /deposits/addresses will issue
       // addresses to KYC-verified users (else it returns deposits_unavailable).
       deposits: this.depositStatus(),
+      // Auto-sweep (consolidation) readout. "active" only when fully wired:
+      // enabled flag + Gas Pump address mode + a KMS signatureId (non-custodial).
+      sweep: this.sweepStatus(),
     };
+  }
+
+  private sweepStatus() {
+    const enabled = process.env.SWEEP_ENABLED === 'true';
+    const addressMode = (process.env.CRYPTO_ADDRESS_MODE ?? 'hd').toLowerCase();
+    const kms = !!(process.env.TATUM_KMS_SIGNATURE_ID ?? '').trim();
+    const master = !!(process.env.TATUM_GP_MASTER ?? process.env.TATUM_GP_MASTER_TRON ?? '').trim();
+    const active = enabled && addressMode === 'gaspump' && kms && master;
+    return { active, enabled, addressMode, kmsSignatureId: kms, gpMaster: master };
   }
 
   private depositStatus() {
