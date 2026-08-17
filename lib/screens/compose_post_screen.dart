@@ -436,15 +436,43 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
 
   Widget _imageAttachment() {
     if (_imageUrl != null) {
-      return Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.sm), border: Border.all(color: AppColors.border)),
-        child: Row(children: [
-          Icon(Icons.image_rounded, color: AppColors.green),
-          const SizedBox(width: 10),
-          Expanded(child: Text('Setup image attached', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-          TextButton(onPressed: () => setState(() => _imageUrl = null), child: Text('Remove', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.red))),
-        ]),
+      // Live preview of the attached image with a remove button, so the user
+      // sees exactly what will be posted.
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Stack(
+          children: [
+            Image.network(
+              _imageUrl!,
+              width: double.infinity,
+              height: 190,
+              fit: BoxFit.cover,
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : Container(height: 190, color: AppColors.surface, alignment: Alignment.center, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+              errorBuilder: (_, __, ___) => Container(
+                height: 120, color: AppColors.surface, alignment: Alignment.center,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.image_rounded, color: AppColors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Image attached', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                ]),
+              ),
+            ),
+            Positioned(
+              top: 8, right: 8,
+              child: Material(
+                color: Colors.black.withOpacity(0.5),
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => setState(() => _imageUrl = null),
+                  child: const Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close_rounded, size: 18, color: Colors.white)),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
     return OutlinedButton.icon(

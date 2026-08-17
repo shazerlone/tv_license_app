@@ -9,6 +9,7 @@ import '../services/api_client.dart';
 import '../screens/copy_trading_screen.dart';
 import 'verified_badge.dart';
 import 'comments_sheet.dart';
+import 'full_screen_image.dart';
 
 /// A premium X / Threads-style feed post, fully wired to [AppState]:
 /// subscribe→bell, like, repost, comment (opens thread), share, bookmark.
@@ -113,13 +114,19 @@ class FeedPost extends StatelessWidget {
                   ],
                   if (post.chartImageUrl != null && post.chartImageUrl!.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      child: Image.network(
-                        post.chartImageUrl!,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    GestureDetector(
+                      onTap: () => FullScreenImage.open(context, post.chartImageUrl!),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        child: Image.network(
+                          post.chartImageUrl!,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (_, child, progress) => progress == null
+                              ? child
+                              : Container(height: 180, alignment: Alignment.center, color: AppColors.surface, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   ],

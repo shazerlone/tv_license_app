@@ -26,17 +26,19 @@ class PairDetailScreen extends StatefulWidget {
 class _PairDetailScreenState extends State<PairDetailScreen> {
   Quote? _quote;
   Timer? _priceTimer;
-  int _tf = 0; // index into _timeframes
+  int _tf = 5; // index into _timeframes (default 1D)
   bool _candle = true; // candlestick by default (line = false)
   final IndicatorConfig _ind = IndicatorConfig(); // active indicators + inputs
   bool _chartLock = false; // freeze page scroll while touching the chart
-  // (range, interval, label) for our own chart.
+  // (range, interval, label) for our own chart — proper trading timeframes.
   static const _timeframes = [
-    ('1d', '5m', '1D'),
-    ('5d', '30m', '1W'),
-    ('1mo', '1d', '1M'),
-    ('3mo', '1d', '3M'),
-    ('1y', '1wk', '1Y'),
+    ('1d', '1m', '1m'),
+    ('5d', '5m', '5m'),
+    ('5d', '15m', '15m'),
+    ('1mo', '30m', '30m'),
+    ('1mo', '60m', '1H'),
+    ('6mo', '1d', '1D'),
+    ('2y', '1wk', '1W'),
   ];
   List<Trader> _traders = const [];
   bool _tradersFiltered = false; // true when the list is specific to this pair
@@ -91,11 +93,13 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   String _fmt(double? v) => v == null ? '—' : (v >= 100 ? v.toStringAsFixed(2) : v.toStringAsFixed(4));
 
   String _tfLabel(String short) => switch (short) {
+        '1m' => '1 Minute',
+        '5m' => '5 Minutes',
+        '15m' => '15 Minutes',
+        '30m' => '30 Minutes',
+        '1H' => '1 Hour',
         '1D' => '1 Day',
         '1W' => '1 Week',
-        '1M' => '1 Month',
-        '3M' => '3 Months',
-        '1Y' => '1 Year',
         _ => short,
       };
 

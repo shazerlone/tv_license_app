@@ -173,13 +173,15 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
                         ],
                       ),
                       const Spacer(),
-                      _SubscribeButton(
-                        subscribed: subscribed,
-                        notify: store.isNotifying(trader.id),
-                        onSubscribe: () => store.subscribe(trader.id),
-                        onUnsub: () => store.unsubscribe(trader.id),
-                        onToggleNotify: () => store.toggleNotify(trader.id),
-                      ),
+                      // Don't offer subscribe on your own profile.
+                      if (!widget.isOwner)
+                        _SubscribeButton(
+                          subscribed: subscribed,
+                          notify: store.isNotifying(trader.id),
+                          onSubscribe: () => store.subscribe(trader.id),
+                          onUnsub: () => store.unsubscribe(trader.id),
+                          onToggleNotify: () => store.toggleNotify(trader.id),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -205,16 +207,19 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
                   _EquityCard(trader: trader, points: _equity),
                   const SizedBox(height: 14),
                   _StatsRow(trader: trader),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: trader))),
-                      icon: Icon(Icons.copy_all_rounded, size: 18, color: AppColors.primary),
-                      label: Text('Copy this trader', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: AppColors.primary)),
+                  // "Copy this trader" only makes sense on someone else's profile.
+                  if (!widget.isOwner) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CopyTradingScreen(trader: trader))),
+                        icon: Icon(Icons.copy_all_rounded, size: 18, color: AppColors.primary),
+                        label: Text('Copy this trader', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: AppColors.primary)),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 18),
                 ],
               ),
@@ -422,7 +427,8 @@ class _PostsList extends StatelessWidget {
       padding: EdgeInsets.zero,
       itemCount: posts.length,
       itemBuilder: (_, i) {
-        final post = FeedPost(post: posts[i]);
+        // Owner view (onDelete provided) = these are the viewer's own posts.
+        final post = FeedPost(post: posts[i], isOwn: onDelete != null);
         if (onDelete == null) return post;
         // Owner view: swipe a post away to delete it, plus a visible menu.
         return Stack(
