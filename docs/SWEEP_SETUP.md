@@ -55,9 +55,24 @@ tatum-kms daemon --api-key=<YOUR_TATUM_KEY>   # keeps running, signs pending txn
 The Gas Pump **master** is the address that owns the per-user deposit addresses and
 pays gas. Put it in `TATUM_GP_MASTER` (or per-network `TATUM_GP_MASTER_TRON`, etc.).
 
-### 3. Fund gas
+### 3. Fund gas — and make TRON nearly free with Energy
 Keep a little native coin on the master for fees: **TRX** (TRON), **ETH** (Ethereum),
 **BNB** (BSC). Sweeps fail if the master can't pay gas.
+
+**TRON — the big cost saver (how the giants keep it ~$0):** a USDT-TRON transfer
+normally burns ~$3–7 of TRX. Instead, **stake ("freeze") TRX on the master to get
+Energy**, which regenerates daily and covers the transfer cost. TRON automatically
+spends Energy before burning TRX, so **once the master has enough staked Energy your
+sweeps cost effectively nothing** — you only lock capital (recoverable on unfreeze),
+you don't spend it. No code change: just stake TRX on the master address. (Or use an
+Energy **rental** service for a few cents per sweep if you'd rather not lock capital.)
+
+### 3b. Batch vs instant
+Default is **batch** (`SWEEP_MODE=batch`): a scheduler consolidates funded addresses
+every `SWEEP_BATCH_INTERVAL_MS` (default 15 min) instead of sweeping on every deposit
+— fewer, cheaper operations, the way large platforms do it. Set `SWEEP_MODE=instant`
+to sweep the moment each deposit credits. Either way the user's balance credits
+instantly on detection; the sweep is a separate back-office step.
 
 ### 4. Set the env (all required — sweep stays off until every one is present)
 ```
@@ -91,10 +106,12 @@ TATUM_USDT_CONTRACT_TRON=TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
 
 ## How it behaves in code (for reference)
 
-- **Trigger:** fires right after a chain deposit credits (`triggerAfterDeposit`),
-  fire-and-forget — a sweep failure never fails the deposit.
-- **Idempotent:** a per-address in-flight guard (`Sweep` table) + an on-chain balance
-  check mean a double trigger or retry can't double-send.
+- **Trigger:** batch mode runs a scheduler every `SWEEP_BATCH_INTERVAL_MS` that sweeps
+  every funded address still holding ≥ `SWEEP_MIN_USDT`; instant mode fires right after
+  each deposit credits. Both fire-and-forget — a sweep failure never fails the deposit.
+- **Idempotent & scale-safe:** an on-chain balance check plus a **partial unique index**
+  on `Sweep(network, fromAddress)` for in-flight rows mean a double trigger, a retry, or
+  two server instances ticking at once can never double-send.
 - **Audit:** every attempt is a `Sweep` row (`pending → broadcast → confirmed/failed`)
   with `txRef` and `error`.
 - **Gated:** `SweepService.enabled` is false unless `SWEEP_ENABLED=true` **and** the

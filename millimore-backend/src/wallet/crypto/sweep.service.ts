@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoAddressService } from './crypto-address.service';
 import { DepositNetwork } from './address-provider';
@@ -33,13 +34,47 @@ export class SweepService {
     return Number.isFinite(n) && n > 0 ? n : 1;
   }
 
-  /** Fire-and-forget auto-sweep after a deposit is credited. Never throws into the
-   *  caller (deposit crediting must not fail because a sweep failed). */
+  /** 'batch' (default) sweeps on a schedule; 'instant' sweeps immediately after
+   *  each deposit. Batching is how large platforms cut cost/tx count. */
+  get mode(): 'batch' | 'instant' {
+    return (process.env.SWEEP_MODE ?? 'batch').toLowerCase() === 'instant' ? 'instant' : 'batch';
+  }
+
+  /** Fire-and-forget auto-sweep after a deposit is credited. In batch mode this is
+   *  a no-op (the scheduler consolidates); in instant mode it sweeps now. Never
+   *  throws into the caller (deposit crediting must not fail because a sweep did). */
   triggerAfterDeposit(userId: string, network: DepositNetwork, address: string): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.mode !== 'instant') return;
     void this.sweepAddress(userId, network, address).catch((e) =>
       this.logger.warn(`auto-sweep failed for ${network} ${address}: ${String(e)}`),
     );
+  }
+
+  /**
+   * Scheduled consolidation: sweep every funded deposit address that still holds
+   * ≥ min USDT. Only addresses that have received a confirmed deposit are checked,
+   * so idle addresses cost nothing. Safe to run concurrently on many instances —
+   * the partial unique index makes a double-sweep impossible.
+   */
+  async sweepBatch(limit = 200): Promise<{ scanned: number; swept: number; results: Array<Record<string, unknown>> }> {
+    if (!this.enabled) return { scanned: 0, swept: 0, results: [] };
+    const funded = await this.prisma.deposit.findMany({
+      where: { status: 'confirmed', method: 'crypto', address: { not: null } },
+      distinct: ['address'],
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { userId: true, address: true, payCurrency: true },
+    });
+    const results: Array<Record<string, unknown>> = [];
+    let swept = 0;
+    for (const d of funded) {
+      const network = (d.payCurrency ?? '') as DepositNetwork;
+      if (!d.address || !network) continue;
+      const r = await this.sweepAddress(d.userId, network, d.address);
+      if (r.status === 'broadcast') swept++;
+      results.push(r);
+    }
+    return { scanned: funded.length, swept, results };
   }
 
   /** Sweep every configured deposit address of a user that holds ≥ min USDT. */
@@ -66,18 +101,28 @@ export class SweepService {
     const { balance } = await this.addresses.usdtBalance(address, network);
     if (balance < this.minUsdt()) return { network, address, status: 'skipped', reason: `balance ${balance} < min ${this.minUsdt()}`, balance };
 
-    const rec = await this.prisma.sweep.create({
-      data: {
-        id: genId('swp'),
-        userId,
-        network,
-        fromAddress: address,
-        toAddress: (process.env[`TATUM_GP_MASTER_${network.toUpperCase()}`] ?? process.env.TATUM_GP_MASTER ?? '').trim(),
-        asset: 'USDT',
-        amount: balance,
-        status: 'pending',
-      },
-    });
+    let rec;
+    try {
+      rec = await this.prisma.sweep.create({
+        data: {
+          id: genId('swp'),
+          userId,
+          network,
+          fromAddress: address,
+          toAddress: (process.env[`TATUM_GP_MASTER_${network.toUpperCase()}`] ?? process.env.TATUM_GP_MASTER ?? '').trim(),
+          asset: 'USDT',
+          amount: balance,
+          status: 'pending',
+        },
+      });
+    } catch (e) {
+      // Partial unique index (network, fromAddress) WHERE status in pending/broadcast:
+      // another instance already started a sweep for this address — safe to skip.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        return { network, address, status: 'skipped', reason: 'sweep in flight (race)' };
+      }
+      throw e;
+    }
 
     const res = await this.addresses.sweep(address, network, index);
     await this.prisma.sweep.update({

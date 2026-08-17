@@ -36,7 +36,8 @@ export class HealthController {
     const kms = !!(process.env.TATUM_KMS_SIGNATURE_ID ?? '').trim();
     const master = !!(process.env.TATUM_GP_MASTER ?? process.env.TATUM_GP_MASTER_TRON ?? '').trim();
     const active = enabled && addressMode === 'gaspump' && kms && master;
-    return { active, enabled, addressMode, kmsSignatureId: kms, gpMaster: master };
+    const mode = (process.env.SWEEP_MODE ?? 'batch').toLowerCase() === 'instant' ? 'instant' : 'batch';
+    return { active, enabled, mode, addressMode, kmsSignatureId: kms, gpMaster: master };
   }
 
   private depositStatus() {

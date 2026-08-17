@@ -7,6 +7,7 @@ import { DepositsService } from './deposits.service';
 import { CryptoDepositService } from './crypto/crypto-deposit.service';
 import { CryptoAddressService } from './crypto/crypto-address.service';
 import { SweepService } from './crypto/sweep.service';
+import { SweepScheduler } from './crypto/sweep.scheduler';
 import { PayoutMethodsService } from './payout-methods.service';
 import { TransactionsService } from './transactions.service';
 import { WalletController } from './wallet.controller';
@@ -29,6 +30,7 @@ import { PayoutMethodsController } from './payout-methods.controller';
     CryptoDepositService,
     CryptoAddressService,
     SweepService,
+    SweepScheduler,
     PayoutMethodsService,
     TransactionsService,
   ],
