@@ -76,7 +76,16 @@ class _DepositFlowScreenState extends State<DepositFlowScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Deposit', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+      appBar: AppBar(
+        title: Text('Deposit', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        actions: [
+          IconButton(
+            tooltip: 'Deposit history',
+            icon: Icon(Icons.history_rounded, color: AppColors.textPrimary),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositHistoryScreen())),
+          ),
+        ],
+      ),
       body: switch (_gate) {
         _Gate.loading => Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.6)),
         _Gate.kyc => _GateMessage(
@@ -221,22 +230,15 @@ class _AddressScreen extends StatelessWidget {
           const SizedBox(height: 18),
           // Address + copy
           Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Deposit address ($_truncated)', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
-                      const SizedBox(height: 2),
-                      Text(address.address, maxLines: 2, overflow: TextOverflow.ellipsis, style: GoogleFonts.robotoMono(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                _CopyButton(value: address.address),
+                Text('Deposit address ($_truncated)', style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+                const SizedBox(height: 3),
+                Text(address.address, style: GoogleFonts.robotoMono(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
               ],
             ),
           ),
@@ -576,6 +578,138 @@ class _WarnStrip extends StatelessWidget {
           Icon(Icons.warning_amber_rounded, size: 17, color: AppColors.red),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.red, height: 1.4, fontWeight: FontWeight.w600))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Deposit history (GET /deposits) — pending / confirmed / failed, per §4.
+class DepositHistoryScreen extends StatefulWidget {
+  const DepositHistoryScreen({super.key});
+  @override
+  State<DepositHistoryScreen> createState() => _DepositHistoryScreenState();
+}
+
+class _DepositHistoryScreenState extends State<DepositHistoryScreen> {
+  List<Map<String, dynamic>> _items = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await BackendApi.deposits();
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _money(num? v) => v == null ? '' : '\$${v.toStringAsFixed(2)}';
+
+  String _network(String? payCurrency, String? asset) {
+    final p = (payCurrency ?? '').toLowerCase();
+    if (p.contains('trc') || p.contains('tron')) return 'USDT · TRON';
+    if (p.contains('erc') || p.contains('eth')) return 'USDT · Ethereum';
+    if (p.contains('bep') || p.contains('bsc')) return 'USDT · BSC';
+    return asset != null ? 'USDT · $asset' : 'USDT';
+  }
+
+  String _date(String iso) {
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '';
+    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    return '${m[dt.month - 1]} ${dt.day}, ${h}:${dt.minute.toString().padLeft(2, '0')} ${dt.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: Text('Deposit history', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+      body: _loading
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.6))
+          : _items.isEmpty
+              ? Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.inbox_outlined, size: 40, color: AppColors.textMuted.withOpacity(0.5)),
+                    const SizedBox(height: 12),
+                    Text('No deposits yet', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  ]),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                    itemCount: _items.length,
+                    itemBuilder: (_, i) => _row(_items[i]),
+                  ),
+                ),
+    );
+  }
+
+  Widget _row(Map<String, dynamic> d) {
+    final status = (d['status'] ?? 'pending').toString();
+    final amount = d['amount'] as num?;
+    final reason = (d['reason'] ?? '').toString();
+    final confirmed = status == 'confirmed';
+    final failed = status == 'failed';
+    final color = confirmed ? AppColors.green : (failed ? AppColors.red : AppColors.primary);
+
+    Widget leading;
+    if (status == 'pending') {
+      leading = SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary));
+    } else {
+      leading = Icon(confirmed ? Icons.check_circle_rounded : Icons.error_outline_rounded, size: 20, color: color);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: failed ? AppColors.surface : AppColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 22, child: Center(child: leading)),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_network(d['payCurrency']?.toString(), d['asset']?.toString()),
+                    style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(_date((confirmed ? d['confirmedAt'] : d['createdAt'])?.toString() ?? d['createdAt']?.toString() ?? ''),
+                    style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+                if (failed && reason.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(reason, style: GoogleFonts.inter(fontSize: 11, color: AppColors.red)),
+                ],
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(_money(amount), style: GoogleFonts.robotoMono(fontSize: 13.5, fontWeight: FontWeight.w700, color: failed ? AppColors.textMuted : AppColors.textPrimary)),
+              const SizedBox(height: 2),
+              Text(status[0].toUpperCase() + status.substring(1), style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+            ],
+          ),
         ],
       ),
     );

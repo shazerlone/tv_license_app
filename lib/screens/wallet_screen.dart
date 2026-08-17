@@ -224,6 +224,8 @@ class _WalletScreenState extends State<WalletScreen> {
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
       child: Column(
         children: [
+          _linkRow(Icons.history_rounded, 'Deposit history', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositHistoryScreen()))),
+          Divider(height: 1, color: AppColors.border),
           _linkRow(Icons.account_balance_wallet_outlined, 'Payout methods', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayoutMethodsScreen()))),
           Divider(height: 1, color: AppColors.border),
           _linkRow(Icons.verified_user_outlined, 'Identity verification', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycScreen())), last: true),
