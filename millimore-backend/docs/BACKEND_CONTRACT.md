@@ -704,6 +704,15 @@ address, KYC (Sumsub-ready), and an admin audit trail.
   `User.kycStatus` ∈ `none|pending|verified|rejected` (on `GET /me`).
 - **Audit log** — every admin decision writes an `AdminAuditLog` row;
   `GET /admin/audit?targetType=&cursor=`.
+- **Social notifications** — a creator is notified on the WS `user` channel (+ push)
+  when someone subscribes, likes, or comments: `type:"social.subscribe"` `{ actorName,
+  traderId }`, `type:"social.like"` / `type:"social.comment"` `{ actorName, postId }`.
+  Best-effort and self-skipping (no notification for acting on your own content);
+  a like only notifies on a first like, not repeat taps.
+- **Feed** — `GET /feed` now also includes the caller's OWN posts when they are a
+  creator (own + subscribed traders, newest first), so the app renders one list.
+- **Uploads** — `POST /uploads` accepts base64 up to 8MB; the server JSON body limit
+  is 12MB (`BODY_LIMIT` env override) so real photos aren't rejected with 413.
 - **New env** — `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_LEVEL_NAME`,
   `MAX_LEVERAGE`, `DEFAULT_LEVERAGE` (all optional; settings row overrides).
 

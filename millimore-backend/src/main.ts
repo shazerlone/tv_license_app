@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -11,8 +12,16 @@ import { RealtimeGateway } from './realtime/realtime.gateway';
 async function bootstrap() {
   // rawBody:true captures the unparsed body so the KYC (Sumsub) webhook can
   // verify the payload signature; JSON parsing still works as normal.
-  const app = await NestFactory.create(AppModule, { bufferLogs: false, rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false, rawBody: true });
   const config = app.get(ConfigService);
+
+  // Base64 image uploads (POST /uploads) can be several MB — the default ~100KB
+  // body limit would 413 real photos before the handler's own 8MB check runs.
+  // Raise JSON + urlencoded limits to comfortably cover an 8MB file base64-encoded
+  // (~10.7MB) plus overhead. Env override via BODY_LIMIT (e.g. "16mb").
+  const bodyLimit = config.get<string>('BODY_LIMIT', '12mb');
+  app.useBodyParser('json', { limit: bodyLimit });
+  app.useBodyParser('urlencoded', { limit: bodyLimit, extended: true });
 
   // Behind an ALB/CloudFront, trust the proxy so req.ip is the real client (used
   // by the rate limiter) and secure-cookie/redirect logic is correct.

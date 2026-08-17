@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { Prisma, PostType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradersService } from '../traders/traders.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { genId } from '../common/ids';
 import { PostDto, CommentDto, CreatePostDto, LikesDto } from './dto/post.dto';
 import { ReelDto } from '../traders/dto/trader.dto';
@@ -23,7 +24,24 @@ export class PostsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly traders: TradersService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /** Notify a post's owning creator of social activity (like/comment). Best-effort
+   *  and self-skipping — never blocks or fails the underlying action. */
+  private async notifyPostOwner(postId: string, actorId: string, type: 'social.like' | 'social.comment') {
+    try {
+      const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { trader: { select: { userId: true } } } });
+      const ownerId = post?.trader.userId;
+      if (!ownerId || ownerId === actorId) return; // no owner, or acting on own post
+      const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { name: true } });
+      const actorName = actor?.name ?? 'Someone';
+      const title = type === 'social.like' ? `${actorName} liked your post` : `${actorName} commented on your post`;
+      await this.notifications.pushEvent(ownerId, type, title, { data: { actorName, postId } });
+    } catch {
+      /* notifications are best-effort */
+    }
+  }
 
   toDto(p: PostWithMeta): PostDto {
     return {
@@ -66,11 +84,13 @@ export class PostsService {
   }
 
   async feed(userId: string): Promise<PostDto[]> {
-    const subs = await this.prisma.subscription.findMany({
-      where: { userId },
-      select: { traderId: true },
-    });
-    const traderIds = subs.map((s) => s.traderId);
+    const [subs, ownTrader] = await Promise.all([
+      this.prisma.subscription.findMany({ where: { userId }, select: { traderId: true } }),
+      // A creator sees their OWN posts in the feed too, so the app doesn't have to
+      // merge own + subscription feeds client-side.
+      this.prisma.trader.findUnique({ where: { userId }, select: { id: true } }),
+    ]);
+    const traderIds = [...new Set([...subs.map((s) => s.traderId), ...(ownTrader ? [ownTrader.id] : [])])];
     if (traderIds.length === 0) return [];
     const posts = await this.prisma.post.findMany({
       where: { traderId: { in: traderIds } },
@@ -92,11 +112,14 @@ export class PostsService {
 
   async like(userId: string, postId: string): Promise<LikesDto> {
     await this.getPostOrThrow(postId);
+    // Only notify on a NEW like (not a repeated tap on an already-liked post).
+    const existing = await this.prisma.postLike.findUnique({ where: { userId_postId: { userId, postId } }, select: { userId: true } });
     await this.prisma.postLike.upsert({
       where: { userId_postId: { userId, postId } },
       update: {},
       create: { userId, postId },
     });
+    if (!existing) await this.notifyPostOwner(postId, userId, 'social.like');
     return { likes: await this.prisma.postLike.count({ where: { postId } }) };
   }
 
@@ -142,6 +165,7 @@ export class PostsService {
       data: { id: genId('c'), postId, userId, text },
       include: { user: { select: { id: true, name: true, username: true } } },
     });
+    await this.notifyPostOwner(postId, userId, 'social.comment');
     return {
       id: c.id,
       author: c.user.name,

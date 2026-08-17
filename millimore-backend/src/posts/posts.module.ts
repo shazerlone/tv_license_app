@@ -4,9 +4,10 @@ import { PostsController } from './posts.controller';
 import { FeedController } from './feed.controller';
 import { DiscoverController } from './discover.controller';
 import { TradersModule } from '../traders/traders.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TradersModule],
+  imports: [TradersModule, NotificationsModule],
   providers: [PostsService],
   controllers: [PostsController, FeedController, DiscoverController],
   exports: [PostsService],
