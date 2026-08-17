@@ -5,10 +5,13 @@ import 'package:image_picker/image_picker.dart';
 
 Future<String?> pickImageAsDataUrl() async {
   final picker = ImagePicker();
+  // Downscale + compress on-device: keeps chart detail readable while cutting
+  // the base64 payload so uploads succeed and are fast.
   final file = await picker.pickImage(
     source: ImageSource.gallery,
-    maxWidth: 1600,
-    imageQuality: 82,
+    maxWidth: 1280,
+    maxHeight: 1280,
+    imageQuality: 70,
   );
   if (file == null) return null;
   final bytes = await file.readAsBytes();

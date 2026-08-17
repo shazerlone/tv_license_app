@@ -159,11 +159,7 @@ class _NetworkCard extends StatelessWidget {
         decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border), boxShadow: AppColors.softShadow),
         child: Row(
           children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(11)),
-              child: Icon(Icons.hub_outlined, size: 20, color: AppColors.primary),
-            ),
+            UsdtBadge(network: address.network, size: 40),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -211,7 +207,11 @@ class _AddressScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
           Center(
-            child: Text('USDT · ${address.networkLabel}', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            child: Column(children: [
+              UsdtBadge(network: address.network, size: 48),
+              const SizedBox(height: 8),
+              Text('USDT · ${address.networkLabel}', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            ]),
           ),
           const SizedBox(height: 14),
           Center(
@@ -709,6 +709,66 @@ class _DepositHistoryScreenState extends State<DepositHistoryScreen> {
               const SizedBox(height: 2),
               Text(status[0].toUpperCase() + status.substring(1), style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The USDT (Tether) token mark with a small network sub-badge — the way
+/// Binance/Bybit show a coin on a specific chain.
+class UsdtBadge extends StatelessWidget {
+  final String network;
+  final double size;
+  const UsdtBadge({super.key, required this.network, this.size = 40});
+
+  static const _tether = Color(0xFF26A17B); // Tether green
+  Color get _networkColor => switch (network) {
+        'tron' => const Color(0xFFEB0029),
+        'ethereum' => const Color(0xFF627EEA),
+        'bsc' => const Color(0xFFF3BA2F),
+        _ => AppColors.slate,
+      };
+  String get _networkGlyph => switch (network) {
+        'tron' => 'T',
+        'ethereum' => 'E',
+        'bsc' => 'B',
+        _ => '•',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = size * 0.42;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // USDT coin
+          Container(
+            width: size,
+            height: size,
+            decoration: const BoxDecoration(color: _tether, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text('₮', style: GoogleFonts.inter(fontSize: size * 0.56, fontWeight: FontWeight.w800, color: Colors.white, height: 1)),
+          ),
+          // Network sub-badge
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: sub,
+              height: sub,
+              decoration: BoxDecoration(
+                color: _networkColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.background, width: 1.6),
+              ),
+              alignment: Alignment.center,
+              child: Text(_networkGlyph, style: GoogleFonts.inter(fontSize: sub * 0.52, fontWeight: FontWeight.w800, color: Colors.white, height: 1)),
+            ),
           ),
         ],
       ),

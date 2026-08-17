@@ -29,6 +29,7 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
   int _tf = 0; // index into _timeframes
   bool _candle = true; // candlestick by default (line = false)
   final IndicatorConfig _ind = IndicatorConfig(); // active indicators + inputs
+  bool _chartLock = false; // freeze page scroll while touching the chart
   // (range, interval, label) for our own chart.
   static const _timeframes = [
     ('1d', '5m', '1D'),
@@ -135,6 +136,9 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
         ],
       ),
       body: ListView(
+        // While the finger is on the chart, freeze page scroll so pinch/pan only
+        // move the chart — the page no longer jumps around.
+        physics: _chartLock ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
         children: [
           // Chart toolbar: timeframe dropdown + tools + line/candle toggle
           Padding(
@@ -185,13 +189,18 @@ class _PairDetailScreenState extends State<PairDetailScreen> {
           // Our own clean chart (no third-party chrome) — pinch to zoom, drag to pan.
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 2, 12, 2),
-            child: MarketChart(
-              pair: widget.pair,
-              range: _timeframes[_tf].$1,
-              interval: _timeframes[_tf].$2,
-              candle: _candle,
-              indicators: _ind,
-              height: 340 + _ind.subPaneCount * 88.0,
+            child: Listener(
+              onPointerDown: (_) { if (!_chartLock) setState(() => _chartLock = true); },
+              onPointerUp: (_) { if (_chartLock) setState(() => _chartLock = false); },
+              onPointerCancel: (_) { if (_chartLock) setState(() => _chartLock = false); },
+              child: MarketChart(
+                pair: widget.pair,
+                range: _timeframes[_tf].$1,
+                interval: _timeframes[_tf].$2,
+                candle: _candle,
+                indicators: _ind,
+                height: 340 + _ind.subPaneCount * 88.0,
+              ),
             ),
           ),
           Padding(

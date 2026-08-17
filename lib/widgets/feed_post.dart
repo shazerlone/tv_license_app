@@ -16,12 +16,14 @@ class FeedPost extends StatelessWidget {
   final Post post;
   final VoidCallback? onOpenProfile;
   final bool showDivider;
+  final bool isOwn; // the signed-in creator's own post — no subscribe/copy
 
   const FeedPost({
     super.key,
     required this.post,
     this.onOpenProfile,
     this.showDivider = true,
+    this.isOwn = false,
   });
 
   @override
@@ -60,17 +62,24 @@ class FeedPost extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _SubscribeControl(
-                        subscribed: subscribed,
-                        notify: store.isNotifying(traderId),
-                        onSubscribe: () {
-                          store.subscribe(traderId);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Subscribed to ${post.trader.name}')),
-                          );
-                        },
-                        onToggleNotify: () => store.toggleNotify(traderId),
-                      ),
+                      if (isOwn)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                          child: Text('You', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                        )
+                      else
+                        _SubscribeControl(
+                          subscribed: subscribed,
+                          notify: store.isNotifying(traderId),
+                          onSubscribe: () {
+                            store.subscribe(traderId);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Subscribed to ${post.trader.name}')),
+                            );
+                          },
+                          onToggleNotify: () => store.toggleNotify(traderId),
+                        ),
                       const SizedBox(width: 2),
                       GestureDetector(
                         onTap: () => _moreSheet(context),
@@ -88,7 +97,7 @@ class FeedPost extends StatelessWidget {
                     const SizedBox(height: 12),
                     _TradeDetails(post: post),
                   ],
-                  if (post.type == PostType.trade) ...[
+                  if (post.type == PostType.trade && !isOwn) ...[
                     const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
 import '../widgets/market_ticker.dart';
@@ -7,6 +8,7 @@ import 'markets_screen.dart';
 import '../config.dart';
 import '../models/trader.dart';
 import '../models/post.dart';
+import '../models/api_models.dart';
 import '../models/trade.dart';
 import '../models/app_notification.dart';
 import '../services/backend_api.dart';
@@ -495,7 +497,8 @@ class CreatorHome extends StatefulWidget {
 }
 
 class _CreatorHomeState extends State<CreatorHome> {
-  List<Post> _posts = const [];
+  List<Post> _posts = const []; // own posts + subscribed traders' posts, merged
+  String? _traderId; // the creator's OWN trader id (≠ user id)
   bool _loading = false;
   bool _loaded = false;
 
@@ -504,21 +507,40 @@ class _CreatorHomeState extends State<CreatorHome> {
     super.didChangeDependencies();
     if (_loaded) return;
     _loaded = true;
-    final id = SessionScope.of(context).user?.id;
-    if (kUseBackend && id != null) {
+    if (kUseBackend) {
       _loading = true;
-      _loadPosts(id);
-    } else if (!kUseBackend) {
+      _loadAll();
+    } else {
       _posts = mockPosts(mockTraders).take(2).toList();
     }
   }
 
-  Future<void> _loadPosts(String id) async {
+  /// Loads the creator's own posts (by their real trader id, cached at first
+  /// post) plus their subscription feed, and merges them newest-first. The
+  /// dashboard used to query with the USER id — which is not the trader id — so
+  /// own posts never appeared ("No posts yet").
+  Future<void> _loadAll() async {
     try {
-      final list = await BackendApi.traderPosts(id);
+      final prefs = await SharedPreferences.getInstance();
+      final traderId = prefs.getString('creator_trader_id');
+      // Concurrent, but typed (Future.wait would erase List<ApiPost>).
+      final ownF = traderId != null ? BackendApi.traderPosts(traderId) : Future.value(<ApiPost>[]);
+      final feedF = BackendApi.feed().catchError((_) => <ApiPost>[]);
+      final own = (await ownF).map(Post.fromApi).toList();
+      final feed = (await feedF).map(Post.fromApi).toList();
       if (!mounted) return;
+      // Merge, de-dupe by id (own wins), newest first.
+      final byId = <String, Post>{};
+      for (final p in feed) {
+        byId[p.id] = p;
+      }
+      for (final p in own) {
+        byId[p.id] = p;
+      }
+      final merged = byId.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       setState(() {
-        _posts = list.map(Post.fromApi).toList();
+        _traderId = traderId;
+        _posts = merged;
         _loading = false;
       });
     } catch (_) {
@@ -529,8 +551,7 @@ class _CreatorHomeState extends State<CreatorHome> {
 
   void _compose() async {
     final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const ComposePostScreen()));
-    final id = SessionScope.of(context).user?.id;
-    if (ok == true && id != null) _loadPosts(id);
+    if (ok == true) _loadAll();
   }
 
   @override
@@ -588,7 +609,7 @@ class _CreatorHomeState extends State<CreatorHome> {
             ),
           ),
         ),
-        SliverToBoxAdapter(child: _SectionHeader(title: 'Your recent posts')),
+        SliverToBoxAdapter(child: _SectionHeader(title: 'Your feed')),
         if (_loading)
           const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: AppLoader()))
         else if (posts.isEmpty)
@@ -601,7 +622,7 @@ class _CreatorHomeState extends State<CreatorHome> {
                   const SizedBox(height: 12),
                   Text('No posts yet', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                   const SizedBox(height: 4),
-                  Text('Share a trade idea or lesson to grow your following.',
+                  Text('Post a trade idea, or subscribe to traders to see their posts here.',
                       textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                 ],
               ),
@@ -612,6 +633,7 @@ class _CreatorHomeState extends State<CreatorHome> {
             delegate: SliverChildBuilderDelegate(
               (_, i) => FeedPost(
                 post: posts[i],
+                isOwn: _traderId != null && posts[i].trader.id == _traderId,
                 onOpenProfile: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => TraderProfileScreen(trader: posts[i].trader))),
               ),

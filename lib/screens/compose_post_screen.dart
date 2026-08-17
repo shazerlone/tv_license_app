@@ -110,10 +110,17 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         _imageUrl = url;
         _uploadingImage = false;
       });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingImage = false);
+      final msg = e.code == 'too_large'
+          ? 'That image is too large — pick a smaller one (max 8MB).'
+          : (e.status == 413 ? 'Image is too large to upload — try a smaller screenshot.' : 'Could not upload the image: ${e.message}');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (_) {
       if (!mounted) return;
       setState(() => _uploadingImage = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not upload the image')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not upload the image — check your connection.')));
     }
   }
 

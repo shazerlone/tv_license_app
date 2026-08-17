@@ -79,14 +79,17 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
   Future<void> _load() async {
     try {
       final id = widget.trader.id;
-      final posts = await BackendApi.traderPosts(id);
-      final active = await BackendApi.traderTrades(id, status: 'active');
-      final closed = await BackendApi.traderTrades(id, status: 'closed');
-      List<double> equity = const [];
-      try {
-        final pts = await BackendApi.traderEquity(id);
-        equity = pts.map((e) => e.value).toList();
-      } catch (_) {}
+      // Kick off all requests concurrently, then await — parallel, but keeps
+      // each future's real type (Future.wait would erase them). Sequential
+      // awaits used to make this page slow.
+      final postsF = BackendApi.traderPosts(id);
+      final activeF = BackendApi.traderTrades(id, status: 'active');
+      final closedF = BackendApi.traderTrades(id, status: 'closed');
+      final equityF = BackendApi.traderEquity(id).then((pts) => pts.map((e) => e.value).toList()).catchError((_) => <double>[]);
+      final posts = await postsF;
+      final active = await activeF;
+      final closed = await closedF;
+      final equity = await equityF;
       if (!mounted) return;
       setState(() {
         _posts = posts.map(Post.fromApi).toList();
