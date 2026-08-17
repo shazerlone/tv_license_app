@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
 import '../theme/app_theme.dart';
 import '../state/app_state.dart';
 import '../services/backend_api.dart';
@@ -243,10 +245,12 @@ class _AddressScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          _CopyButton(value: address.address, wide: true),
+          const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _CopyButton(value: address.address, wide: true)),
-            const SizedBox(width: 10),
             Expanded(child: _SaveQrButton(address: address)),
+            const SizedBox(width: 10),
+            Expanded(child: _ShareQrButton(address: address)),
           ]),
           const SizedBox(height: 12),
           _WarnStrip(text: 'Send only USDT on ${address.networkLabel}. Other assets or networks will be lost.'),
@@ -304,34 +308,46 @@ class _CopyButtonState extends State<_CopyButton> {
   }
 }
 
-/// Renders the QR to a PNG and opens the share sheet (Save Image / send).
+/// Renders the deposit QR to a PNG byte buffer (shared by save + share).
+Future<Uint8List?> _renderQrPng(String data) async {
+  final painter = QrPainter(
+    data: data,
+    version: QrVersions.auto,
+    gapless: true,
+    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF0F172A)),
+    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF0F172A)),
+  );
+  final image = await painter.toImageData(760, format: ui.ImageByteFormat.png);
+  return image?.buffer.asUint8List();
+}
+
+/// Saves the QR straight to the device photo gallery (works on iOS + Android).
 class _SaveQrButton extends StatelessWidget {
   final _DepositAddress address;
   const _SaveQrButton({required this.address});
 
   Future<void> _save(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final painter = QrPainter(
-        data: address.address,
-        version: QrVersions.auto,
-        gapless: true,
-        eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF0F172A)),
-        dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF0F172A)),
-      );
-      final image = await painter.toImageData(720, format: ui.ImageByteFormat.png);
-      if (image == null) throw 'render failed';
+      final bytes = await _renderQrPng(address.address);
+      if (bytes == null) throw 'render failed';
+      // Write to a temp file first, then hand it to the gallery — most reliable
+      // path across iOS and Android versions.
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/millimore_usdt_${address.network}.png');
-      await file.writeAsBytes(image.buffer.asUint8List());
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'My Millimore USDT deposit address (${address.networkLabel}):\n${address.address}',
-      );
+      await file.writeAsBytes(bytes);
+      await Gal.putImage(file.path, album: 'Millimore');
+      messenger.showSnackBar(const SnackBar(content: Text('QR saved to your Photos')));
+    } on GalException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(
+        e.type == GalExceptionType.accessDenied
+            ? 'Allow photo access in Settings to save the QR.'
+            : 'Could not save the QR — the address is copied instead.',
+      )));
+      await Clipboard.setData(ClipboardData(text: address.address));
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save the QR — the address is copied instead.')));
-        await Clipboard.setData(ClipboardData(text: address.address));
-      }
+      messenger.showSnackBar(const SnackBar(content: Text('Could not save the QR — the address is copied instead.')));
+      await Clipboard.setData(ClipboardData(text: address.address));
     }
   }
 
@@ -340,8 +356,42 @@ class _SaveQrButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: () => _save(context),
       style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-      icon: Icon(Icons.qr_code_rounded, size: 16, color: AppColors.primary),
+      icon: Icon(Icons.download_rounded, size: 16, color: AppColors.primary),
       label: Text('Save QR', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+    );
+  }
+}
+
+/// Opens the OS share sheet with the QR image + address text.
+class _ShareQrButton extends StatelessWidget {
+  final _DepositAddress address;
+  const _ShareQrButton({required this.address});
+
+  Future<void> _share(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final bytes = await _renderQrPng(address.address);
+      if (bytes == null) throw 'render failed';
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/millimore_usdt_${address.network}_share.png');
+      await file.writeAsBytes(bytes);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'My Millimore USDT deposit address (${address.networkLabel}):\n${address.address}',
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not open share — the address is copied instead.')));
+      await Clipboard.setData(ClipboardData(text: address.address));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () => _share(context),
+      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+      icon: Icon(Icons.ios_share_rounded, size: 16, color: AppColors.primary),
+      label: Text('Share', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
     );
   }
 }
