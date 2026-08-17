@@ -74,6 +74,13 @@ every `SWEEP_BATCH_INTERVAL_MS` (default 15 min) instead of sweeping on every de
 to sweep the moment each deposit credits. Either way the user's balance credits
 instantly on detection; the sweep is a separate back-office step.
 
+**Per-network floors (don't let gas eat the funds):** a sweep only fires when the
+balance clears a per-network minimum, so a tiny balance is never swept for more than
+it's worth. Defaults: **TRON 1** (near-free with Energy), **Ethereum 50** (gas is
+pricey — only consolidate when economical, exactly how Binance treats ETH), **BSC 5**.
+Override with `SWEEP_MIN_USDT_{TRON,ETHEREUM,BSC}` or a global `SWEEP_MIN_USDT`.
+Sub-floor balances simply wait and get swept once more deposits accumulate.
+
 ### 4. Set the env (all required — sweep stays off until every one is present)
 ```
 SWEEP_ENABLED=true

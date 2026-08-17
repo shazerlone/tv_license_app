@@ -29,9 +29,17 @@ export class SweepService {
     return process.env.SWEEP_ENABLED === 'true' && this.addresses.canSweep;
   }
 
-  private minUsdt(): number {
-    const n = Number(process.env.SWEEP_MIN_USDT ?? 1);
-    return Number.isFinite(n) && n > 0 ? n : 1;
+  // Per-network sweep floors. A sweep only happens when the balance clears the
+  // floor, so gas never eats the funds. TRON is ~free (Energy) so it can sweep
+  // small amounts; ETH gas is expensive so its floor is high — only consolidate
+  // when it's economical, exactly how large platforms treat Ethereum. Override
+  // any network with SWEEP_MIN_USDT_{TRON,ETHEREUM,BSC}, or all with SWEEP_MIN_USDT.
+  private static readonly DEFAULT_MIN: Record<DepositNetwork, number> = { tron: 1, ethereum: 50, bsc: 5 };
+
+  private minUsdt(network: DepositNetwork): number {
+    const raw = process.env[`SWEEP_MIN_USDT_${network.toUpperCase()}`] ?? process.env.SWEEP_MIN_USDT;
+    const n = raw != null ? Number(raw) : SweepService.DEFAULT_MIN[network];
+    return Number.isFinite(n) && n > 0 ? n : SweepService.DEFAULT_MIN[network];
   }
 
   /** 'batch' (default) sweeps on a schedule; 'instant' sweeps immediately after
@@ -99,7 +107,8 @@ export class SweepService {
     if (inFlight) return { network, address, status: 'skipped', reason: 'sweep in flight', sweepId: inFlight.id };
 
     const { balance } = await this.addresses.usdtBalance(address, network);
-    if (balance < this.minUsdt()) return { network, address, status: 'skipped', reason: `balance ${balance} < min ${this.minUsdt()}`, balance };
+    const floor = this.minUsdt(network);
+    if (balance < floor) return { network, address, status: 'skipped', reason: `balance ${balance} < min ${floor} (${network})`, balance };
 
     let rec;
     try {
