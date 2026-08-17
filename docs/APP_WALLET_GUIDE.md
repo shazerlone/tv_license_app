@@ -12,6 +12,32 @@ soft shadows, generous spacing, tasteful motion. No cramped rows, no neon.
 
 ---
 
+## 0. Readiness gate — check this FIRST (new)
+
+The deposit backend goes live per-environment. Before showing **Deposit** as
+enabled, read the public, unauthenticated probe:
+
+`GET /v1/health` →
+```json
+{
+  "safety": { "depositAutoConfirm": false, "seedDemo": false, "cryptoProvider": "tatum" },
+  "deposits": { "addressProvider": "tatum", "networks": ["tron","ethereum","bsc"], "gate": "ready" }
+}
+```
+- **`deposits.gate === "ready"`** → the funnel is live; show **Deposit** enabled and
+  use `deposits.networks` as the network list.
+- **`deposits.gate === "coming_soon"`** → no processor connected yet; show Deposit as
+  "Coming soon" (disabled) instead of letting the user reach a dead end.
+
+Treat this as a feature flag the app checks on launch (cache it briefly). It saves
+the user from opening the funnel only to hit `deposits_unavailable`.
+
+> **Verified live:** address issuance, on-chain deposit detection, and automatic
+> crediting are working end-to-end (proven on testnet — a real USDT deposit
+> credited the wallet, spam tokens ignored). Withdrawals + AML rule are live.
+
+---
+
 ## 1. The money model (explain to the user in-app)
 - The wallet holds a **USD balance**. Users **deposit crypto (USDT)** → it credits
   the USD balance → they copy-trade with it → they **withdraw** back out.
@@ -79,9 +105,12 @@ After the user says "I've sent it" (or immediately), show a **live pending state
 - Let the user leave — the push notification (`wallet.deposit`) will tell them when
   it lands, so they don't have to sit on the screen.
 
-> Deposits auto-forward to Millimore's master wallet and the user's balance is
-> credited automatically once the payment confirms on-chain — the app never needs
-> a tx hash from the user. Just show address → wait → confirmed.
+> The user's balance is credited **automatically** once the deposit confirms
+> on-chain — the app never needs a tx hash from the user. Detection is belt-and-
+> suspenders on the backend: a live webhook credits within seconds, and a
+> reconciliation scan catches anything a webhook missed, so the app can rely on
+> "send → wait → confirmed" without the user doing anything. (Custody/sweeping of
+> funds is handled server-side and is invisible to the app.)
 
 ---
 
