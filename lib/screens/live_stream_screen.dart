@@ -3,7 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:video_player/video_player.dart';
 import '../theme/app_theme.dart';
+import '../config.dart';
+import '../services/backend_api.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
 import '../models/copy_models.dart';
@@ -40,6 +43,12 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   final _reactions = LiveReactionsController();
   Timer? _heartTimer;
 
+  // Real HLS playback.
+  VideoPlayerController? _video;
+  bool _videoReady = false;
+  bool _resolving = true; // connecting to the stream
+  bool _videoFailed = false; // no live broadcast / init failed (backend mode)
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +58,40 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     _heartTimer = Timer.periodic(const Duration(milliseconds: 1400), (_) {
       if (mounted) _reactions.burst(1 + math.Random().nextInt(2));
     });
+    if (kUseBackend) {
+      _initVideo();
+    } else {
+      _resolving = false; // demo mode keeps the branded animated backdrop
+    }
+  }
+
+  /// Resolves the trader's live broadcast and plays its HLS URL. HLS ingest lags
+  /// RTMP and can 404 for a few seconds right after going live, so we retry a
+  /// few times with backoff before giving up.
+  Future<void> _initVideo() async {
+    final trader = widget.trader;
+    if (trader == null || !trader.isLive) {
+      if (mounted) setState(() { _resolving = false; _videoFailed = true; });
+      return;
+    }
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final b = await BackendApi.liveBroadcastForTrader(trader.id);
+        final hls = b?['hlsUrl']?.toString();
+        if (hls != null && hls.isNotEmpty) {
+          final c = VideoPlayerController.networkUrl(Uri.parse(hls));
+          await c.initialize();
+          c
+            ..setLooping(false)
+            ..play();
+          if (!mounted) { c.dispose(); return; }
+          setState(() { _video = c; _videoReady = true; _resolving = false; });
+          return;
+        }
+      } catch (_) {/* retry */}
+      await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+    }
+    if (mounted) setState(() { _resolving = false; _videoFailed = true; });
   }
 
   @override
@@ -66,6 +109,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     _anim.dispose();
     _heartTimer?.cancel();
     _reactions.dispose();
+    _video?.dispose();
     _store?.stopPriceFeed();
     super.dispose();
   }
@@ -110,8 +154,8 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // "Stream" — animated chart
-          AnimatedBuilder(animation: _anim, builder: (_, __) => CustomPaint(painter: _StreamPainter(progress: _anim.value))),
+          // Real HLS video (or a connecting / unavailable state)
+          Positioned.fill(child: _videoLayer()),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -269,6 +313,44 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
           ),
         ],
       ),
+    );
+  }
+
+  /// The video surface: real stream when ready, else a branded animated
+  /// backdrop with a connecting spinner or an "unavailable" message.
+  Widget _videoLayer() {
+    final v = _video;
+    if (_videoReady && v != null && v.value.isInitialized) {
+      return ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: v.value.aspectRatio == 0 ? 16 / 9 : v.value.aspectRatio,
+            child: VideoPlayer(v),
+          ),
+        ),
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        AnimatedBuilder(animation: _anim, builder: (_, __) => CustomPaint(painter: _StreamPainter(progress: _anim.value))),
+        if (_resolving)
+          const Center(child: CircularProgressIndicator(strokeWidth: 2.6, color: Colors.white))
+        else if (_videoFailed)
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.videocam_off_rounded, size: 40, color: Colors.white.withOpacity(0.7)),
+                const SizedBox(height: 12),
+                Text('Stream unavailable', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                const SizedBox(height: 4),
+                Text('Not live right now — check back soon.', style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

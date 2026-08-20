@@ -288,6 +288,15 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null);
   }
 
+  /// The live Broadcast for a trader (with its `hlsUrl`), or null if not live.
+  static Future<Map<String, dynamic>?> liveBroadcastForTrader(String traderId) async {
+    final list = await liveBroadcasts();
+    for (final b in list) {
+      if (b['traderId']?.toString() == traderId || b['creatorId']?.toString() == traderId) return b;
+    }
+    return null;
+  }
+
   static Future<List<Map<String, dynamic>>> broadcastChat(String id) async {
     final res = await _api.get('/broadcasts/$id/chat');
     return _list(res, res is Map ? 'items' : null);
