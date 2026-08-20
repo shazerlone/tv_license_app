@@ -27,6 +27,37 @@ export class HealthController {
       // Auto-sweep (consolidation) readout. "active" only when fully wired:
       // enabled flag + Gas Pump address mode + a KMS signatureId (non-custodial).
       sweep: this.sweepStatus(),
+      // Which optional integrations are configured on THIS running server, so you
+      // can see what's live vs still-missing without reading the env. Booleans/
+      // labels only — never secrets.
+      integrations: this.integrationsStatus(),
+    };
+  }
+
+  private integrationsStatus() {
+    const has = (k: string) => !!(process.env[k] ?? '').trim();
+    const socialLogin = [
+      has('GOOGLE_OAUTH_CLIENT_ID') && 'google',
+      has('APPLE_CLIENT_ID') && 'apple',
+      has('FACEBOOK_APP_ID') && 'facebook',
+    ].filter(Boolean);
+    const marketProvider = (process.env.MARKET_DATA_PROVIDER ?? '').trim().toLowerCase();
+    return {
+      // Live video ingest — falls back to a mock live-input without these.
+      streaming: has('CLOUDFLARE_STREAM_TOKEN') && has('CLOUDFLARE_ACCOUNT_ID') ? 'cloudflare' : 'mock',
+      // Mobile push (FCM HTTP v1). NOTE: real gate is the service account, not the
+      // legacy FCM_SERVER_KEY. WS in-app events work regardless.
+      push: has('FCM_SERVICE_ACCOUNT_JSON') || has('FCM_SERVICE_ACCOUNT_B64'),
+      // Transactional email (password reset). 'console' = logs only, doesn't send.
+      mail: (process.env.MAIL_PROVIDER ?? 'console').toLowerCase() !== 'console',
+      // SMS OTP login. 'console' = codes only logged (dev), no real SMS.
+      otp: (process.env.OTP_PROVIDER ?? 'console').toLowerCase() !== 'console' && has('OTP_PROVIDER_KEY'),
+      // Upload storage: S3 when a bucket is set, else Postgres fallback.
+      storage: has('STORAGE_BUCKET') && has('STORAGE_REGION') ? 's3' : 'db',
+      // Market prices.
+      marketData: marketProvider && (has('TWELVE_DATA_API_KEY') || has('FINNHUB_API_KEY')) ? marketProvider : 'none',
+      socialLogin,
+      youtube: has('YOUTUBE_OAUTH_CLIENT_ID'),
     };
   }
 
