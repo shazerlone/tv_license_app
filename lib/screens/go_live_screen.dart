@@ -3,12 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../state/app_state.dart';
 import '../services/backend_api.dart';
+import '../services/rtmp_broadcaster.dart';
 import '../services/api_client.dart';
 import '../models/copy_models.dart';
 import '../widgets/order_ticket.dart';
@@ -27,10 +27,9 @@ class GoLiveScreen extends StatefulWidget {
 
 class _GoLiveScreenState extends State<GoLiveScreen> {
   final _titleController = TextEditingController(text: 'Live trading session');
-  CameraController? _camera;
-  List<CameraDescription> _cameras = [];
-  int _camIndex = 0;
+  final RtmpBroadcaster _broadcaster = RtmpBroadcaster();
   bool _cameraReady = false;
+  bool _publishStarted = false; // guards one-shot RTMPS publish
   String? _camError;
   bool _showHistory = false;
   AppState? _store;
@@ -79,37 +78,28 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
       return;
     }
     try {
-      _cameras = await availableCameras();
-      if (_cameras.isEmpty) {
-        setState(() => _camError = 'No camera found');
-        return;
-      }
-      await _startController(0);
-    } catch (e) {
-      setState(() => _camError = 'Camera unavailable');
-    }
-  }
-
-  Future<void> _startController(int index) async {
-    await _camera?.dispose();
-    final controller = CameraController(_cameras[index], ResolutionPreset.high, enableAudio: true);
-    try {
-      await controller.initialize();
+      await _broadcaster.init();
       if (!mounted) return;
       setState(() {
-        _camera = controller;
-        _camIndex = index;
         _cameraReady = true;
         _camError = null;
       });
     } catch (e) {
-      setState(() => _camError = 'Camera permission needed');
+      if (mounted) setState(() => _camError = 'Camera permission needed');
     }
   }
 
-  void _flip() {
-    if (_cameras.length < 2) return;
-    _startController((_camIndex + 1) % _cameras.length);
+  void _flip() => _broadcaster.flip();
+
+  /// Once the backend broadcast is live and returns the RTMPS ingest, start
+  /// pushing the camera to Cloudflare (guarded so it only fires once).
+  void _maybePublish(AppState store) {
+    if (_publishStarted || !store.isBackendLive) return;
+    final url = store.liveIngestUrl;
+    final key = store.liveStreamKey;
+    if (url == null || key == null || !_broadcaster.ready) return;
+    _publishStarted = true;
+    _broadcaster.publish(ingestUrl: url, streamKey: key);
   }
 
   /// Confirm, capture stats, end the broadcast, then show a recap.
@@ -124,6 +114,8 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     final trades = store.closedLiveTrades.length + store.liveTrades.length;
     final booked = store.closedLiveTrades.fold<double>(0, (s, c) => s + c.pnl) +
         store.liveTrades.fold<double>(0, (s, t) => s + store.livePnl(t));
+    await _broadcaster.stop();
+    _publishStarted = false;
     store.endBroadcast();
     if (mounted) await _showRecap(peak, dur, trades, booked);
     return true;
@@ -168,7 +160,7 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    _camera?.dispose();
+    _broadcaster.dispose();
     _heartTimer?.cancel();
     _chatTimer?.cancel();
     _reactions.dispose();
@@ -182,6 +174,8 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     final phase = store.phase;
     final live = phase == BroadcastPhase.live;
     final connecting = phase == BroadcastPhase.connecting;
+    // Start pushing the camera the moment the backend hands us the ingest URL.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybePublish(store));
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -189,16 +183,9 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview (or placeholder)
-          _cameraReady && _camera != null
-              ? FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _camera!.value.previewSize?.height ?? 1080,
-                    height: _camera!.value.previewSize?.width ?? 1920,
-                    child: CameraPreview(_camera!),
-                  ),
-                )
+          // Live camera preview (or placeholder) — this is the actual encoder feed.
+          _cameraReady
+              ? Positioned.fill(child: _broadcaster.preview())
               : _PreviewPlaceholder(reason: _camError),
 
           // Scrims for readability
