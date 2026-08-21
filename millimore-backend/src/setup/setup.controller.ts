@@ -56,4 +56,9 @@ export class SetupController {
   pushTest(@Query('token') token: string, @Query('userId') userId?: string) {
     return this.setup.pushTest(token, userId);
   }
+
+  @Get('broadcast-test')
+  broadcastTest(@Query('token') token: string) {
+    return this.setup.broadcastTest(token);
+  }
 }

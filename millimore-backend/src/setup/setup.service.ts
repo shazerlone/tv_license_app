@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { KycStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CloudflareService } from '../broadcasts/cloudflare.service';
 import { DepositsService } from '../wallet/deposits.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SweepService } from '../wallet/crypto/sweep.service';
@@ -25,7 +27,28 @@ export class SetupService {
     private readonly deposits: DepositsService,
     private readonly sweep: SweepService,
     private readonly notifications: NotificationsService,
+    private readonly config: ConfigService,
   ) {}
+
+  /** Browser-openable check (token-gated): create a REAL Cloudflare live input and
+   *  return its WHIP/ingest/HLS URLs so the app team can eyeball whipUrl without
+   *  auth. Each call mints a throwaway Cloudflare input. */
+  async broadcastTest(token: string) {
+    this.assertSetup(token);
+    const cf = new CloudflareService(this.config);
+    const li = await cf.createLiveInput(`setup_${Date.now()}`);
+    return {
+      provider: cf.enabled ? 'cloudflare' : 'mock',
+      whipUrl: li.whipUrl,
+      hlsUrl: li.hlsUrl,
+      ingestUrl: li.ingestUrl,
+      streamKeyTail: li.streamKey ? `…${li.streamKey.slice(-6)}` : null,
+      cfInputId: li.cfInputId,
+      note: cf.enabled
+        ? 'Real Cloudflare live input. whipUrl is the WebRTC publish endpoint the app posts camera to.'
+        : 'Cloudflare NOT configured — mock input (whipUrl null). Set CLOUDFLARE_* to get a real WHIP URL.',
+    };
+  }
 
   /** Browser-openable push diagnostic (token-gated). With no userId it tests the
    *  most-recently registered device (i.e. the last phone that opened the app). */
