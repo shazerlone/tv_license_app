@@ -55,6 +55,7 @@ export class BroadcastsService {
       // Ingest credentials are only exposed to the broadcasting creator.
       ingestUrl: owner ? b.ingestUrl : undefined,
       streamKey: owner ? b.streamKey : undefined,
+      whipUrl: owner ? b.whipUrl : undefined,
       hlsUrl: b.hlsUrl,
       viewers: b.viewers,
       peakViewers: b.peakViewers,
@@ -77,6 +78,7 @@ export class BroadcastsService {
         phase: 'connecting',
         ingestUrl: input.ingestUrl,
         streamKey: input.streamKey,
+        whipUrl: input.whipUrl,
         hlsUrl: input.hlsUrl,
         cfInputId: input.cfInputId,
       },

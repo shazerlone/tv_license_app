@@ -438,6 +438,7 @@ model Broadcast {
   phase        BroadcastPhase @default(connecting)
   ingestUrl    String
   streamKey    String
+  whipUrl      String? // Cloudflare WebRTC/WHIP publish URL (mobile go-live)
   hlsUrl       String
   cfInputId    String? // Cloudflare live input id
   youtubeLiveChatId String? // linked YouTube live chat (chat ingest)

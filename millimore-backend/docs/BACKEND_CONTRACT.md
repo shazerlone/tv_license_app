@@ -718,6 +718,12 @@ address, KYC (Sumsub-ready), and an admin audit trail.
   a like only notifies on a first like, not repeat taps.
 - **Feed** — `GET /feed` now also includes the caller's OWN posts when they are a
   creator (own + subscribed traders, newest first), so the app renders one list.
+- **Broadcast WHIP ingest** — the `Broadcast` object now carries an owner-only
+  `whipUrl` (Cloudflare WebRTC/WHIP publish URL) alongside `ingestUrl`/`streamKey`,
+  on the same responses (`POST /broadcasts`, `POST /broadcasts/{id}/start`, owner
+  `GET /broadcasts/{id}`). Mobile go-live publishes camera→WHIP (RTMP libs don't
+  build on Xcode 26); viewers still watch `hlsUrl`. `null` when Cloudflare isn't
+  configured (mock input).
 - **Uploads** — `POST /uploads` accepts base64 up to 8MB; the server JSON body limit
   is 12MB (`BODY_LIMIT` env override) so real photos aren't rejected with 413.
 - **New env** — `SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY`, `SUMSUB_LEVEL_NAME`,

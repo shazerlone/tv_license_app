@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 export interface LiveInput {
   ingestUrl: string;
   streamKey: string;
+  whipUrl: string | null; // WebRTC/WHIP publish URL (mobile go-live)
   hlsUrl: string;
   cfInputId: string | null;
 }
@@ -42,6 +43,7 @@ export class CloudflareService {
       return {
         ingestUrl: 'rtmps://ingest.millimore.app/live',
         streamKey: key,
+        whipUrl: null, // no real WebRTC endpoint without Cloudflare
         hlsUrl: `https://cdn.millimore.app/${broadcastId}/index.m3u8`,
         cfInputId: null,
       };
@@ -61,16 +63,20 @@ export class CloudflareService {
       );
       if (!res.ok) throw new Error(`live_inputs ${res.status}`);
       const body = (await res.json()) as {
-        result: { uid: string; rtmps?: { url: string; streamKey: string } };
+        result: { uid: string; rtmps?: { url: string; streamKey: string }; webRTC?: { url?: string } };
       };
       const uid = body.result.uid;
       const rtmps = body.result.rtmps;
       const sub = this.customerSubdomain
         ? `customer-${this.customerSubdomain}.cloudflarestream.com`
         : 'customer-stream.cloudflarestream.com';
+      // Cloudflare returns the WHIP publish URL as result.webRTC.url; fall back to
+      // the documented format if the field is absent.
+      const whipUrl = body.result.webRTC?.url ?? `https://${sub}/${uid}/webRTC/publish`;
       return {
         ingestUrl: rtmps?.url ?? 'rtmps://live.cloudflare.com:443/live',
         streamKey: rtmps?.streamKey ?? uid,
+        whipUrl,
         hlsUrl: `https://${sub}/${uid}/manifest/video.m3u8`,
         cfInputId: uid,
       };
@@ -81,6 +87,7 @@ export class CloudflareService {
       return {
         ingestUrl: 'rtmps://live.cloudflare.com:443/live',
         streamKey: key,
+        whipUrl: null, // provider hiccup — no real WebRTC endpoint
         hlsUrl: `https://customer-stream.cloudflarestream.com/${broadcastId}/manifest/video.m3u8`,
         cfInputId: null,
       };
