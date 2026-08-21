@@ -289,9 +289,7 @@ class BackendApi {
   }
 
   // ── Push devices (§4.12) ──────────────────────────────────────────────────
-  static Future<void> registerDevice({required String platform, required String token, String? appVersion}) =>
-      _api.post('/devices', {'platform': platform, 'token': token, if (appVersion != null) 'appVersion': appVersion});
-
+  // (registerDevice is defined above, near the milestone-4 section.)
   static Future<void> removeDevice(String token) => _api.delete('/devices/$token');
 
   /// The live Broadcast for a trader (with its `hlsUrl`), or null if not live.
