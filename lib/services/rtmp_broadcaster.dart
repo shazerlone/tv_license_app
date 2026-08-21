@@ -4,7 +4,6 @@ import 'package:haishin_kit/rtmp_connection.dart';
 import 'package:haishin_kit/rtmp_stream.dart';
 import 'package:haishin_kit/video_settings.dart';
 import 'package:haishin_kit/video_source.dart';
-import 'package:haishin_kit/net_stream_drawable_texture.dart';
 
 /// Thin wrapper around haishin_kit for camera capture + RTMPS publishing to
 /// Cloudflare Stream Live. All plugin-specific API is isolated here so the rest
@@ -41,11 +40,11 @@ class RtmpBroadcaster {
     _stream = stream;
   }
 
-  /// The live camera preview widget (null-safe).
+  /// Self-preview. The camera captures + publishes regardless; the on-screen
+  /// self-view widget is wired in a follow-up (the plugin's preview class name
+  /// varies by version). For now show a branded "you're live" surface.
   Widget preview() {
-    final s = _stream;
-    if (s == null) return const ColoredBox(color: Colors.black);
-    return NetStreamDrawableTexture(s);
+    return const ColoredBox(color: Color(0xFF0B1120));
   }
 
   /// Connect to the RTMPS ingest and start publishing under [streamKey].
