@@ -12,6 +12,7 @@ import 'services/auth_api.dart';
 import 'services/auth_store.dart';
 import 'services/app_config.dart';
 import 'services/realtime_service.dart';
+import 'services/push_service.dart';
 import 'config.dart';
 import 'screens/login_screen.dart';
 
@@ -103,6 +104,8 @@ class _MillimoreAppState extends State<MillimoreApp> {
     final token = ApiClient.instance.token;
     if (_session.isSignedIn && token != null) {
       if (!_realtime.connected) _realtime.connect(token);
+      // Register for push once signed in (idempotent).
+      PushService.instance.start(_appState);
     } else {
       _realtime.disconnect();
     }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "620603015906",
+    "project_id": "millimore-31a87",
+    "storage_bucket": "millimore-31a87.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620603015906:android:073cbd7d5363e145f094bb",
+        "android_client_info": {
+          "package_name": "com.millimore.millimore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYMF2OVTFI-mVNq8Qslthcq8-31Uyl5iA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

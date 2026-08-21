@@ -288,6 +288,12 @@ class BackendApi {
     return _list(res, res is Map ? 'items' : null);
   }
 
+  // ── Push devices (§4.12) ──────────────────────────────────────────────────
+  static Future<void> registerDevice({required String platform, required String token, String? appVersion}) =>
+      _api.post('/devices', {'platform': platform, 'token': token, if (appVersion != null) 'appVersion': appVersion});
+
+  static Future<void> removeDevice(String token) => _api.delete('/devices/$token');
+
   /// The live Broadcast for a trader (with its `hlsUrl`), or null if not live.
   static Future<Map<String, dynamic>?> liveBroadcastForTrader(String traderId) async {
     final list = await liveBroadcasts();
