@@ -91,15 +91,20 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
 
   void _flip() => _broadcaster.flip();
 
-  /// Once the backend broadcast is live and returns the RTMPS ingest, start
-  /// pushing the camera to Cloudflare (guarded so it only fires once).
+  /// Once the backend broadcast is live and returns the WHIP URL, start pushing
+  /// the camera to Cloudflare over WebRTC (guarded so it only fires once).
   void _maybePublish(AppState store) {
     if (_publishStarted || !store.isBackendLive) return;
-    final url = store.liveIngestUrl;
-    final key = store.liveStreamKey;
-    if (url == null || key == null || !_broadcaster.ready) return;
+    final whip = store.liveWhipUrl;
+    if (whip == null || whip.isEmpty || !_broadcaster.ready) return;
     _publishStarted = true;
-    _broadcaster.publish(ingestUrl: url, streamKey: key);
+    _broadcaster.publish(whipUrl: whip).catchError((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Couldn\'t start the live video — check your connection.')),
+        );
+      }
+    });
   }
 
   /// Confirm, capture stats, end the broadcast, then show a recap.

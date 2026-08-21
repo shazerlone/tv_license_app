@@ -485,11 +485,15 @@ class AppState extends ChangeNotifier {
   String? get broadcastId => _broadcastId;
   String? _hlsUrl;
   String? get hlsUrl => _hlsUrl;
-  // Owner-only RTMPS ingest for publishing from the phone (Cloudflare Stream Live).
+  // Owner-only ingest for publishing from the phone (Cloudflare Stream Live).
   String? _ingestUrl;
   String? get liveIngestUrl => _ingestUrl;
   String? _streamKey;
   String? get liveStreamKey => _streamKey;
+  // WHIP (WebRTC) ingest URL — how the phone actually publishes (RTMP libs
+  // don't build on Xcode 26). Present on the broadcast create response.
+  String? _whipUrl;
+  String? get liveWhipUrl => _whipUrl;
   StreamSubscription? _bcSub;
   bool get isBackendLive => kUseBackend && _broadcastId != null;
 
@@ -528,9 +532,10 @@ class AppState extends ChangeNotifier {
       final id = created['id'].toString();
       _broadcastId = id;
       _hlsUrl = created['hlsUrl'] as String?;
-      // Owner-only ingest (present on the create response) for RTMPS publishing.
+      // Owner-only ingest (present on the create response).
       _ingestUrl = created['ingestUrl'] as String?;
       _streamKey = created['streamKey'] as String?;
+      _whipUrl = (created['whipUrl'] ?? created['whip'] ?? created['webrtcUrl']) as String?;
       await BackendApi.startBroadcast(id);
       _phase = BroadcastPhase.live;
       _liveStart = DateTime.now();
@@ -608,6 +613,7 @@ class AppState extends ChangeNotifier {
       _hlsUrl = null;
       _ingestUrl = null;
       _streamKey = null;
+      _whipUrl = null;
     }
     notifyListeners();
   }

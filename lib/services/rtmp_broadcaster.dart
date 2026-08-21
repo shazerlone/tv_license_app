@@ -1,67 +1,142 @@
-import 'package:camera/camera.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:http/http.dart' as http;
 
-/// Camera capture + self-preview for the go-live screen.
+/// Publishes the phone's camera + mic to Cloudflare Stream Live over **WHIP**
+/// (WebRTC-HTTP Ingestion Protocol). This replaces RTMP (HaishinKit), which
+/// doesn't build on the Xcode 26 SDK Apple requires. flutter_webrtc uses a
+/// prebuilt WebRTC framework, so it builds cleanly.
 ///
-/// NOTE ON PUBLISHING: the mature Flutter RTMP publisher (HaishinKit) forces
-/// Swift 6 strict concurrency in its SPM manifest and does not compile under the
-/// Xcode 26 toolchain Apple now requires, so it was removed. Real phone→viewer
-/// broadcasting is being moved to WebRTC WHIP (Cloudflare Stream Live supports
-/// it, and flutter_webrtc builds cleanly on Xcode 26) — that lands once the
-/// backend exposes the broadcast's WHIP ingest URL. Until then [publish] is a
-/// no-op: the creator sees their camera and the broadcast record is created,
-/// but no media is pushed yet.
+/// Flow: getUserMedia (shows self-preview immediately) → createOffer →
+/// POST the SDP to the broadcast's WHIP URL → setRemoteDescription(answer).
 class RtmpBroadcaster {
-  CameraController? _cam;
-  List<CameraDescription> _cameras = const [];
-  int _index = 0;
+  final RTCVideoRenderer _renderer = RTCVideoRenderer();
+  MediaStream? _stream;
+  RTCPeerConnection? _pc;
+  bool _rendererReady = false;
+  bool _publishing = false;
+  String? _facing = 'user';
 
-  bool get ready => _cam?.value.isInitialized ?? false;
-  bool get publishing => false;
+  bool get ready => _rendererReady && _stream != null;
+  bool get publishing => _publishing;
 
+  /// Open the camera + mic and start the local preview.
   Future<void> init() async {
-    _cameras = await availableCameras();
-    if (_cameras.isEmpty) return;
-    // Prefer the front camera for a selfie-style go-live.
-    final front = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
-    await _start(front >= 0 ? front : 0);
+    if (_stream != null) return;
+    await _renderer.initialize();
+    _stream = await navigator.mediaDevices.getUserMedia({
+      'audio': true,
+      'video': {
+        'facingMode': _facing,
+        'width': {'ideal': 720},
+        'height': {'ideal': 1280},
+        'frameRate': {'ideal': 30},
+      },
+    });
+    _renderer.srcObject = _stream;
+    _rendererReady = true;
   }
 
-  Future<void> _start(int i) async {
-    await _cam?.dispose();
-    final c = CameraController(_cameras[i], ResolutionPreset.high, enableAudio: true);
-    await c.initialize();
-    _cam = c;
-    _index = i;
-  }
-
+  /// The live self-preview (mirrored, cover-fit).
   Widget preview() {
-    final c = _cam;
-    if (c == null || !c.value.isInitialized) {
-      return const ColoredBox(color: Color(0xFF0B1120));
-    }
-    return FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(
-        width: c.value.previewSize?.height ?? 1080,
-        height: c.value.previewSize?.width ?? 1920,
-        child: CameraPreview(c),
-      ),
+    if (!_rendererReady) return const ColoredBox(color: Color(0xFF0B1120));
+    return RTCVideoView(
+      _renderer,
+      mirror: _facing == 'user',
+      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
     );
   }
 
-  /// Real RTMPS/WHIP publish is pending the backend WHIP URL (see class note).
-  Future<void> publish({required String ingestUrl, required String streamKey}) async {}
+  /// Establish the WebRTC session and publish to the Cloudflare WHIP endpoint.
+  Future<void> publish({required String whipUrl}) async {
+    if (_stream == null || _publishing) return;
+    _publishing = true;
+    try {
+      final pc = await createPeerConnection({
+        'iceServers': [
+          {'urls': 'stun:stun.cloudflare.com:3478'},
+        ],
+        'sdpSemantics': 'unified-plan',
+      });
+      _pc = pc;
+      for (final track in _stream!.getTracks()) {
+        await pc.addTrack(track, _stream!);
+      }
 
-  Future<void> flip() async {
-    if (_cameras.length < 2) return;
-    await _start((_index + 1) % _cameras.length);
+      final offer = await pc.createOffer({});
+      await pc.setLocalDescription(offer);
+      final localSdp = await _gatheredSdp(pc, offer);
+
+      final res = await http.post(
+        Uri.parse(whipUrl),
+        headers: {'Content-Type': 'application/sdp', 'Accept': 'application/sdp'},
+        body: localSdp,
+      );
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        throw 'WHIP publish failed (${res.statusCode})';
+      }
+      await pc.setRemoteDescription(RTCSessionDescription(res.body, 'answer'));
+    } catch (_) {
+      _publishing = false;
+      rethrow;
+    }
   }
 
-  Future<void> stop() async {}
+  /// Wait for ICE gathering to complete so the SDP carries all candidates
+  /// (Cloudflare WHIP expects a complete offer, not trickle).
+  Future<String> _gatheredSdp(RTCPeerConnection pc, RTCSessionDescription offer) async {
+    if (pc.iceGatheringState == RTCIceGatheringState.RTCIceGatheringStateComplete) {
+      return (await pc.getLocalDescription())?.sdp ?? offer.sdp!;
+    }
+    final done = Completer<void>();
+    Timer? timeout;
+    pc.onIceGatheringState = (state) {
+      if (state == RTCIceGatheringState.RTCIceGatheringStateComplete && !done.isCompleted) {
+        done.complete();
+      }
+    };
+    timeout = Timer(const Duration(seconds: 3), () {
+      if (!done.isCompleted) done.complete(); // proceed with what we have
+    });
+    await done.future;
+    timeout.cancel();
+    return (await pc.getLocalDescription())?.sdp ?? offer.sdp!;
+  }
+
+  /// Flip the camera (front/back).
+  Future<void> flip() async {
+    final track = _stream?.getVideoTracks().firstOrNull;
+    if (track == null) return;
+    await Helper.switchCamera(track);
+    _facing = _facing == 'user' ? 'environment' : 'user';
+  }
+
+  /// Stop publishing (keeps the preview alive).
+  Future<void> stop() async {
+    _publishing = false;
+    try {
+      await _pc?.close();
+    } catch (_) {}
+    _pc = null;
+  }
 
   Future<void> dispose() async {
-    await _cam?.dispose();
-    _cam = null;
+    _publishing = false;
+    try {
+      await _pc?.close();
+    } catch (_) {}
+    try {
+      await _stream?.dispose();
+    } catch (_) {}
+    try {
+      await _renderer.dispose();
+    } catch (_) {}
+    _pc = null;
+    _stream = null;
   }
+}
+
+extension _FirstOrNull<E> on List<E> {
+  E? get firstOrNull => isEmpty ? null : first;
 }
