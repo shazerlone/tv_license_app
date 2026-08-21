@@ -129,6 +129,25 @@ class RealtimeService {
           body: amt != null ? '+\$${amt.toStringAsFixed(2)} added to your balance' : 'Your deposit was credited.',
           createdAt: now));
         break;
+      case 'social.subscribe':
+        _store.pushNotification(AppNotification(
+          id: id(), type: AppNotificationType.subscribe,
+          title: (d['title'] ?? '${d['actorName'] ?? 'Someone'} subscribed to you').toString(),
+          body: 'Tap to see your subscribers.',
+          traderId: d['traderId']?.toString(), createdAt: now));
+        break;
+      case 'social.like':
+        _store.pushNotification(AppNotification(
+          id: id(), type: AppNotificationType.like,
+          title: (d['title'] ?? '${d['actorName'] ?? 'Someone'} liked your post').toString(),
+          body: '', createdAt: now));
+        break;
+      case 'social.comment':
+        _store.pushNotification(AppNotification(
+          id: id(), type: AppNotificationType.comment,
+          title: (d['title'] ?? '${d['actorName'] ?? 'Someone'} commented on your post').toString(),
+          body: '', createdAt: now));
+        break;
       case 'payout.status':
         // Rejected withdrawals refund the held balance — refresh either way.
         _store.loadWallet();

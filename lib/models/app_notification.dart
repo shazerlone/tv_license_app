@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-enum AppNotificationType { live, tradeOpened, tradeClosed, copier, system }
+enum AppNotificationType { live, tradeOpened, tradeClosed, copier, subscribe, like, comment, system }
 
 class AppNotification {
   final String id;
@@ -38,6 +38,15 @@ class AppNotification {
       case 'copier':
         t = AppNotificationType.copier;
         break;
+      case 'social.subscribe':
+        t = AppNotificationType.subscribe;
+        break;
+      case 'social.like':
+        t = AppNotificationType.like;
+        break;
+      case 'social.comment':
+        t = AppNotificationType.comment;
+        break;
       default:
         t = AppNotificationType.system;
     }
@@ -63,6 +72,12 @@ class AppNotification {
         return Icons.flag_rounded;
       case AppNotificationType.copier:
         return Icons.person_add_rounded;
+      case AppNotificationType.subscribe:
+        return Icons.person_add_alt_1_rounded;
+      case AppNotificationType.like:
+        return Icons.favorite_rounded;
+      case AppNotificationType.comment:
+        return Icons.mode_comment_rounded;
       case AppNotificationType.system:
         return Icons.campaign_rounded;
     }
@@ -77,6 +92,12 @@ class AppNotification {
       case AppNotificationType.tradeClosed:
         return AppColors.primary;
       case AppNotificationType.copier:
+        return AppColors.primary;
+      case AppNotificationType.subscribe:
+        return AppColors.primary;
+      case AppNotificationType.like:
+        return AppColors.red;
+      case AppNotificationType.comment:
         return AppColors.primary;
       case AppNotificationType.system:
         return AppColors.purple;
