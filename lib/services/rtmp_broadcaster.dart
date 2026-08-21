@@ -1,102 +1,67 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:audio_session/audio_session.dart';
-import 'package:haishin_kit/haishin_kit.dart';
 
-/// Wrapper around haishin_kit 0.16.x (HaishinKit.swift 2.x) for camera capture
-/// + RTMPS publishing to Cloudflare Stream Live. All plugin API is isolated
-/// here. Encoder: H.264/AAC, 720p, ~3 Mbps, 2s keyframe.
+/// Camera capture + self-preview for the go-live screen.
 ///
-/// Note: in this plugin version the live preview is bound to the publish
-/// session, so the camera self-view appears once publishing starts. The mixer
-/// captures from init(); before going live the screen shows a placeholder.
+/// NOTE ON PUBLISHING: the mature Flutter RTMP publisher (HaishinKit) forces
+/// Swift 6 strict concurrency in its SPM manifest and does not compile under the
+/// Xcode 26 toolchain Apple now requires, so it was removed. Real phone→viewer
+/// broadcasting is being moved to WebRTC WHIP (Cloudflare Stream Live supports
+/// it, and flutter_webrtc builds cleanly on Xcode 26) — that lands once the
+/// backend exposes the broadcast's WHIP ingest URL. Until then [publish] is a
+/// no-op: the creator sees their camera and the broadcast record is created,
+/// but no media is pushed yet.
 class RtmpBroadcaster {
-  MediaMixer? _mixer;
-  StreamSession? _session;
-  List<VideoSource> _sources = const [];
-  CameraPosition _position = CameraPosition.front;
-  bool _publishing = false;
+  CameraController? _cam;
+  List<CameraDescription> _cameras = const [];
+  int _index = 0;
 
-  bool get ready => _mixer != null;
-  bool get publishing => _publishing;
+  bool get ready => _cam?.value.isInitialized ?? false;
+  bool get publishing => false;
 
-  /// Configure audio session (iOS), enumerate cameras, and start the mixer.
   Future<void> init() async {
-    if (_mixer != null) return;
-    try {
-      final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration(
-        avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-        avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth,
-      ));
-    } catch (_) {/* android / not needed */}
-
-    _sources = await HaishinKitPlatformInterface.instance.videoSources;
-    final mixer = await MediaMixer.create(
-      options: MediaMixerOptions(captureSessionMode: CaptureSessionMode.single),
-    );
-    await mixer.attachAudio(0, AudioSource());
-    final cam = _pick(_position);
-    if (cam != null) await mixer.attachVideo(0, cam);
-    mixer.screen?.size = ScreenObjectSize(width: 720, height: 1280);
-    await mixer.startRunning();
-    _mixer = mixer;
+    _cameras = await availableCameras();
+    if (_cameras.isEmpty) return;
+    // Prefer the front camera for a selfie-style go-live.
+    final front = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
+    await _start(front >= 0 ? front : 0);
   }
 
-  VideoSource? _pick(CameraPosition p) {
-    for (final s in _sources) {
-      if (s.position == p) return s;
-    }
-    return _sources.isNotEmpty ? _sources.first : null;
+  Future<void> _start(int i) async {
+    await _cam?.dispose();
+    final c = CameraController(_cameras[i], ResolutionPreset.high, enableAudio: true);
+    await c.initialize();
+    _cam = c;
+    _index = i;
   }
 
-  /// Live self-preview (available once publishing has created the session).
   Widget preview() {
-    final s = _session;
-    if (s == null) return const ColoredBox(color: Color(0xFF0B1120));
-    return StreamSessionViewTexture(s);
-  }
-
-  /// Create the publish session for the RTMPS ingest and connect. Cloudflare's
-  /// publish URL is `{ingestUrl}/{streamKey}`.
-  Future<void> publish({required String ingestUrl, required String streamKey}) async {
-    if (_mixer == null || _publishing) return;
-    final url = '$ingestUrl/$streamKey';
-    final session = await StreamSession.create(url, StreamSessionMode.publish);
-    session.videoSettings = VideoCodecSettings(
-      width: 720,
-      height: 1280,
-      bitrate: 3000 * 1000,
-      frameInterval: 2,
+    final c = _cam;
+    if (c == null || !c.value.isInitialized) {
+      return const ColoredBox(color: Color(0xFF0B1120));
+    }
+    return FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: c.value.previewSize?.height ?? 1080,
+        height: c.value.previewSize?.width ?? 1920,
+        child: CameraPreview(c),
+      ),
     );
-    _session = session;
-    _publishing = true;
-    await session.connect();
   }
 
-  /// Flip between front/back cameras.
+  /// Real RTMPS/WHIP publish is pending the backend WHIP URL (see class note).
+  Future<void> publish({required String ingestUrl, required String streamKey}) async {}
+
   Future<void> flip() async {
-    _position = _position == CameraPosition.front ? CameraPosition.back : CameraPosition.front;
-    final cam = _pick(_position);
-    if (cam != null) await _mixer?.attachVideo(0, cam);
+    if (_cameras.length < 2) return;
+    await _start((_index + 1) % _cameras.length);
   }
 
-  /// Stop publishing (keeps the camera/mixer running).
-  Future<void> stop() async {
-    _publishing = false;
-    try {
-      await _session?.close();
-    } catch (_) {}
-  }
+  Future<void> stop() async {}
 
   Future<void> dispose() async {
-    _publishing = false;
-    try {
-      await _session?.dispose();
-    } catch (_) {}
-    try {
-      await _mixer?.dispose();
-    } catch (_) {}
-    _session = null;
-    _mixer = null;
+    await _cam?.dispose();
+    _cam = null;
   }
 }
