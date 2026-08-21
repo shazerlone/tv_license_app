@@ -128,4 +128,43 @@ export class PushService {
       }),
     );
   }
+
+  /**
+   * Diagnostic send that RETURNS the real FCM outcome per device (status + error
+   * body) instead of swallowing it — so we can tell if push silence is "no device
+   * registered", "wrong Firebase project", "bad token", etc. Does not prune tokens.
+   */
+  async testSend(userId: string, msg: { title: string; body?: string }): Promise<Record<string, unknown>> {
+    const devices = await this.prisma.device.findMany({ where: { userId }, select: { token: true, platform: true } });
+    const base = { saConfigured: !!this.sa, projectId: this.sa?.project_id ?? null, deviceCount: devices.length };
+    if (!this.sa) return { ...base, note: 'FCM service account not loaded — set FCM_SERVICE_ACCOUNT_JSON/_B64.' };
+    if (devices.length === 0) return { ...base, note: 'No devices registered for this user — the app must POST /v1/devices with its FCM token.' };
+
+    let token: string;
+    try {
+      token = await this.accessToken();
+    } catch (e) {
+      return { ...base, note: `FCM OAuth failed: ${(e as Error).message} (check the service-account key).` };
+    }
+    const url = `https://fcm.googleapis.com/v1/projects/${this.sa.project_id}/messages:send`;
+    const results = await Promise.all(
+      devices.map(async (d) => {
+        const tail = d.token.slice(-10);
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ message: { token: d.token, notification: { title: msg.title, body: msg.body ?? '' } } }),
+            signal: AbortSignal.timeout(8000),
+          });
+          const body = (await res.json().catch(() => null)) as any;
+          return { tokenTail: tail, platform: d.platform, status: res.status, ok: res.ok, error: res.ok ? undefined : (body?.error?.message ?? body?.error?.status ?? JSON.stringify(body)?.slice(0, 200)) };
+        } catch (e) {
+          return { tokenTail: tail, platform: d.platform, ok: false, error: (e as Error).message };
+        }
+      }),
+    );
+    const sent = results.filter((r) => r.ok).length;
+    return { ...base, sent, results };
+  }
 }

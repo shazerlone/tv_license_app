@@ -26,6 +26,7 @@ import { PayoutsService } from '../payouts/payouts.service';
 import { DepositsService } from '../wallet/deposits.service';
 import { TreasuryService } from '../wallet/treasury.service';
 import { TransactionsService } from '../wallet/transactions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { KycService } from '../kyc/kyc.service';
 import { AuditService } from '../audit/audit.service';
@@ -72,6 +73,7 @@ export class AdminController {
     private readonly referrals: ReferralsService,
     private readonly support: SupportService,
     private readonly announcements: AnnouncementsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Get('me/permissions')
@@ -448,6 +450,15 @@ export class AdminController {
     const res = await this.treasury.sweepOne(id);
     await this.audit.record(user.userId, 'treasury.sweep_one', 'treasury', id, { status: res.status });
     return res;
+  }
+
+  // ── push diagnostics ───────────────────────────────────────────────
+  @Post('push-test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a test push and return the real FCM outcome (diagnostic)' })
+  pushTest(@CurrentUser() user: AuthUser, @Query('userId') userId?: string) {
+    // Defaults to the calling admin's own account, so you can test on your own device.
+    return this.notifications.testPush(userId || user.userId);
   }
 
   // ── audit trail ────────────────────────────────────────────────────

@@ -32,6 +32,11 @@ export class NotificationsService {
     }
   }
 
+  /** Admin diagnostic: send a test push and return the real FCM outcome per device. */
+  async testPush(userId: string, title = 'Millimore test', body = 'Push is working 🎉'): Promise<Record<string, unknown>> {
+    return this.push.testSend(userId, { title, body });
+  }
+
   private toDto(n: Notification): NotificationDto {
     return {
       id: n.id,
