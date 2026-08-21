@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger } from '@ne
 import { KycStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DepositsService } from '../wallet/deposits.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SweepService } from '../wallet/crypto/sweep.service';
 import { CryptoAddressService } from '../wallet/crypto/crypto-address.service';
 import { DepositNetwork } from '../wallet/crypto/address-provider';
@@ -23,7 +24,23 @@ export class SetupService {
     private readonly prisma: PrismaService,
     private readonly deposits: DepositsService,
     private readonly sweep: SweepService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /** Browser-openable push diagnostic (token-gated). With no userId it tests the
+   *  most-recently registered device (i.e. the last phone that opened the app). */
+  async pushTest(token: string, userId?: string) {
+    this.assertSetup(token);
+    let uid = userId?.trim();
+    if (!uid) {
+      const dev = await this.prisma.device.findFirst({ orderBy: { createdAt: 'desc' }, select: { userId: true } });
+      if (!dev) {
+        return { note: 'No devices registered by ANY user yet — the app must POST /v1/devices with its FCM token after the user grants notification permission. That is almost certainly why push is silent.' };
+      }
+      uid = dev.userId;
+    }
+    return { userId: uid, ...(await this.notifications.testPush(uid)) };
+  }
 
   private assertSetup(token: string) {
     const setupToken = process.env.WALLET_SETUP_TOKEN?.trim();

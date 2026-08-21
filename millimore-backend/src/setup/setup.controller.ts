@@ -51,4 +51,9 @@ export class SetupController {
   sweep(@Query('token') token: string) {
     return this.setup.sweepTest(token);
   }
+
+  @Get('push-test')
+  pushTest(@Query('token') token: string, @Query('userId') userId?: string) {
+    return this.setup.pushTest(token, userId);
+  }
 }
