@@ -51,6 +51,10 @@ workflows:
     scripts:
       - name: Regenerate native platform folders
         script: |
+          # Use CocoaPods (not Swift Package Manager) so we can force pod build
+          # settings — HaishinKit.swift fails Xcode 26's Swift 6 strict
+          # concurrency, so we build the pods in Swift 5 mode below.
+          flutter config --no-enable-swift-package-manager || true
           rm -rf android ios
           flutter create --platforms=android,ios --org com.millimore --project-name millimore .
       - name: Inject camera & mic permissions
@@ -59,6 +63,9 @@ workflows:
           plutil -insert NSMicrophoneUsageDescription -string "Microphone is used to go live." ios/Runner/Info.plist || true
           plutil -insert NSPhotoLibraryUsageDescription -string "Attach a chart or setup image to your posts." ios/Runner/Info.plist || true
           plutil -insert NSPhotoLibraryAddUsageDescription -string "Save deposit QR codes to your photos." ios/Runner/Info.plist || true
+      - name: Force Swift 5 mode for pods (HaishinKit / Swift 6 fix)
+        script: |
+          python3 -c 'import pathlib; p=pathlib.Path("ios/Podfile"); t=p.read_text(); a="flutter_additional_ios_build_settings(target)"; add=a+"\n    target.build_configurations.each do |config|\n      config.build_settings[\"SWIFT_VERSION\"] = \"5.0\"\n      config.build_settings[\"SWIFT_STRICT_CONCURRENCY\"] = \"minimal\"\n    end"; p.write_text(t if "SWIFT_STRICT_CONCURRENCY" in t else t.replace(a, add))'
       - name: Configure Firebase push (iOS)
         script: |
           # Firebase config file (Dart options also cover init; this is the native backup).
