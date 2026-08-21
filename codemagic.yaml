@@ -44,10 +44,8 @@ workflows:
       app_store_connect: Millimore
     environment:
       flutter: stable
-      # Pin Xcode: Xcode 26's Swift 6 strict concurrency fails HaishinKit.swift
-      # (the live-streaming lib). 16.4 ships the iOS 18 SDK (App Store-accepted)
-      # and builds it cleanly.
-      xcode: "16.4"
+      # Xcode 26 (default) is required by Apple (iOS 26 SDK). haishin_kit 0.16
+      # uses HaishinKit.swift 2.x, which is Swift-6-clean, so it builds here.
       # No `ios_signing` block: that block fails at startup when no provisioning
       # profile exists yet. Instead the script below imports the distribution
       # certificate stored in Codemagic (millimore-dist, with its private key)
@@ -56,9 +54,8 @@ workflows:
       - name: Regenerate native platform folders
         script: |
           # haishin_kit (live RTMPS) is Swift Package Manager-only, so SPM must
-          # stay enabled. Xcode is pinned (see environment.xcode) to a version
-          # that builds HaishinKit.swift without Xcode 26's Swift 6 strict-
-          # concurrency errors.
+          # stay enabled. haishin_kit 0.16 uses HaishinKit.swift 2.x which is
+          # Swift-6-clean, so it builds on Xcode 26 (required for the iOS 26 SDK).
           rm -rf android ios
           flutter create --platforms=android,ios --org com.millimore --project-name millimore .
       - name: Inject camera & mic permissions
