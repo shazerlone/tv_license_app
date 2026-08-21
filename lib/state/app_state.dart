@@ -485,6 +485,11 @@ class AppState extends ChangeNotifier {
   String? get broadcastId => _broadcastId;
   String? _hlsUrl;
   String? get hlsUrl => _hlsUrl;
+  // Owner-only RTMPS ingest for publishing from the phone (Cloudflare Stream Live).
+  String? _ingestUrl;
+  String? get liveIngestUrl => _ingestUrl;
+  String? _streamKey;
+  String? get liveStreamKey => _streamKey;
   StreamSubscription? _bcSub;
   bool get isBackendLive => kUseBackend && _broadcastId != null;
 
@@ -523,6 +528,9 @@ class AppState extends ChangeNotifier {
       final id = created['id'].toString();
       _broadcastId = id;
       _hlsUrl = created['hlsUrl'] as String?;
+      // Owner-only ingest (present on the create response) for RTMPS publishing.
+      _ingestUrl = created['ingestUrl'] as String?;
+      _streamKey = created['streamKey'] as String?;
       await BackendApi.startBroadcast(id);
       _phase = BroadcastPhase.live;
       _liveStart = DateTime.now();
@@ -598,6 +606,8 @@ class AppState extends ChangeNotifier {
       _bcSub = null;
       _broadcastId = null;
       _hlsUrl = null;
+      _ingestUrl = null;
+      _streamKey = null;
     }
     notifyListeners();
   }
