@@ -50,6 +50,7 @@ class AuthApi {
     String? experience,
     List<String>? interests,
     String? photoUrl,
+    String? email,
   }) async {
     final res = await _api.post('/auth/register/follower', {
       'name': name,
@@ -58,6 +59,7 @@ class AuthApi {
       if (experience != null) 'experience': experience,
       if (interests != null) 'interests': interests,
       if (photoUrl != null) 'photoUrl': photoUrl,
+      if (email != null && email.isNotEmpty) 'email': email,
     });
     return _session(res as Map);
   }
@@ -71,6 +73,7 @@ class AuthApi {
     required String market,
     required String platform,
     required Map<String, dynamic> verification,
+    String? email,
   }) async {
     final res = await _api.post('/auth/register/creator', {
       'name': name,
@@ -79,6 +82,7 @@ class AuthApi {
       'market': market,
       'platform': platform,
       'verification': verification,
+      if (email != null && email.isNotEmpty) 'email': email,
     });
     return _session(res as Map);
   }
