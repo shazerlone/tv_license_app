@@ -67,17 +67,29 @@ export class CloudflareService {
       };
       const uid = body.result.uid;
       const rtmps = body.result.rtmps;
-      const sub = this.customerSubdomain
-        ? `customer-${this.customerSubdomain}.cloudflarestream.com`
-        : 'customer-stream.cloudflarestream.com';
-      // Cloudflare returns the WHIP publish URL as result.webRTC.url; fall back to
-      // the documented format if the field is absent.
-      const whipUrl = body.result.webRTC?.url ?? `https://${sub}/${uid}/webRTC/publish`;
+      const webrtc = body.result.webRTC?.url;
+      // Prefer the customer host Cloudflare itself returned (in webRTC.url) so we
+      // never mis-build it. Fall back to the configured subdomain — normalized to
+      // just the code, tolerating a full host being pasted into the env (which
+      // otherwise doubles into customer-customer-….cloudflarestream.com.cloudflarestream.com).
+      const code = (this.customerSubdomain ?? '')
+        .replace(/^https?:\/\//, '')
+        .replace(/^customer-/, '')
+        .replace(/\.cloudflarestream\.com.*$/, '')
+        .trim();
+      let host: string;
+      try {
+        host = webrtc ? new URL(webrtc).host : '';
+      } catch {
+        host = '';
+      }
+      if (!host) host = code ? `customer-${code}.cloudflarestream.com` : 'customer-stream.cloudflarestream.com';
+      const whipUrl = webrtc ?? `https://${host}/${uid}/webRTC/publish`;
       return {
         ingestUrl: rtmps?.url ?? 'rtmps://live.cloudflare.com:443/live',
         streamKey: rtmps?.streamKey ?? uid,
         whipUrl,
-        hlsUrl: `https://${sub}/${uid}/manifest/video.m3u8`,
+        hlsUrl: `https://${host}/${uid}/manifest/video.m3u8`,
         cfInputId: uid,
       };
     } catch (e) {
