@@ -12,6 +12,7 @@ import '../services/api_client.dart';
 import '../state/session.dart';
 import '../config.dart';
 import 'home_screen.dart';
+import 'email_verify_screen.dart';
 
 class TraderRegisterScreen extends StatefulWidget {
   const TraderRegisterScreen({super.key});
@@ -32,6 +33,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
   // Personal
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   Country _country = countryByIso('IN');
   Country? _residence;
   final _formKey1 = GlobalKey<FormState>();
@@ -137,12 +139,21 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
               'investorPassword': _investorPwController.text.trim(),
             if (_uploadedFileName != null) 'statementUrl': _uploadedFileName,
           },
+          email: _emailController.text.trim(),
         );
         if (!mounted) return;
         SessionScope.of(context).applyBackendSession(user);
         _backendApplied = true;
         setState(() => _isLoading = false);
         _go(4);
+        // Prompt email verification if provided.
+        final email = _emailController.text.trim();
+        if (email.isNotEmpty) {
+          try {
+            final dev = await AuthApi.sendEmailCode();
+            if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
+          } catch (_) {}
+        }
         return;
       } on ApiException catch (e) {
         if (!mounted) return;
@@ -195,6 +206,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
     _stepController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _serverController.dispose();
     _accountController.dispose();
     _investorPwController.dispose();
@@ -251,6 +263,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
           formKey: _formKey1,
           nameController: _nameController,
           phoneController: _phoneController,
+          emailController: _emailController,
           country: _country,
           onCountryChanged: (c) => setState(() => _country = c),
           residence: _residence,
@@ -447,6 +460,7 @@ class _StepPersonal extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final TextEditingController emailController;
   final Country country;
   final ValueChanged<Country> onCountryChanged;
   final Country? residence;
@@ -457,6 +471,7 @@ class _StepPersonal extends StatelessWidget {
     required this.formKey,
     required this.nameController,
     required this.phoneController,
+    required this.emailController,
     required this.country,
     required this.onCountryChanged,
     required this.residence,
@@ -490,6 +505,18 @@ class _StepPersonal extends StatelessWidget {
                   style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: 'e.g. Marcus Sterling'),
                   validator: (v) => (v == null || v.isEmpty) ? 'Enter your name' : null,
+                ),
+                const SizedBox(height: 20),
+                _FieldLabel('Email (optional)'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autocorrect: false,
+                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                  decoration: const InputDecoration(hintText: 'you@email.com — payouts & updates'),
+                  validator: (v) => (v != null && v.isNotEmpty && !v.contains('@')) ? 'Enter a valid email' : null,
                 ),
                 const SizedBox(height: 20),
                 _FieldLabel('Phone number'),
