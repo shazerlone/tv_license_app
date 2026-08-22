@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 import '../theme/app_theme.dart';
 import '../config.dart';
 import '../services/backend_api.dart';
+import '../services/realtime_service.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
 import '../models/copy_models.dart';
@@ -27,21 +28,17 @@ class LiveStreamScreen extends StatefulWidget {
 class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerProviderStateMixin {
   final _chatController = TextEditingController();
   late final AnimationController _anim;
-  late final int _viewers;
+  int _viewers = 0; // real viewer count from the broadcast
 
-  final List<_Msg> _messages = [
-    _Msg('alex_t', 'great setup on EURUSD!'),
-    _Msg('jade_fx', 'following this one live'),
-    _Msg('crypto_k', 'what is your SL here?'),
-    _Msg('mark99', 'copied! 🔥'),
-    _Msg('luna_t', 'clean analysis as always'),
-  ];
+  final List<_Msg> _messages = []; // real chat; demo-seeded only when !kUseBackend
 
   Trader get _trader => widget.trader ?? mockTraders[0];
 
   AppState? _store;
   final _reactions = LiveReactionsController();
   Timer? _heartTimer;
+  String? _broadcastId;
+  StreamSubscription? _bcSub;
 
   // Real HLS playback.
   VideoPlayerController? _video;
@@ -53,15 +50,20 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _anim = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
-    _viewers = 800 + math.Random().nextInt(11000);
-    // Simulated audience love while watching.
-    _heartTimer = Timer.periodic(const Duration(milliseconds: 1400), (_) {
-      if (mounted) _reactions.burst(1 + math.Random().nextInt(2));
-    });
     if (kUseBackend) {
       _initVideo();
     } else {
-      _resolving = false; // demo mode keeps the branded animated backdrop
+      // Demo mode only: seed sample chat + ambient hearts.
+      _resolving = false;
+      _messages.addAll(const [
+        _Msg('alex_t', 'great setup on EURUSD!'),
+        _Msg('jade_fx', 'following this one live'),
+        _Msg('mark99', 'copied! 🔥'),
+      ]);
+      _viewers = 800 + math.Random().nextInt(4000);
+      _heartTimer = Timer.periodic(const Duration(milliseconds: 1400), (_) {
+        if (mounted) _reactions.burst(1 + math.Random().nextInt(2));
+      });
     }
   }
 
@@ -79,28 +81,73 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
 
   Future<void> _initVideo() async {
     final trader = widget.trader;
-    if (trader == null || !trader.isLive) {
+    if (trader == null) {
       if (mounted) setState(() { _resolving = false; _videoFailed = true; });
       return;
     }
-    for (var attempt = 0; attempt < 3; attempt++) {
+    Map<String, dynamic>? b;
+    // Retry across ~30s: HLS lags the WHIP ingest by a few seconds after go-live.
+    for (var attempt = 0; attempt < 5; attempt++) {
       try {
-        final b = await BackendApi.liveBroadcastForTrader(trader.id);
-        final hls = _normalizeHls(b?['hlsUrl']?.toString());
-        if (hls != null && hls.isNotEmpty) {
-          final c = VideoPlayerController.networkUrl(Uri.parse(hls));
-          await c.initialize();
-          c
-            ..setLooping(false)
-            ..play();
-          if (!mounted) { c.dispose(); return; }
-          setState(() { _video = c; _videoReady = true; _resolving = false; });
-          return;
+        b = await BackendApi.liveBroadcastForTrader(trader.id);
+        if (b != null) {
+          final id = b['id']?.toString();
+          if (id != null && _broadcastId == null) {
+            _broadcastId = id;
+            _subscribeBroadcast(id);
+            _loadChat(id);
+          }
+          if (b['viewers'] is num && mounted) setState(() => _viewers = (b!['viewers'] as num).toInt());
+          final hls = _normalizeHls(b['hlsUrl']?.toString());
+          if (hls != null && hls.isNotEmpty) {
+            final c = VideoPlayerController.networkUrl(Uri.parse(hls));
+            await c.initialize();
+            c
+              ..setLooping(false)
+              ..play();
+            if (!mounted) { c.dispose(); return; }
+            setState(() { _video = c; _videoReady = true; _resolving = false; });
+            return;
+          }
         }
       } catch (_) {/* retry */}
       await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
     }
+    // No playable video: "connecting" if a real broadcast exists, else offline.
     if (mounted) setState(() { _resolving = false; _videoFailed = true; });
+  }
+
+  /// Subscribe to the broadcast room for real chat / viewers / reactions.
+  void _subscribeBroadcast(String id) {
+    RealtimeService.current?.subscribeBroadcast(id);
+    _bcSub = RealtimeService.current?.broadcastEvents.listen((m) {
+      if (m['ch'] != 'broadcast:$id' || !mounted) return;
+      final type = m['type']?.toString() ?? '';
+      final d = (m['data'] is Map) ? (m['data'] as Map).cast<String, dynamic>() : const <String, dynamic>{};
+      switch (type) {
+        case 'chat':
+          setState(() => _messages.add(_Msg((d['author'] ?? '').toString(), (d['text'] ?? '').toString())));
+          break;
+        case 'viewers':
+          if (d['count'] is num) setState(() => _viewers = (d['count'] as num).toInt());
+          break;
+        case 'reaction':
+          _reactions.burst(1 + math.Random().nextInt(2));
+          break;
+      }
+    });
+  }
+
+  Future<void> _loadChat(String id) async {
+    try {
+      final rows = await BackendApi.broadcastChat(id);
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(rows.map((r) => _Msg((r['author'] ?? '').toString(), (r['text'] ?? '').toString())));
+      });
+    } catch (_) {}
   }
 
   @override
@@ -118,6 +165,9 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     _anim.dispose();
     _heartTimer?.cancel();
     _reactions.dispose();
+    _bcSub?.cancel();
+    final id = _broadcastId;
+    if (id != null) RealtimeService.current?.unsubscribeBroadcast(id);
     _video?.dispose();
     _store?.stopPriceFeed();
     super.dispose();
@@ -130,6 +180,11 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       _messages.add(_Msg('you', t));
       _chatController.clear();
     });
+    // Post to the real broadcast room (echo appears via the WS for others).
+    final id = _broadcastId;
+    if (kUseBackend && id != null) {
+      BackendApi.sendBroadcastChat(id, t).catchError((_) {});
+    }
   }
 
   @override
@@ -137,25 +192,8 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     final trader = _trader;
     final store = AppStateScope.of(context);
     final subscribed = store.isSubscribed(trader.id);
-    // Prefer the broadcaster's live-placed trades; fall back to an open mock trade.
-    final List<LiveTrade> overlay = store.liveTrades.isNotEmpty
-        ? store.liveTrades
-        : [
-            () {
-              final m = mockTrades.firstWhere((t) => t.traderId == trader.id && t.status == TradeStatus.open, orElse: () => mockTrades.first);
-              return LiveTrade(
-                id: 'mock_${m.id}',
-                symbol: m.pair,
-                isBuy: m.direction == TradeDirection.buy,
-                orderType: LiveOrderType.market,
-                entryPrice: m.entryPrice,
-                lots: 0.10,
-                sl: m.stopLoss,
-                tp: m.takeProfit,
-                openedAt: m.openedAt,
-              );
-            }()
-          ];
+    // Only real trades the creator placed on-stream (no mock fallback).
+    final List<LiveTrade> overlay = store.liveTrades;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B1120),
