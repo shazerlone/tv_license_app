@@ -34,6 +34,9 @@ class UserProfile {
   final String? addressLine;
   final String? city;
   final String? postalCode;
+  final String? email;
+  final bool emailVerified;
+  final bool emailNotifications;
 
   const UserProfile({
     this.id,
@@ -50,6 +53,9 @@ class UserProfile {
     this.addressLine,
     this.city,
     this.postalCode,
+    this.email,
+    this.emailVerified = false,
+    this.emailNotifications = true,
   });
 
   bool get kycVerified => kycStatus == 'verified';
@@ -84,6 +90,9 @@ class UserProfile {
         'addressLine': addressLine,
         'city': city,
         'postalCode': postalCode,
+        'email': email,
+        'emailVerified': emailVerified,
+        'emailNotifications': emailNotifications,
       };
 
   /// Maps a backend `User` (docs/BACKEND_CONTRACT.md §3) to a UserProfile.
@@ -103,6 +112,9 @@ class UserProfile {
       addressLine: j['addressLine'] as String?,
       city: j['city'] as String?,
       postalCode: j['postalCode'] as String?,
+      email: j['email'] as String?,
+      emailVerified: j['emailVerified'] == true,
+      emailNotifications: j['emailNotifications'] == null ? true : j['emailNotifications'] == true,
     );
   }
 
@@ -121,6 +133,9 @@ class UserProfile {
     String? addressLine,
     String? city,
     String? postalCode,
+    String? email,
+    bool? emailVerified,
+    bool? emailNotifications,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -137,6 +152,9 @@ class UserProfile {
       addressLine: addressLine ?? this.addressLine,
       city: city ?? this.city,
       postalCode: postalCode ?? this.postalCode,
+      email: email ?? this.email,
+      emailVerified: emailVerified ?? this.emailVerified,
+      emailNotifications: emailNotifications ?? this.emailNotifications,
     );
   }
 }

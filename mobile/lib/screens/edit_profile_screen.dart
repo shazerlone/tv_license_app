@@ -5,6 +5,7 @@ import '../config.dart';
 import '../state/session.dart';
 import '../services/auth_api.dart';
 import '../services/api_client.dart';
+import 'email_verify_screen.dart';
 import '../services/backend_api.dart';
 import '../services/image_picker_service.dart';
 import '../services/app_config.dart';
@@ -25,11 +26,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _address = TextEditingController();
   final _city = TextEditingController();
   final _postal = TextEditingController();
+  final _email = TextEditingController();
   String? _photoUrl;
   double _leverage = 1;
   bool _saving = false;
   bool _isCreator = false;
   bool _init = false;
+  bool _emailNotif = true;
+  String? _origEmail;
+  bool _emailVerified = false;
 
   @override
   void didChangeDependencies() {
@@ -46,6 +51,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _photoUrl = u?.photoUrl;
     _leverage = (u?.leverage ?? 1).clamp(1, AppConfig.instance.maxLeverage < 1 ? 1 : AppConfig.instance.maxLeverage);
     _isCreator = u?.isCreator ?? false;
+    _email.text = u?.email ?? '';
+    _origEmail = u?.email;
+    _emailNotif = u?.emailNotifications ?? true;
+    _emailVerified = u?.emailVerified ?? false;
   }
 
   @override
@@ -56,7 +65,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _address.dispose();
     _city.dispose();
     _postal.dispose();
+    _email.dispose();
     super.dispose();
+  }
+
+  /// Save the email if it changed, (re)send the code, then open the verify
+  /// screen. Refreshes the verified state on return.
+  Future<void> _verifyEmail() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid email first')));
+      return;
+    }
+    final session = SessionScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    String? devCode;
+    try {
+      if (email != (_origEmail ?? '')) {
+        final updated = await AuthApi.updateMe({'email': email, 'emailNotifications': _emailNotif});
+        session.applyBackendSession(updated);
+        _origEmail = email;
+      }
+      devCode = await AuthApi.sendEmailCode();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.code == 'email_taken' ? 'That email is already in use.' : e.message)));
+      return;
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+      return;
+    }
+    if (!mounted) return;
+    final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: devCode)));
+    if (ok == true && mounted) setState(() => _emailVerified = true);
   }
 
   Future<void> _pickPhoto() async {
@@ -93,6 +133,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (_city.text.trim().isNotEmpty) 'city': _city.text.trim(),
           if (_postal.text.trim().isNotEmpty) 'postalCode': _postal.text.trim(),
           if (AppConfig.instance.maxLeverage > 1) 'leverage': _leverage,
+          if (_email.text.trim() != (_origEmail ?? '')) 'email': _email.text.trim(),
+          'emailNotifications': _emailNotif,
         };
         final updated = await AuthApi.updateMe(fields);
         if (!mounted) return;
@@ -102,7 +144,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          e.code == 'email_taken' ? 'That email is already in use.' : e.message,
+        )));
         return;
       } catch (_) {
         if (!mounted) return;
@@ -155,6 +199,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
             decoration: const InputDecoration(hintText: 'Your name'),
             onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 20),
+          Row(children: [
+            _Label('Email'),
+            const SizedBox(width: 8),
+            if (_email.text.trim().isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(color: (_emailVerified ? AppColors.green : AppColors.slate).withOpacity(0.14), borderRadius: BorderRadius.circular(5)),
+                child: Text(_emailVerified ? 'Verified' : 'Unverified',
+                    style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: _emailVerified ? AppColors.green : AppColors.slate)),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: const InputDecoration(hintText: 'you@email.com'),
+            onChanged: (_) => setState(() {}),
+          ),
+          if (_email.text.trim().isNotEmpty && !_emailVerified) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _verifyEmail,
+                icon: Icon(Icons.mark_email_read_outlined, size: 17, color: AppColors.primary),
+                label: Text('Verify email', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _emailNotif,
+            activeColor: AppColors.primary,
+            onChanged: (v) => setState(() => _emailNotif = v),
+            title: Text('Email notifications', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            subtitle: Text('Deposits, copies, and important account updates.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
           ),
           if (_isCreator) ...[
             const SizedBox(height: 20),

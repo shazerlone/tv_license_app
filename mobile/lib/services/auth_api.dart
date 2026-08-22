@@ -105,6 +105,18 @@ class AuthApi {
     return UserProfile.fromJson(((res as Map)['user'] as Map).cast<String, dynamic>());
   }
 
+  /// Send/resend the 6-digit email verification code. Returns devCode in dev.
+  static Future<String?> sendEmailCode() async {
+    final res = await _api.post('/me/email/send-code');
+    return (res is Map ? res['devCode'] : null)?.toString();
+  }
+
+  /// Verify the emailed code. Throws ApiException on code_mismatch/expired/etc.
+  static Future<bool> verifyEmail(String code) async {
+    final res = await _api.post('/me/email/verify', {'code': code});
+    return (res is Map ? res['emailVerified'] == true : false);
+  }
+
   static void logout() {
     // Best-effort server logout (stateless JWT — client discards regardless).
     _api.post('/auth/logout').catchError((_) => null);
