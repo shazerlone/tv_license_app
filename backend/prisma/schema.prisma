@@ -1,0 +1,924 @@
+// Millimore backend — Prisma schema
+// Source of truth for entity shapes: docs/BACKEND_CONTRACT.md
+// Milestone 1 covers: User, OtpRequest, CreatorApplication.
+// Later milestones extend this file (brokers, accounts, traders, copy, broadcasts…).
+
+generator client {
+  provider = "prisma-client-js"
+  // "native" for local dev; the debian-openssl targets cover the container
+  // runtimes (node:22-bookworm-slim = openssl 3.0.x). Without these, Prisma
+  // may generate the wrong query-engine binary and fail at runtime with
+  // "could not locate the Query Engine for runtime debian-openssl-3.0.x".
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  follower
+  creator
+  admin
+}
+
+enum CreatorStatus {
+  none
+  pending
+  approved
+  rejected
+  suspended
+}
+
+enum AccountStatus {
+  connected
+  pending
+  disconnected
+  error
+}
+
+enum PostType {
+  analysis
+  trade
+  lesson
+  update
+}
+
+/// A platform user. Serialized to the contract `User` shape (see UsersService.toDto).
+model User {
+  id             String        @id // prefixed id, e.g. "u_abc123"
+  name           String
+  username       String        @unique
+  email          String?       @unique
+  emailVerified  Boolean       @default(false)
+  emailNotifications Boolean    @default(true) // opt-in to transactional/marketing email
+  phone          String?       @unique
+  photoUrl       String?
+  role           Role          @default(follower)
+  creatorStatus  CreatorStatus @default(none)
+
+  residenceIso     String? // ISO-3166 alpha-2, e.g. "IN"
+  residenceCountry String? // display name, e.g. "India"
+  market           String? // e.g. "Forex"
+  platform         String? // e.g. "MetaTrader 5"
+
+  // Profile / billing address (contract §12).
+  addressLine String?
+  city        String?
+  postalCode  String?
+
+  // Default trading leverage (1..PlatformSettings.maxLeverage). Per-copy can
+  // override this. Wallet balance is the margin; exposure = margin × leverage.
+  leverage Int @default(100)
+
+  // KYC (identity verification) — status mirrors the provider (Sumsub) or an
+  // admin manual decision. Applicant id links to the provider's record.
+  kycStatus     KycStatus @default(none)
+  kycProvider   String? // "sumsub" | "manual"
+  kycApplicantId String?
+  kycReason     String?
+
+  // Referral / affiliate (IB) program (contract §referrals). `referralCode` is
+  // this user's own share code; `referredById` is who referred THEM (FK-less,
+  // like ledger.userId — avoids a self-relation).
+  referralCode   String? @unique
+  referredById   String?
+  referredByCode String?
+
+  supportTickets SupportTicket[]
+
+  // Onboarding extras (follower)
+  experience String?
+  interests  String[] @default([])
+
+  // Auth (write-only; never serialized)
+  passwordHash  String?
+  appleSubject  String? @unique
+  googleSubject String? @unique
+
+  // Two-factor auth (TOTP, RFC 6238). Secret is AES-256-GCM encrypted; backup
+  // codes are bcrypt-hashed; twofaLastStep blocks TOTP code reuse.
+  twofaEnabled     Boolean  @default(false)
+  twofaSecretEnc   String?
+  twofaBackupCodes String[] @default([])
+  twofaLastStep    Int?
+
+  banned    Boolean  @default(false)
+  // Frozen = can still log in, but withdrawals and new copies are blocked
+  // (a softer control than a full ban). Standard broker back-office capability.
+  frozen    Boolean  @default(false)
+  adminNote String? // internal ops note, admin-only (never returned to the app)
+  // Back-office permission group when role=admin: superadmin | finance |
+  // compliance | support | analyst. null (legacy admin) is treated as superadmin.
+  adminRole String?
+  // Throttled activity timestamp (updated at most every ~10 min by the JWT
+  // strategy) — powers real DAU/MAU in admin metrics without an events table.
+  lastSeenAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creatorApplications CreatorApplication[]
+  tradingAccounts     TradingAccount[]
+
+  trader        Trader?
+  subscriptions Subscription[]
+  postLikes     PostLike[]
+  postSaves     PostSave[]
+  comments      Comment[]
+  notifications Notification[]
+  devices       Device[]
+  copyConfigs   CopyConfig[]
+  copyPositions CopyPosition[]
+  broadcasts    Broadcast[]
+  uploads       Upload[]
+  payouts       Payout[]
+  wallet        Wallet?
+  deposits      Deposit[]
+  payoutMethods PayoutMethod[]
+  stories       Story[]
+
+  @@index([role])
+  @@index([creatorStatus])
+  @@index([referredById])
+}
+
+enum PayoutStatus {
+  pending
+  approved
+  rejected
+  paid
+}
+
+/// A creator withdrawal request against accrued earnings (contract §5b, §6).
+/// Earnings themselves are computed live from active copy configs (a performance
+/// fee on copier AUM); this table records money movements only. Amounts are in
+/// `currency` (USD). Admin approves/rejects; `approved` funds are considered
+/// deducted from the withdrawable balance, `paid` marks the transfer done.
+model Payout {
+  id         String       @id // "po_..."
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     Float
+  currency   String       @default("USD")
+  status     PayoutStatus @default(pending)
+  method     String? // e.g. "bank", "usdt" — free-form for now
+  methodId   String? // saved PayoutMethod used, if any
+  note       String? // creator's note on request
+  decisionBy String? // admin user id who approved/rejected
+  reason     String? // admin note / rejection reason
+  flagged    Boolean      @default(false) // risk/fraud review flag
+  flagReason String?
+  createdAt  DateTime     @default(now())
+  decidedAt  DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+/// A user's in-app money balance (the Millimore wallet). Funded by deposits
+/// (crypto now), drawn down by copy allocations, credited by trade P/L and (for
+/// traders) commission. One row per user. `balance` is the source of truth;
+/// every change is mirrored by a LedgerEntry for auditability.
+model Wallet {
+  id        String   @id // "w_..."
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Float    @default(0)
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum LedgerType {
+  deposit
+  withdrawal_hold // funds reserved when a withdrawal is requested
+  withdrawal_refund // reserved funds returned when a withdrawal is rejected
+  copy_allocate // capital moved into a copy position
+  copy_return // principal returned when a copy is stopped
+  trade_pnl // realized profit/loss booked to the copier
+  commission // performance fee taken from a copier's profit (negative)
+  commission_earned // trader's share of a performance fee (positive)
+  platform_fee // Millimore's share of a performance fee (recorded on platform)
+  referral_commission // affiliate/IB revenue share paid to a referrer
+  adjustment // manual admin correction
+}
+
+/// Append-only money ledger. Every wallet change writes one row here so the
+/// books are auditable (a lightweight double-entry: `amount` is signed, and
+/// `balanceAfter` snapshots the wallet after applying it). Never updated/deleted.
+model LedgerEntry {
+  id          String     @id // "led_..."
+  userId      String
+  type        LedgerType
+  amount      Float // signed: credits positive, debits negative
+  balanceAfter Float
+  currency    String     @default("USD")
+  refId       String? // deposit id, payout id, copyConfig id, position id, etc.
+  note        String?
+  createdAt   DateTime   @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+enum DepositStatus {
+  pending
+  confirmed
+  failed
+}
+
+/// A user deposit into their wallet (contract wallet model). Crypto is live now;
+/// other methods are surfaced as "coming soon". In test mode deposits
+/// auto-confirm; in production a payment/crypto webhook flips `confirmed` and the
+/// wallet is credited exactly once.
+model Deposit {
+  id          String        @id // "dep_..."
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String        @default("USD")
+  method      String        @default("crypto") // "crypto" (live), others soon
+  asset       String? // e.g. "USDT", "BTC" for crypto
+  address     String? // deposit address shown to the user (crypto)
+  txRef       String? // on-chain tx / provider reference
+  providerRef String? // processor payment id (e.g. NOWPayments payment_id)
+  payAmount   Float? // exact crypto amount the user must send
+  payCurrency String? // processor pay currency, e.g. "usdttrc20"
+  status      DepositStatus @default(pending)
+  decisionBy  String? // admin who approved/rejected (manual mode)
+  reason      String? // admin note / rejection reason
+  flagged     Boolean       @default(false) // risk/fraud review flag
+  flagReason  String?
+  createdAt   DateTime      @default(now())
+  confirmedAt DateTime?
+
+  @@unique([txRef]) // one credit per on-chain tx (nulls allowed) — dedupe guard
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+enum KycStatus {
+  none
+  pending
+  verified
+  rejected
+}
+
+/// Admin-editable platform settings (a single row, id="platform"). The Millimore
+/// fee, leverage cap, deposit/withdrawal limits and method toggles live here so
+/// ops can change them without a redeploy. Env vars remain the fallback defaults.
+model PlatformSettings {
+  id                       String   @id @default("platform")
+  platformFeeShare         Float    @default(0.30) // Millimore's share of the trader fee
+  maxLeverage              Int      @default(500)
+  defaultLeverage          Int      @default(100)
+  minDeposit               Float    @default(10)
+  minWithdrawal            Float    @default(10)
+  maxWithdrawalPerTx       Float    @default(25000)
+  maxWithdrawalPerDay      Float    @default(50000)
+  depositAutoConfirm       Boolean  @default(false) // prod-safe; dev demo seed enables it
+  kycRequiredForWithdrawal Boolean  @default(true)
+  cryptoEnabled            Boolean  @default(true)
+  cardEnabled              Boolean  @default(false)
+  bankEnabled              Boolean  @default(false)
+  maintenanceMode          Boolean  @default(false)
+  // Referral / affiliate (IB) program
+  referralEnabled          Boolean  @default(true)
+  referralRevenueShare     Float    @default(0.10) // referrer's share of Millimore's fee from referred users
+  referralSignupBonus      Float    @default(0) // one-time bonus to referrer on a referred user's first deposit
+  updatedAt                DateTime @updatedAt
+}
+
+/// A user's saved withdrawal destination (crypto address or bank). Sensitive
+/// details are AES-256-GCM encrypted (write-only, like broker credentials);
+/// responses expose only `masked` + `label`.
+model PayoutMethod {
+  id         String   @id // "pm_..."
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String // "crypto" | "bank"
+  label      String
+  detailsEnc String // encrypted JSON (address / bank account)
+  masked     String // display-safe, e.g. "USDT ••••a1b2"
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// A creator's connected YouTube account (contract §4.10). The OAuth refresh
+/// token is AES-256-GCM encrypted (write-only). Used to pull the creator's live
+/// chat into the in-app chat and (later) drive simulcast programmatically.
+model YoutubeAccount {
+  id               String   @id // "yt_..."
+  userId           String   @unique
+  refreshTokenEnc  String
+  channelId        String?
+  channelTitle     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+enum TicketStatus {
+  open
+  pending // awaiting the user's reply
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+/// A customer support ticket (contract §support). Threaded via SupportMessage;
+/// admins can add internal (user-invisible) notes. Matches broker-CRM helpdesks.
+model SupportTicket {
+  id            String         @id // "tkt_..."
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject       String
+  category      String         @default("general") // general | deposit | withdrawal | kyc | trading | account
+  priority      TicketPriority @default(normal)
+  status        TicketStatus   @default(open)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lastMessageAt DateTime       @default(now())
+
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+/// One message in a ticket thread. `internal=true` = admin-only note (never
+/// returned to the ticket owner). `authorRole` is "user" or "admin".
+model SupportMessage {
+  id         String        @id // "tmsg_..."
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  authorRole String        @default("user")
+  body       String
+  internal   Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+enum AnnouncementAudience {
+  all
+  followers
+  creators
+}
+
+/// A platform announcement shown in the app's notification bell (contract
+/// §announcements). `requiredRead` forces an acknowledgement; `active` + the
+/// optional start/end window control visibility. Targeted by audience.
+model Announcement {
+  id           String               @id // "ann_..."
+  title        String
+  body         String
+  audience     AnnouncementAudience @default(all)
+  requiredRead Boolean              @default(false)
+  active       Boolean              @default(true)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdBy    String
+  createdAt    DateTime             @default(now())
+
+  reads AnnouncementRead[]
+
+  @@index([active])
+}
+
+/// Per-user read/ack of an announcement (drives the unread bell count + the
+/// required-read gate). One row per (announcement, user).
+model AnnouncementRead {
+  id             String       @id // "annr_..."
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+}
+
+/// Append-only audit trail of admin actions (approvals, rejections, flags,
+/// settings changes, KYC decisions) — what a regulated fintech must keep.
+model AdminAuditLog {
+  id         String   @id // "aud_..."
+  adminId    String
+  action     String // "deposit.approve", "payout.reject", "settings.update", …
+  targetType String // "deposit" | "payout" | "user" | "settings" | "kyc"
+  targetId   String
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
+
+enum BroadcastPhase {
+  connecting
+  live
+  ended
+}
+
+/// A creator live stream (contract §3 Broadcast, §4.9). Cloudflare Stream Live
+/// provides ingest/HLS in production; a synthetic dev fallback is used when
+/// CLOUDFLARE_STREAM_TOKEN is unset.
+model Broadcast {
+  id           String         @id // "b_..."
+  creatorId    String
+  creator      User           @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  traderId     String?
+  title        String
+  phase        BroadcastPhase @default(connecting)
+  ingestUrl    String
+  streamKey    String
+  whipUrl      String? // Cloudflare WebRTC/WHIP publish URL (mobile go-live)
+  hlsUrl       String
+  cfInputId    String? // Cloudflare live input id
+  youtubeLiveChatId String? // linked YouTube live chat (chat ingest)
+  viewers      Int            @default(0)
+  peakViewers  Int            @default(0)
+  destinations Json           @default("[]") // [{ id:"youtube", connected:true }]
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime       @default(now())
+
+  chat    BroadcastChat[]
+  outputs BroadcastOutput[]
+
+  @@index([phase])
+  @@index([creatorId])
+}
+
+/// A simulcast destination for a broadcast (contract §4.9). Cloudflare Stream
+/// re-streams the live input to any RTMP target (YouTube/Facebook/Twitch/custom)
+/// — up to 50 per input. The target stream key is AES-256-GCM encrypted
+/// (write-only); responses expose only `masked`. `cfOutputId` links the
+/// Cloudflare output so it can be toggled/removed.
+model BroadcastOutput {
+  id           String    @id // "out_..."
+  broadcastId  String
+  broadcast    Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  platform     String // youtube | facebook | twitch | custom
+  targetUrl    String
+  streamKeyEnc String
+  masked       String
+  cfOutputId   String?
+  enabled      Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  @@index([broadcastId])
+}
+
+/// A live chat message (contract §3 LiveChatMessage). `source` distinguishes
+/// millimore/youtube/facebook; ingested YouTube chat lands here too.
+model BroadcastChat {
+  id          String    @id
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  author      String
+  text        String
+  source      String    @default("millimore")
+  byHost      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([broadcastId, createdAt])
+}
+
+/// Uploaded media (contract §5b). Dev stores bytes in Postgres (stateless across
+/// instances) and serves via GET /uploads/{id}; production writes to S3 via
+/// STORAGE_* env and stores only the URL. Base64 data-URLs are thus retired.
+model Upload {
+  id          String   @id // "up_..."
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentType String
+  data        Bytes? // dev only; null when stored in object storage
+  url         String? // set when stored in S3/CDN
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// A follower copying a trader (contract §3 CopyConfig, §4.7). One active row
+/// per (user, trader).
+model CopyConfig {
+  id        String   @id // "cc_..."
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traderId  String
+  accountId String
+  amount    Float // margin allocated from the wallet
+  leverage  Int      @default(100) // exposure = amount × leverage
+  risk      Float    @default(1.0)
+  autoCopy  Boolean  @default(true)
+  active    Boolean  @default(true)
+  startedAt DateTime @default(now())
+  stoppedAt DateTime?
+
+  @@unique([userId, traderId])
+  @@index([userId])
+}
+
+enum PositionStatus {
+  active
+  closed
+}
+
+/// A copied position (contract §3 CopyPosition, §4.7). P/L is computed live from
+/// current prices for active rows; exitPrice + booked P/L are stored on close.
+model CopyPosition {
+  id         String         @id // "pos_..."
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traderId   String
+  traderName String
+  accountId  String
+  pair       String
+  isBuy      Boolean
+  status     PositionStatus @default(active)
+  entryPrice Float
+  exitPrice  Float?
+  lots       Float
+  pnlAmount  Float          @default(0) // last computed / booked
+  pnlPercent Float          @default(0)
+  openedAt   DateTime       @default(now())
+  closedAt   DateTime?
+
+  @@index([userId, status])
+}
+
+/// In-app notification (contract §4.12). Populated by events (milestone 4/5);
+/// the app polls these as a fallback to the realtime WS channel.
+model Notification {
+  id        String   @id // "n_..."
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // e.g. trader.live.started | trade.opened | trade.closed | creator.status
+  title     String
+  body      String?
+  data      Json? // arbitrary payload (traderId, pair, pnl, …)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// A registered push device (contract §4.12) for FCM/APNs delivery.
+model Device {
+  token      String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform   String // 'android' | 'ios'
+  appVersion String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// A public trader profile (contract §3 Trader). Optionally linked to the
+/// creator User who owns it. Stats are stored (seeded/aggregated).
+model Trader {
+  id     String  @id // "t_..."
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name       String
+  username   String
+  photoUrl   String?
+  isVerified Boolean @default(false)
+  isLive     Boolean @default(false)
+
+  // Performance fee the trader charges on a copier's PROFIT (1–30%, trader-set;
+  // contract §6/wallet model). Millimore keeps a share of this (PLATFORM_FEE_SHARE).
+  commissionPercent Int @default(20)
+
+  returnPercent Float @default(0)
+  returnDays    Int   @default(30)
+  followers     Int   @default(0)
+  copiers       Int   @default(0)
+  aum           Float @default(0)
+  winRate       Float @default(0)
+  maxDrawdown   Float @default(0)
+  totalTrades   Int   @default(0)
+
+  category String   @default("Forex")
+  tags     String[] @default([])
+  bio      String?
+
+  createdAt DateTime @default(now())
+
+  posts         Post[]
+  subscriptions Subscription[]
+
+  @@index([category])
+  @@index([copiers])
+  @@index([returnPercent])
+}
+
+/// A trader's content post (contract §3 Post).
+model Post {
+  id       String   @id // "p_..."
+  traderId String
+  trader   Trader   @relation(fields: [traderId], references: [id], onDelete: Cascade)
+  type     PostType
+  content  String
+  pair     String?
+  title    String?
+  points   String[] @default([])
+  imageUrl String? // optional chart/setup screenshot (uploaded via /uploads)
+
+  // Trade-post fields (type=trade) — makes a post copyable (contract §4.6).
+  tradeSide       String? // "buy" | "sell"
+  tradeEntryType  String? // "market" | "limit"
+  tradeEntryPrice Float?
+  tradeSl         Float?
+  tradeTp         Float?
+  tradeSlPct      Float?
+  tradeTpPct      Float?
+
+  createdAt DateTime @default(now())
+
+  likes    PostLike[]
+  saves    PostSave[]
+  comments Comment[]
+
+  @@index([traderId])
+  @@index([createdAt])
+}
+
+/// A per-pair public chat message (contract §pairs). Powers the Exness/eToro-style
+/// chat under a symbol's chart. Broadcast over the WS `pair:{symbol}` channel.
+model PairChat {
+  id        String   @id // "pc_..."
+  symbol    String // e.g. "XAU/USD"
+  userId    String
+  author    String // username/name snapshot
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([symbol, createdAt])
+}
+
+model PostLike {
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@index([postId])
+}
+
+model PostSave {
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id // "c_..."
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+}
+
+/// Follower → trader subscription (contract §4.5). `notify` = bell toggle.
+model Subscription {
+  userId    String
+  traderId  String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trader    Trader   @relation(fields: [traderId], references: [id], onDelete: Cascade)
+  notify    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@id([userId, traderId])
+  @@index([traderId])
+}
+
+/// A supported broker. GET /brokers?country= is gated by `countries`
+/// (empty list = available everywhere). Serialized to contract §3 `Broker`.
+model Broker {
+  id          String   @id // slug, e.g. "century", "xm"
+  name        String
+  domain      String
+  logoUrl     String?
+  recommended Boolean  @default(false)
+  countries   String[] @default([]) // ISO alpha-2 gate; empty = global
+  sortOrder   Int      @default(100)
+
+  createdAt DateTime @default(now())
+
+  accounts TradingAccount[]
+}
+
+/// A user's connected broker trading account (contract §3 TradingAccount).
+/// The password is write-only: AES-256-GCM encrypted, never serialized.
+model TradingAccount {
+  id            String        @id // "acc_..."
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerId      String
+  broker        Broker        @relation(fields: [brokerId], references: [id])
+  brokerName    String // denormalized snapshot for stable display
+  accountNumber String
+  server        String
+  currency      String        @default("USD")
+  balance       Float         @default(0) // populated by the MT bridge (milestone 6)
+  status        AccountStatus @default(connected)
+
+  // Write-only credential — never returned in responses.
+  passwordEnc String?
+
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([brokerId])
+}
+
+/// One-time-passcode request used by /auth/otp/request + /auth/otp/verify.
+model OtpRequest {
+  id          String   @id // the opaque requestId returned to the client
+  phone       String
+  codeHash    String // never store the raw code
+  attempts    Int      @default(0)
+  consumedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([phone])
+}
+
+/// Email password-reset token. The raw token is emailed to the user; only its
+/// hash is stored (like OtpRequest). Single-use, short-lived.
+model PasswordReset {
+  id         String    @id // "pr_..."
+  userId     String
+  tokenHash  String // sha-256 of the raw token, never the raw value
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+/// A per-user, per-network crypto deposit address (issued after KYC). Funds sent
+/// here are credited to the user's wallet and auto-forwarded to the master wallet
+/// by the processor (Tatum Gas Pump). One address per (user, network).
+model DepositAddress {
+  id              String   @id // "da_..."
+  userId          String
+  network         String // "tron" | "ethereum" | "bsc"
+  asset           String   @default("USDT")
+  address         String
+  providerRef     String? // processor address id (e.g. Tatum gas-pump address)
+  derivationIndex Int? // HD index when applicable
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, network])
+  @@unique([network, address])
+  @@index([address])
+}
+
+/// A user's price alert on a symbol. One-shot: fires once when the live price
+/// crosses `targetPrice` in `direction`, then status → triggered.
+model PriceAlert {
+  id             String    @id // "pa_..."
+  userId         String
+  symbol         String // e.g. "XAU/USD"
+  direction      String // "above" | "below"
+  targetPrice    Float
+  note           String?
+  notifyEmail    Boolean   @default(false)
+  status         String    @default("active") // active | triggered | cancelled
+  triggeredAt    DateTime?
+  triggeredPrice Float?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([status, symbol])
+}
+
+/// Creator verification application (from /auth/register/creator or /creator/apply).
+/// The admin approval queue (milestone 2) reads pending rows here.
+model CreatorApplication {
+  id       String        @id
+  userId   String
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status   CreatorStatus @default(pending)
+
+  market   String
+  platform String
+
+  // verification { platform, server?, account?, investorPassword?, statementUrl? }
+  verificationPlatform String
+  server               String?
+  account              String?
+  statementUrl         String?
+  // Write-only credential — AES-256-GCM encrypted, never returned in responses.
+  investorPasswordEnc  String?
+
+  reviewerNote String?
+  rejectReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([userId])
+}
+
+/// Auto-sweep (consolidation) of a user's deposit address to the master wallet.
+/// Non-custodial: signing is delegated to Tatum KMS via signatureId — the
+/// mnemonic never touches this server. One row per sweep attempt; the unique
+/// (network,address,status=pending) guard prevents overlapping in-flight sweeps.
+model Sweep {
+  id          String   @id // "swp_..."
+  userId      String
+  network     String // "tron" | "ethereum" | "bsc"
+  fromAddress String
+  toAddress   String
+  asset       String   @default("USDT")
+  amount      Float // whole units swept (best-effort; on-chain is source of truth)
+  txRef       String? // on-chain tx hash once broadcast
+  signatureId String? // Tatum KMS signature id used to sign
+  status      String   @default("pending") // pending | broadcast | confirmed | failed
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([network, fromAddress])
+  @@index([status])
+}
+
+/// Email verification code (OTP) sent to the address a user enters. Only the hash
+/// is stored; single-use, short-lived — mirrors OtpRequest but keyed to email.
+model EmailVerification {
+  id         String    @id // "ev_..."
+  userId     String
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([email])
+}
+
+/// A 24h ephemeral Story (image/video + caption). `kind=recap` carries a live
+/// broadcast stat card (broadcastId set). Grouped by author on read.
+model Story {
+  id          String   @id // "st_..."
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaUrl    String
+  mediaType   String   @default("image") // "image" | "video"
+  caption     String?
+  kind        String   @default("normal") // "normal" | "recap"
+  broadcastId String? // set when kind=recap
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  views StoryView[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// A per-viewer view record for a Story (dedup + unseen badges).
+model StoryView {
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@id([storyId, userId])
+  @@index([userId])
+}

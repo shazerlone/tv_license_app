@@ -1,0 +1,58 @@
+# AWS Copilot manifest — Load Balanced Web Service on ECS Fargate + ALB.
+# Copilot provisions the VPC, ALB, ECS service, autoscaling and logs for you.
+# ALB fully supports WebSockets (/v1/ws), which is why we use Fargate+ALB rather
+# than App Runner for this realtime app.
+#
+# Usage (from millimore-backend/, after `aws configure`):
+#   npm i -g @aws-amplify/... ; brew install aws/tap/copilot-cli   # install copilot
+#   copilot init --app millimore --name backend \
+#     --type "Load Balanced Web Service" --dockerfile ./Dockerfile --port 3000
+#   # replace the generated copilot/backend/manifest.yml with this file (adjust), then:
+#   copilot env init --name prod
+#   copilot deploy --name backend --env prod
+#
+# Store secrets first (see AWS_DEPLOY.md):
+#   copilot secret init --name DATABASE_URL --values prod=...      (repeat per secret)
+
+name: backend
+type: Load Balanced Web Service
+
+image:
+  build: Dockerfile
+  port: 3000
+
+http:
+  path: '/'
+  healthcheck:
+    path: '/v1/health'
+    healthy_threshold: 2
+    interval: 15s
+    timeout: 5s
+  # WebSockets ride the same ALB listener; longer idle so /v1/ws stays open.
+  deregistration_delay: 30s
+
+cpu: 512 # 0.5 vCPU
+memory: 1024 # 1 GB
+platform: linux/x86_64
+
+# Start at 1 (no cold start — always warm). Turn on autoscaling when metrics
+# justify it: this scales 1→6 tasks on CPU. Redis makes multi-task safe.
+count:
+  range: 1-6
+  cpu_percentage: 65
+
+exec: true # `copilot svc exec` for a shell (run migrations, debug)
+
+variables:
+  NODE_ENV: production
+  API_PREFIX: v1
+  CORS_ORIGINS: '*' # tighten to your real web origins for production
+  OTP_PROVIDER: console # swap to twilio/msg91 + OTP_PROVIDER_KEY when ready
+  JWT_EXPIRES_IN: 30d
+
+# Pulled from AWS SSM Parameter Store / Secrets Manager (never in the image).
+secrets:
+  DATABASE_URL: /millimore/prod/DATABASE_URL
+  JWT_SECRET: /millimore/prod/JWT_SECRET
+  CREDENTIAL_ENCRYPTION_KEY: /millimore/prod/CREDENTIAL_ENCRYPTION_KEY
+  REDIS_URL: /millimore/prod/REDIS_URL

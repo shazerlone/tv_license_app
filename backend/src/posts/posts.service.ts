@@ -1,0 +1,286 @@
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Prisma, PostType } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { TradersService } from '../traders/traders.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { genId } from '../common/ids';
+import { PostDto, CommentDto, CreatePostDto, LikesDto } from './dto/post.dto';
+import { ReelDto } from '../traders/dto/trader.dto';
+import { seedFromString } from '../common/rng';
+
+/** Prisma include that carries everything needed to serialize a Post for a user. */
+function postInclude(userId: string) {
+  return {
+    trader: true,
+    _count: { select: { likes: true, comments: true } },
+    likes: { where: { userId }, select: { userId: true } },
+    saves: { where: { userId }, select: { userId: true } },
+  } satisfies Prisma.PostInclude;
+}
+type PostWithMeta = Prisma.PostGetPayload<{ include: ReturnType<typeof postInclude> }>;
+
+@Injectable()
+export class PostsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly traders: TradersService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  /** Notify a post's owning creator of social activity (like/comment). Best-effort
+   *  and self-skipping — never blocks or fails the underlying action. */
+  private async notifyPostOwner(postId: string, actorId: string, type: 'social.like' | 'social.comment') {
+    try {
+      const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { trader: { select: { userId: true } } } });
+      const ownerId = post?.trader.userId;
+      if (!ownerId || ownerId === actorId) return; // no owner, or acting on own post
+      const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { name: true } });
+      const actorName = actor?.name ?? 'Someone';
+      const title = type === 'social.like' ? `${actorName} liked your post` : `${actorName} commented on your post`;
+      await this.notifications.pushEvent(ownerId, type, title, { data: { actorName, postId } });
+    } catch {
+      /* notifications are best-effort */
+    }
+  }
+
+  toDto(p: PostWithMeta): PostDto {
+    return {
+      id: p.id,
+      trader: this.traders.toDto(p.trader),
+      type: p.type,
+      content: p.content,
+      pair: p.pair,
+      title: p.title,
+      points: p.points,
+      imageUrl: p.imageUrl,
+      trade:
+        p.type === PostType.trade && p.tradeSide
+          ? {
+              side: p.tradeSide,
+              entryType: p.tradeEntryType ?? 'market',
+              entryPrice: p.tradeEntryPrice,
+              sl: p.tradeSl,
+              tp: p.tradeTp,
+              slPct: p.tradeSlPct,
+              tpPct: p.tradeTpPct,
+            }
+          : null,
+      likes: p._count.likes,
+      comments: p._count.comments,
+      createdAt: p.createdAt.toISOString(),
+      isLiked: p.likes.length > 0,
+      saved: p.saves.length > 0,
+    };
+  }
+
+  async listByTrader(traderId: string, userId: string): Promise<PostDto[]> {
+    await this.traders.getEntityOrThrow(traderId);
+    const posts = await this.prisma.post.findMany({
+      where: { traderId },
+      orderBy: { createdAt: 'desc' },
+      include: postInclude(userId),
+    });
+    return posts.map((p) => this.toDto(p));
+  }
+
+  async feed(userId: string): Promise<PostDto[]> {
+    const [subs, ownTrader] = await Promise.all([
+      this.prisma.subscription.findMany({ where: { userId }, select: { traderId: true } }),
+      // A creator sees their OWN posts in the feed too, so the app doesn't have to
+      // merge own + subscription feeds client-side.
+      this.prisma.trader.findUnique({ where: { userId }, select: { id: true } }),
+    ]);
+    const traderIds = [...new Set([...subs.map((s) => s.traderId), ...(ownTrader ? [ownTrader.id] : [])])];
+    if (traderIds.length === 0) return [];
+    const posts = await this.prisma.post.findMany({
+      where: { traderId: { in: traderIds } },
+      orderBy: { createdAt: 'desc' },
+      include: postInclude(userId),
+      take: 100,
+    });
+    return posts.map((p) => this.toDto(p));
+  }
+
+  async saved(userId: string): Promise<PostDto[]> {
+    const rows = await this.prisma.postSave.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: { post: { include: postInclude(userId) } },
+    });
+    return rows.map((r) => this.toDto(r.post));
+  }
+
+  async like(userId: string, postId: string): Promise<LikesDto> {
+    await this.getPostOrThrow(postId);
+    // Only notify on a NEW like (not a repeated tap on an already-liked post).
+    const existing = await this.prisma.postLike.findUnique({ where: { userId_postId: { userId, postId } }, select: { userId: true } });
+    await this.prisma.postLike.upsert({
+      where: { userId_postId: { userId, postId } },
+      update: {},
+      create: { userId, postId },
+    });
+    if (!existing) await this.notifyPostOwner(postId, userId, 'social.like');
+    return { likes: await this.prisma.postLike.count({ where: { postId } }) };
+  }
+
+  async unlike(userId: string, postId: string): Promise<LikesDto> {
+    await this.getPostOrThrow(postId);
+    await this.prisma.postLike.deleteMany({ where: { userId, postId } });
+    return { likes: await this.prisma.postLike.count({ where: { postId } }) };
+  }
+
+  async save(userId: string, postId: string): Promise<void> {
+    await this.getPostOrThrow(postId);
+    await this.prisma.postSave.upsert({
+      where: { userId_postId: { userId, postId } },
+      update: {},
+      create: { userId, postId },
+    });
+  }
+
+  async unsave(userId: string, postId: string): Promise<void> {
+    await this.prisma.postSave.deleteMany({ where: { userId, postId } });
+  }
+
+  async comments(postId: string, userId: string): Promise<CommentDto[]> {
+    await this.getPostOrThrow(postId);
+    const rows = await this.prisma.comment.findMany({
+      where: { postId },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { id: true, name: true, username: true } } },
+    });
+    return rows.map((c) => ({
+      id: c.id,
+      author: c.user.name,
+      username: c.user.username,
+      text: c.text,
+      createdAt: c.createdAt.toISOString(),
+      byMe: c.userId === userId,
+    }));
+  }
+
+  async addComment(userId: string, postId: string, text: string): Promise<CommentDto> {
+    await this.getPostOrThrow(postId);
+    const c = await this.prisma.comment.create({
+      data: { id: genId('c'), postId, userId, text },
+      include: { user: { select: { id: true, name: true, username: true } } },
+    });
+    await this.notifyPostOwner(postId, userId, 'social.comment');
+    return {
+      id: c.id,
+      author: c.user.name,
+      username: c.user.username,
+      text: c.text,
+      createdAt: c.createdAt.toISOString(),
+      byMe: true,
+    };
+  }
+
+  /** Discover reels — a mixed live/trade/lesson feed (contract §4.4). */
+  async reels(userId: string): Promise<ReelDto[]> {
+    const [live, contentPosts] = await Promise.all([
+      this.prisma.trader.findMany({ where: { isLive: true }, orderBy: { copiers: 'desc' } }),
+      this.prisma.post.findMany({
+        where: { type: { in: ['trade', 'lesson'] } },
+        orderBy: { createdAt: 'desc' },
+        include: postInclude(userId),
+        take: 20,
+      }),
+    ]);
+
+    const reels: ReelDto[] = [];
+    for (const t of live) {
+      reels.push({
+        kind: 'live',
+        trader: this.traders.toDto(t),
+        viewers: 40 + (seedFromString(`${t.id}:viewers`) % 4000),
+      });
+    }
+    for (const p of contentPosts) {
+      const dto = this.toDto(p);
+      reels.push({
+        kind: p.type === 'lesson' ? 'lesson' : 'trade',
+        trader: dto.trader,
+        post: dto,
+        title: p.title,
+        points: p.points,
+      });
+    }
+    return reels;
+  }
+
+  /** Compose a post (contract §4.6). Ensures the author has a trader profile. */
+  async compose(userId: string, dto: CreatePostDto): Promise<PostDto> {
+    const trader = await this.traders.ensureForUser(userId);
+    // Accept the trade payload nested (app's preferred shape) or flat (back-compat).
+    const isTrade = dto.type === 'trade';
+    const t = dto.trade ?? {};
+    const side = t.side ?? dto.side;
+    const post = await this.prisma.post.create({
+      data: {
+        id: genId('p'),
+        traderId: trader.id,
+        type: dto.type as PostType,
+        content: dto.content,
+        pair: dto.pair,
+        title: dto.title,
+        points: dto.points ?? [],
+        imageUrl: dto.imageUrl,
+        // Trade fields only meaningful on a trade post.
+        tradeSide: isTrade ? side ?? null : null,
+        tradeEntryType: isTrade ? t.entryType ?? dto.entryType ?? 'market' : null,
+        tradeEntryPrice: isTrade ? t.entryPrice ?? dto.entryPrice ?? null : null,
+        tradeSl: isTrade ? t.sl ?? dto.sl ?? null : null,
+        tradeTp: isTrade ? t.tp ?? dto.tp ?? null : null,
+        tradeSlPct: isTrade ? t.slPct ?? dto.slPct ?? null : null,
+        tradeTpPct: isTrade ? t.tpPct ?? dto.tpPct ?? null : null,
+      },
+      include: postInclude(userId),
+    });
+    return this.toDto(post);
+  }
+
+  /** Edit own post (contract §5b). */
+  async update(
+    userId: string,
+    postId: string,
+    patch: { content?: string; title?: string; pair?: string; points?: string[] },
+  ): Promise<PostDto> {
+    await this.ownedPostOrThrow(userId, postId);
+    const post = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        content: patch.content,
+        title: patch.title,
+        pair: patch.pair,
+        points: patch.points,
+      },
+      include: postInclude(userId),
+    });
+    return this.toDto(post);
+  }
+
+  /** Delete own post (contract §5b). */
+  async remove(userId: string, postId: string): Promise<void> {
+    await this.ownedPostOrThrow(userId, postId);
+    await this.prisma.post.delete({ where: { id: postId } });
+  }
+
+  private async ownedPostOrThrow(userId: string, postId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { trader: { select: { userId: true } } },
+    });
+    if (!post) throw new NotFoundException({ code: 'post_not_found', message: 'Post not found' });
+    if (post.trader.userId !== userId) {
+      throw new ForbiddenException({ code: 'forbidden', message: 'Not your post' });
+    }
+    return post;
+  }
+
+  private async getPostOrThrow(postId: string) {
+    const p = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    if (!p) throw new NotFoundException({ code: 'post_not_found', message: 'Post not found' });
+    return p;
+  }
+}

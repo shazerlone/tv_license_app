@@ -1,0 +1,29 @@
+# AWS App Runner — source-based deploy (App Runner reads this from the
+# "Source directory" you set to `millimore-backend` in the console).
+# Builds the API + admin, runs DB migrations, then starts. No Docker/CLI needed.
+version: 1.0
+runtime: nodejs18
+build:
+  commands:
+    build:
+      - npm ci --include=dev
+      - npx prisma generate
+      - npm run build
+      - cd admin && npm ci --include=dev && npm run build && cd ..
+run:
+  command: sh -c "npx prisma migrate deploy && npm run db:seed && node dist/main.js"
+  network:
+    port: 3000
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: API_PREFIX
+      value: v1
+    - name: CORS_ORIGINS
+      value: "*"
+    - name: OTP_PROVIDER
+      value: console
+    # Set these as SECRETS in the App Runner console (not here):
+    #   DATABASE_URL, JWT_SECRET, CREDENTIAL_ENCRYPTION_KEY
+    # Optional: REDIS_URL (ElastiCache) for multi-instance realtime,
+    #           STORAGE_BUCKET + STORAGE_REGION for S3 uploads.
