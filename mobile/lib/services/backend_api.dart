@@ -275,6 +275,21 @@ class BackendApi {
     return (res as Map).cast<String, dynamic>();
   }
 
+  /// A specific author's active stories, grouped (for their profile ring).
+  /// Returns null when they have no active stories.
+  static Future<Map<String, dynamic>?> storiesForUser(String userId) async {
+    final res = await _api.get('/stories/user/$userId');
+    if (res is Map && res.isNotEmpty) return res.cast<String, dynamic>();
+    return null;
+  }
+
+  /// A trader's active stories, grouped (for their profile ring). Null if none.
+  static Future<Map<String, dynamic>?> storiesForTrader(String traderId) async {
+    final res = await _api.get('/stories/trader/$traderId');
+    if (res is Map && res.isNotEmpty) return res.cast<String, dynamic>();
+    return null;
+  }
+
   static Future<void> viewStory(String id) => _api.post('/stories/$id/view');
   static Future<void> deleteStory(String id) => _api.delete('/stories/$id');
 

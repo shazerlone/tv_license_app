@@ -26,6 +26,20 @@ export class StoriesController {
     return this.stories.feed(u.userId);
   }
 
+  @Get('user/:userId')
+  @ApiOperation({ summary: "A specific author's active stories, grouped (for their profile ring)" })
+  @ApiOkResponse({ type: StoryGroupDto })
+  userGroup(@CurrentUser() u: AuthUser, @Param('userId') userId: string): Promise<StoryGroupDto | null> {
+    return this.stories.userGroup(userId, u.userId);
+  }
+
+  @Get('trader/:traderId')
+  @ApiOperation({ summary: "A trader's active stories, grouped (for their profile ring)" })
+  @ApiOkResponse({ type: StoryGroupDto })
+  traderGroup(@CurrentUser() u: AuthUser, @Param('traderId') traderId: string): Promise<StoryGroupDto | null> {
+    return this.stories.traderGroup(traderId, u.userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a single story' })
   @ApiOkResponse({ type: StoryDto })

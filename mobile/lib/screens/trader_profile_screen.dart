@@ -7,7 +7,9 @@ import '../config.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
 import '../models/post.dart';
+import '../models/story.dart';
 import '../services/backend_api.dart';
+import 'story_viewer_screen.dart';
 import '../state/app_state.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/avatar.dart';
@@ -35,6 +37,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
   List<Post> _posts = const [];
   List<double> _equity = const [];
   bool _loading = false;
+  StoryGroup? _storyGroup; // this creator's active stories (for the profile ring)
 
   @override
   void initState() {
@@ -86,15 +89,18 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
       final activeF = BackendApi.traderTrades(id, status: 'active');
       final closedF = BackendApi.traderTrades(id, status: 'closed');
       final equityF = BackendApi.traderEquity(id).then((pts) => pts.map((e) => e.value).toList()).catchError((_) => <double>[]);
+      final storyF = BackendApi.storiesForTrader(id).catchError((_) => null);
       final posts = await postsF;
       final active = await activeF;
       final closed = await closedF;
       final equity = await equityF;
+      final story = await storyF;
       if (!mounted) return;
       setState(() {
         _posts = posts.map(Post.fromApi).toList();
         _trades = [...active, ...closed].map(Trade.fromApi).toList();
         _equity = equity;
+        _storyGroup = story != null ? StoryGroup.fromJson(story) : null;
         _loading = false;
       });
     } catch (_) {
@@ -107,6 +113,43 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Avatar with an Instagram-style story ring when this creator has active
+  /// stories: gradient when unseen, gray when all seen. Tapping opens them.
+  Widget _avatarWithStory(Trader trader) {
+    final g = _storyGroup;
+    final base = Avatar(
+      name: trader.name,
+      photoUrl: trader.avatarUrl,
+      size: 76,
+      ringColor: (g == null && trader.isLive) ? AppColors.red : null,
+    );
+    if (g == null || g.stories.isEmpty) return base;
+    final unseen = g.hasUnseen;
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => StoryViewerScreen(groups: [g], initialGroup: 0)),
+      ).then((_) {
+        if (kUseBackend) BackendApi.storiesForTrader(trader.id).then((s) {
+          if (mounted) setState(() => _storyGroup = s != null ? StoryGroup.fromJson(s) : null);
+        }).catchError((_) {});
+      }),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: unseen ? const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFFA78BFA)], begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
+          border: unseen ? null : Border.all(color: AppColors.border, width: 2.5),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(2.5),
+          decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.background),
+          child: Avatar(name: trader.name, photoUrl: trader.avatarUrl, size: 66),
+        ),
+      ),
+    );
   }
 
   @override
@@ -153,12 +196,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          Avatar(
-                            name: trader.name,
-                            photoUrl: trader.avatarUrl,
-                            size: 76,
-                            ringColor: trader.isLive ? AppColors.red : null,
-                          ),
+                          _avatarWithStory(trader),
                           if (trader.isLive)
                             Positioned(
                               bottom: -6, left: 0, right: 0,

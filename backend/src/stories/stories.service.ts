@@ -93,6 +93,42 @@ export class StoriesService {
     });
   }
 
+  /** Active stories for one specific author, grouped (for their profile ring).
+   *  Returns null when they have no active stories. */
+  async userGroup(targetUserId: string, viewerId: string): Promise<StoryGroupDto | null> {
+    const stories = await this.prisma.story.findMany({
+      where: { userId: targetUserId, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        views: { where: { userId: viewerId }, select: { userId: true } },
+        user: { select: { id: true, name: true, username: true, photoUrl: true } },
+      },
+    });
+    if (stories.length === 0) return null;
+    const g: StoryGroupDto = {
+      user: {
+        id: stories[0].user.id,
+        name: stories[0].user.name,
+        username: stories[0].user.username,
+        photoUrl: stories[0].user.photoUrl,
+      },
+      stories: [],
+      hasUnseen: false,
+    };
+    for (const s of stories) {
+      g.stories.push(this.toDto(s, viewerId));
+      if (s.views.length === 0) g.hasUnseen = true;
+    }
+    return g;
+  }
+
+  /** Same as userGroup but keyed by a trader id (resolves trader → user). */
+  async traderGroup(traderId: string, viewerId: string): Promise<StoryGroupDto | null> {
+    const t = await this.prisma.trader.findUnique({ where: { id: traderId }, select: { userId: true } });
+    if (!t?.userId) return null;
+    return this.userGroup(t.userId, viewerId);
+  }
+
   async getOne(id: string, userId: string): Promise<StoryDto> {
     const s = await this.prisma.story.findUnique({ where: { id }, include: { views: true } });
     if (!s || s.expiresAt.getTime() < Date.now()) throw new NotFoundException({ code: 'story_not_found', message: 'Story not found or expired' });
