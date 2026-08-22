@@ -39,11 +39,16 @@ export class FirebaseAdminService {
     if (this.initTried) return undefined;
     this.initTried = true;
 
+    // Reuse the same service-account key already configured for push (FCM) — it
+    // belongs to the same Firebase project, so it verifies ID tokens too. Falls
+    // back to a dedicated FIREBASE_SERVICE_ACCOUNT if you prefer a separate key.
     const raw =
       this.config.get<string>('FIREBASE_SERVICE_ACCOUNT') ||
-      this.decodeB64(this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_B64'));
+      this.decodeB64(this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_B64')) ||
+      this.config.get<string>('FCM_SERVICE_ACCOUNT_JSON') ||
+      this.decodeB64(this.config.get<string>('FCM_SERVICE_ACCOUNT_B64'));
     if (!raw) {
-      this.logger.warn('Firebase Phone Auth disabled: no FIREBASE_SERVICE_ACCOUNT[_B64] set.');
+      this.logger.warn('Firebase Phone Auth disabled: no FIREBASE_SERVICE_ACCOUNT[_B64] / FCM_SERVICE_ACCOUNT_[JSON|B64] set.');
       return undefined;
     }
     try {
