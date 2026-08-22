@@ -32,7 +32,10 @@ class PushService {
     if (_started || !kUseBackend) return;
     _started = true;
     try {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      // main() already initializes Firebase; only do it here if that was skipped.
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      }
       FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
       final fm = FirebaseMessaging.instance;
 

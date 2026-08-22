@@ -15,9 +15,18 @@ import 'services/realtime_service.dart';
 import 'services/push_service.dart';
 import 'config.dart';
 import 'screens/login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize Firebase up front so Phone Auth works on the login screen
+  // (before any session exists). Idempotent — push_service reuses this app.
+  if (kUseBackend) {
+    try {
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    } catch (_) {/* messaging/auth degrade gracefully if this fails */}
+  }
   runApp(const MillimoreApp());
 }
 

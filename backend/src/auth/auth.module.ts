@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { OtpService } from './otp/otp.service';
+import { FirebaseAdminService } from './firebase/firebase-admin.service';
 import { UsersModule } from '../users/users.module';
 import { CryptoModule } from '../common/crypto/crypto.module';
 
@@ -23,7 +24,7 @@ import { CryptoModule } from '../common/crypto/crypto.module';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, OtpService],
+  providers: [AuthService, JwtStrategy, OtpService, FirebaseAdminService],
   controllers: [AuthController],
   exports: [AuthService],
 })

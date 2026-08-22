@@ -96,6 +96,7 @@ model User {
   passwordHash  String?
   appleSubject  String? @unique
   googleSubject String? @unique
+  firebaseUid   String? @unique
 
   // Two-factor auth (TOTP, RFC 6238). Secret is AES-256-GCM encrypted; backup
   // codes are bcrypt-hashed; twofaLastStep blocks TOTP code reuse.

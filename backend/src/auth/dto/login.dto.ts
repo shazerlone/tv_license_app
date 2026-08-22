@@ -32,3 +32,10 @@ export class GoogleSocialDto {
   @IsString()
   idToken: string;
 }
+
+/** POST /auth/firebase — Firebase Phone Auth ID token exchange. */
+export class FirebaseSignInDto {
+  @ApiProperty({ description: 'Firebase ID token from a completed phone sign-in.' })
+  @IsString()
+  idToken: string;
+}

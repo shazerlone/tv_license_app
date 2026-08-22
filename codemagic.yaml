@@ -74,6 +74,30 @@ workflows:
           # provisioning profile includes it).
           python3 -c 'import pathlib; pathlib.Path("ios/Runner/Runner.entitlements").write_text("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict>\n<key>aps-environment</key><string>production</string>\n</dict></plist>\n")'
           python3 -c 'import re,pathlib; p=pathlib.Path("ios/Runner.xcodeproj/project.pbxproj"); t=p.read_text(); t=t if "CODE_SIGN_ENTITLEMENTS" in t else re.sub(r"(PRODUCT_BUNDLE_IDENTIFIER = com\.millimore\.millimore;)", r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;", t); p.write_text(t)'
+      - name: Configure Firebase Phone Auth (iOS URL scheme)
+        script: |
+          # Firebase Phone Auth's reCAPTCHA fallback opens a Safari flow that
+          # redirects back via a custom URL scheme = REVERSED_CLIENT_ID from the
+          # GoogleService-Info.plist. Register it in Info.plist's CFBundleURLTypes.
+          python3 - <<'PY'
+          import plistlib, pathlib
+          gsp = pathlib.Path("ios/Runner/GoogleService-Info.plist")
+          info = pathlib.Path("ios/Runner/Info.plist")
+          if gsp.exists():
+              g = plistlib.loads(gsp.read_bytes())
+              rev = g.get("REVERSED_CLIENT_ID")
+              if rev:
+                  d = plistlib.loads(info.read_bytes())
+                  types = d.setdefault("CFBundleURLTypes", [])
+                  if not any(rev in (t.get("CFBundleURLSchemes") or []) for t in types):
+                      types.append({"CFBundleURLSchemes": [rev]})
+                  info.write_bytes(plistlib.dumps(d))
+                  print("Added REVERSED_CLIENT_ID URL scheme.")
+              else:
+                  print("No REVERSED_CLIENT_ID in GoogleService-Info.plist (phone auth may need it).")
+          else:
+              print("GoogleService-Info.plist missing; skipping URL scheme.")
+          PY
       - name: Flutter packages get
         script: flutter pub get
       - name: Generate branded app icon

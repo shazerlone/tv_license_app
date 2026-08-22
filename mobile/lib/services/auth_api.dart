@@ -103,6 +103,12 @@ class AuthApi {
     return _session(res as Map);
   }
 
+  /// Exchange a Firebase Phone Auth ID token for a Millimore session.
+  static Future<UserProfile> firebaseSignIn(String idToken) async {
+    final res = await _api.post('/auth/firebase', {'idToken': idToken});
+    return _session(res as Map);
+  }
+
   static Future<UserProfile> me() async {
     final res = await _api.get('/me');
     return UserProfile.fromJson(((res as Map)['user'] as Map).cast<String, dynamic>());

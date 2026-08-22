@@ -24,7 +24,7 @@ import {
   OtpVerifyDto,
   AuthResponseDto,
 } from './dto/otp.dto';
-import { LoginDto, AppleSocialDto, GoogleSocialDto } from './dto/login.dto';
+import { LoginDto, AppleSocialDto, GoogleSocialDto, FirebaseSignInDto } from './dto/login.dto';
 import {
   ForgotPasswordDto,
   ForgotPasswordResponseDto,
@@ -125,6 +125,15 @@ export class AuthController {
   @ApiOkResponse({ type: AuthResponseDto })
   google(@Body() dto: GoogleSocialDto): Promise<AuthResponseDto> {
     return this.auth.socialGoogle(dto.idToken);
+  }
+
+  @Post('firebase')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(AUTH_THROTTLE)
+  @ApiOperation({ summary: 'Exchange a Firebase Phone Auth ID token for a session (SMS OTP, no DLT)' })
+  @ApiOkResponse({ type: AuthResponseDto })
+  firebase(@Body() dto: FirebaseSignInDto): Promise<AuthResponseDto> {
+    return this.auth.firebaseSignIn(dto.idToken);
   }
 
   @Post('logout')

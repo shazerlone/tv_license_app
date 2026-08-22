@@ -18,6 +18,7 @@ import { ReferralsService } from '../referrals/referrals.service';
 import { TwofaService } from '../twofa/twofa.service';
 import { MailService } from '../mail/mail.service';
 import { EmailVerificationService } from '../users/email-verification.service';
+import { FirebaseAdminService } from './firebase/firebase-admin.service';
 import { genId } from '../common/ids';
 import { countryNameFromIso } from '../common/countries';
 import {
@@ -42,7 +43,43 @@ export class AuthService {
     private readonly twofa: TwofaService,
     private readonly mail: MailService,
     private readonly emailVerification: EmailVerificationService,
+    private readonly firebase: FirebaseAdminService,
   ) {}
+
+  /**
+   * Exchange a verified Firebase ID token (Phone Auth) for a Millimore session.
+   * Matches an existing account by phone (or Firebase uid), else creates a
+   * minimal follower — registration can enrich it afterward via PATCH /me.
+   */
+  async firebaseSignIn(idToken: string): Promise<AuthResponseDto> {
+    const id = await this.firebase.verify(idToken);
+    if (!id.phone) {
+      throw new BadRequestException({ code: 'phone_missing', message: 'This sign-in did not include a phone number.' });
+    }
+    let user =
+      (await this.prisma.user.findFirst({ where: { firebaseUid: id.uid } })) ??
+      (await this.prisma.user.findUnique({ where: { phone: id.phone } }));
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          id: genId('u'),
+          name: id.name || 'New User',
+          username: await this.uniqueUsername(id.name || 'user'),
+          phone: id.phone,
+          firebaseUid: id.uid,
+          role: Role.follower,
+          creatorStatus: CreatorStatus.none,
+        },
+      });
+    } else if (!user.firebaseUid) {
+      // Link the Firebase uid to an existing (phone-matched) account.
+      user = await this.prisma.user.update({ where: { id: user.id }, data: { firebaseUid: id.uid } });
+    }
+    if (user.banned) {
+      throw new UnauthorizedException({ code: 'account_banned', message: 'Account suspended' });
+    }
+    return this.envelope(user);
+  }
 
   /** Set an email at registration (unverified) + fire a verification code. Guards
    *  against a duplicate email and never fails registration on a mail hiccup. */
