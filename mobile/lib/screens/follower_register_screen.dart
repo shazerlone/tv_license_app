@@ -97,7 +97,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   }
 
   Future<void> _pickPhoto() async {
-    final url = await ImagePickerService.pickImageAsDataUrl();
+    final url = await ImagePickerService.pickImageAsDataUrl(cropSquare: true);
     if (url != null && mounted) setState(() => _photoDataUrl = url);
   }
 

@@ -450,6 +450,12 @@ class BackendApi {
     return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
   }
 
+  /// Submit a manual identity verification (details + hosted document images).
+  static Future<Map<String, dynamic>> submitKyc(Map<String, dynamic> body) async {
+    final res = await _api.post('/kyc/submit', body);
+    return (res is Map) ? res.cast<String, dynamic>() : <String, dynamic>{};
+  }
+
   // ── Announcements ─────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> announcements() async {
     final res = await _api.get('/announcements');

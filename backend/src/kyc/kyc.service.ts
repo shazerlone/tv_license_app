@@ -33,6 +33,24 @@ export class KycService {
     return res;
   }
 
+  /** Manual funnel: store the applicant's details + document image URLs and move
+   *  them to pending review. Used when no automated provider (Sumsub) is wired. */
+  async submitManual(userId: string, details: Record<string, unknown>): Promise<{ kycStatus: KycStatus }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { kycStatus: true } });
+    if (!user) throw new NotFoundException({ code: 'user_not_found', message: 'User not found' });
+    if (user.kycStatus === KycStatus.verified) return { kycStatus: KycStatus.verified };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        kycProvider: 'manual',
+        kycStatus: KycStatus.pending,
+        kycReason: null,
+        kycDetails: { ...details, submittedAt: new Date().toISOString() } as Prisma.InputJsonValue,
+      },
+    });
+    return { kycStatus: KycStatus.pending };
+  }
+
   async status(userId: string): Promise<{ kycStatus: KycStatus; provider: string | null; reason: string | null }> {
     const u = await this.prisma.user.findUnique({
       where: { id: userId },

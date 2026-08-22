@@ -106,6 +106,19 @@ export class UsersService {
       }
       throw e;
     });
+    // Keep the public creator card (Trader) in sync so a new photo/name shows up
+    // everywhere — discover, live, home feed — not just on the private profile.
+    if (dto.photoUrl !== undefined || dto.name !== undefined) {
+      await this.prisma.trader
+        .updateMany({
+          where: { userId: id },
+          data: {
+            ...(dto.photoUrl !== undefined ? { photoUrl: dto.photoUrl } : {}),
+            ...(dto.name !== undefined ? { name: dto.name } : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
     // Fire a verification code to the new address (never block the profile update).
     if (emailChanged && normalizedEmail) {
       void this.emailVerification.sendCode(id, normalizedEmail).catch(() => undefined);

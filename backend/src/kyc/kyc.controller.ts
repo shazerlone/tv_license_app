@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { KycService } from './kyc.service';
-import { KycStartResponseDto, KycStatusResponseDto } from './dto/kyc.dto';
+import { KycStartResponseDto, KycStatusResponseDto, KycSubmitDto } from './dto/kyc.dto';
 
 @ApiTags('kyc')
 @Controller('kyc')
@@ -18,6 +18,15 @@ export class KycController {
   @ApiOkResponse({ type: KycStartResponseDto })
   start(@CurrentUser() user: AuthUser): Promise<KycStartResponseDto> {
     return this.kyc.start(user.userId);
+  }
+
+  @Post('submit')
+  @ApiBearerAuth('bearer')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Submit a manual verification (details + document images)' })
+  @ApiOkResponse({ type: KycStatusResponseDto })
+  submit(@CurrentUser() user: AuthUser, @Body() dto: KycSubmitDto) {
+    return this.kyc.submitManual(user.userId, { ...dto });
   }
 
   @Get()

@@ -2,7 +2,7 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
-Future<String?> pickImageAsDataUrl() async {
+Future<String?> pickImageAsDataUrl({bool cropSquare = false}) async {
   final input = html.FileUploadInputElement()..accept = 'image/*';
   input.click();
   await input.onChange.first;

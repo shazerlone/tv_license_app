@@ -78,6 +78,7 @@ model User {
   kycProvider   String? // "sumsub" | "manual"
   kycApplicantId String?
   kycReason     String?
+  kycDetails    Json? // manual submission: name, dob, docType, docNumber, country, doc image URLs
 
   // Referral / affiliate (IB) program (contract §referrals). `referralCode` is
   // this user's own share code; `referredById` is who referred THEM (FK-less,
