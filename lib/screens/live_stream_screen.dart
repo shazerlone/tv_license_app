@@ -68,6 +68,15 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   /// Resolves the trader's live broadcast and plays its HLS URL. HLS ingest lags
   /// RTMP and can 404 for a few seconds right after going live, so we retry a
   /// few times with backoff before giving up.
+  /// Defensive fix for a malformed Cloudflare HLS URL (doubled `customer-`
+  /// prefix / doubled `.cloudflarestream.com` domain). Harmless when correct.
+  String? _normalizeHls(String? u) {
+    if (u == null) return null;
+    return u
+        .replaceAll('customer-customer-', 'customer-')
+        .replaceAll('.cloudflarestream.com.cloudflarestream.com', '.cloudflarestream.com');
+  }
+
   Future<void> _initVideo() async {
     final trader = widget.trader;
     if (trader == null || !trader.isLive) {
@@ -77,7 +86,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final b = await BackendApi.liveBroadcastForTrader(trader.id);
-        final hls = b?['hlsUrl']?.toString();
+        final hls = _normalizeHls(b?['hlsUrl']?.toString());
         if (hls != null && hls.isNotEmpty) {
           final c = VideoPlayerController.networkUrl(Uri.parse(hls));
           await c.initialize();
