@@ -235,12 +235,14 @@ function UserDetail({
   const [amt, setAmt] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState(user.adminNote ?? '');
+  const [email, setEmail] = useState(user.email ?? '');
 
   const reload = useCallback(async () => {
     try {
       const detail = await apiFetch<AdminUserDetail>(`/admin/users/${user.id}`);
       setD(detail);
       setNote(detail.user.adminNote ?? '');
+      setEmail(detail.user.email ?? '');
     } catch (e: any) {
       setErr(e.message);
     }
@@ -384,8 +386,40 @@ function UserDetail({
             )}
           </div>
 
+          {/* Email (editable) */}
+          <div className="section-title">Email</div>
+          <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              style={{ flex: 1, minWidth: 180 }}
+            />
+            {d?.user.emailVerified ? <Pill tone="green">verified</Pill> : <Pill tone="amber">unverified</Pill>}
+          </div>
+          <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <button
+              className="btn sm"
+              disabled={busy || email.trim() === (d?.user.email ?? '')}
+              onClick={() => patchDetail({ email: email.trim() })}
+            >
+              Save email
+            </button>
+            <button
+              className="btn ghost sm"
+              disabled={busy || !d?.user.email}
+              onClick={() => patchDetail({ emailVerified: !d?.user.emailVerified })}
+            >
+              {d?.user.emailVerified ? 'Mark unverified' : 'Mark verified'}
+            </button>
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Changing the email resets verification. “email_taken” means another user has it.
+          </div>
+
           {/* Admin note */}
-          <div className="section-title">Internal note</div>
+          <div className="section-title" style={{ marginTop: 16 }}>Internal note</div>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Ops-only note…" style={{ width: '100%' }} />
           <div style={{ marginTop: 8 }}>
             <button className="btn sm" disabled={busy} onClick={() => patchDetail({ adminNote: note })}>Save note</button>

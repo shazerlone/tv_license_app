@@ -16,6 +16,7 @@ export interface AdminUser {
   name: string;
   username: string;
   email: string | null;
+  emailVerified?: boolean;
   phone: string | null;
   photoUrl: string | null;
   role: 'follower' | 'creator' | 'admin';
