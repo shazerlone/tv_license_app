@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
 import '../widgets/market_ticker.dart';
+import '../widgets/story_tray.dart';
 import 'markets_screen.dart';
 import '../config.dart';
 import '../models/trader.dart';
@@ -232,6 +233,7 @@ class _FollowerHomeState extends State<FollowerHome> {
           ),
         ),
         const SliverToBoxAdapter(child: MarketTicker()),
+        const SliverToBoxAdapter(child: StoryTray()),
         const SliverToBoxAdapter(child: SizedBox(height: 8)),
         if (_liveTraders.isNotEmpty) ...[
           SliverToBoxAdapter(child: _SectionHeader(dot: true, title: 'Live now')),
@@ -596,6 +598,7 @@ class _CreatorHomeState extends State<CreatorHome> {
           ),
         ),
         const SliverToBoxAdapter(child: MarketTicker()),
+        const SliverToBoxAdapter(child: StoryTray()),
         const SliverToBoxAdapter(child: SizedBox(height: 18)),
         SliverToBoxAdapter(
           child: Padding(

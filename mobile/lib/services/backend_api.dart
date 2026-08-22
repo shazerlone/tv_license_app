@@ -252,6 +252,32 @@ class BackendApi {
     return ((res as Map)['url']).toString();
   }
 
+  // ── Stories (24h) ─────────────────────────────────────────────────────────
+  static Future<List<Map<String, dynamic>>> stories() async {
+    final res = await _api.get('/stories');
+    return _list(res, res is Map ? 'items' : null);
+  }
+
+  static Future<Map<String, dynamic>> createStory({
+    required String mediaUrl,
+    String mediaType = 'image',
+    String? caption,
+    String? kind,
+    String? broadcastId,
+  }) async {
+    final res = await _api.post('/stories', {
+      'mediaUrl': mediaUrl,
+      'mediaType': mediaType,
+      if (caption != null && caption.isNotEmpty) 'caption': caption,
+      if (kind != null) 'kind': kind,
+      if (broadcastId != null) 'broadcastId': broadcastId,
+    });
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  static Future<void> viewStory(String id) => _api.post('/stories/$id/view');
+  static Future<void> deleteStory(String id) => _api.delete('/stories/$id');
+
   // ── Creator earnings (§5b) ────────────────────────────────────────────────
   static Future<Map<String, dynamic>> creatorEarnings() async {
     final res = await _api.get('/creator/earnings');
