@@ -45,7 +45,7 @@ class AuthApi {
   /// { token, user }). No OTP step.
   static Future<UserProfile> registerFollower({
     required String name,
-    required String phone,
+    String? phone,
     String? residenceIso,
     String? experience,
     List<String>? interests,
@@ -55,7 +55,7 @@ class AuthApi {
   }) async {
     final res = await _api.post('/auth/register/follower', {
       'name': name,
-      'phone': phone,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
       if (residenceIso != null) 'residenceIso': residenceIso,
       if (experience != null) 'experience': experience,
       if (interests != null) 'interests': interests,

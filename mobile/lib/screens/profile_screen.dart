@@ -119,6 +119,13 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Phone-registered accounts have no email yet — nudge them to add one
+            // (for receipts, password recovery & security alerts). Hidden once set.
+            if (user != null && (user.email == null || user.email!.isEmpty)) ...[
+              _AddEmailBanner(onTap: () => _push(context, const EditProfileScreen())),
+              const SizedBox(height: 16),
+            ],
+
             // Account / KYC status — informative, not nagging. Deposits &
             // withdrawals unlock once identity is verified.
             if (user != null) _AccountStatusCard(user: user, onVerify: () => _push(context, const KycScreen())),
@@ -369,6 +376,48 @@ class _CircleIcon extends StatelessWidget {
         width: 40, height: 40,
         decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: AppColors.border)),
         child: Icon(icon, size: 19, color: AppColors.textPrimary),
+      ),
+    );
+  }
+}
+
+/// Nudge shown to phone-registered accounts that have no email yet.
+class _AddEmailBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddEmailBanner({required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.mark_email_unread_outlined, size: 20, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Add your email', style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text('For receipts, password recovery & security alerts.',
+                      style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary, height: 1.35)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 22, color: AppColors.primary),
+          ],
+        ),
       ),
     );
   }

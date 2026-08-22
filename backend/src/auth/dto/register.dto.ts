@@ -46,11 +46,12 @@ export class RegisterFollowerDto {
   @MaxLength(120)
   name: string;
 
-  @ApiProperty({ example: '+91 90000 00000' })
+  @ApiPropertyOptional({ example: '+91 90000 00000', description: 'Optional — provide email+password OR phone.' })
+  @IsOptional()
   @IsString()
-  phone: string;
+  phone?: string;
 
-  @ApiPropertyOptional({ example: 'priya@example.com', description: 'Optional email; a verification code is sent when provided.' })
+  @ApiPropertyOptional({ example: 'priya@example.com', description: 'Required when no phone is given; a verification code is sent.' })
   @IsOptional()
   @IsEmail()
   @MaxLength(160)

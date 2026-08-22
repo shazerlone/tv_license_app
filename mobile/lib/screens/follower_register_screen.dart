@@ -7,6 +7,7 @@ import '../widgets/phone_field.dart';
 import '../services/image_picker_service.dart';
 import '../services/auth_api.dart';
 import '../services/api_client.dart';
+import '../services/phone_auth_service.dart';
 import '../state/session.dart';
 import 'otp_screen.dart';
 import 'home_screen.dart';
@@ -25,6 +26,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _codeController = TextEditingController();
   bool _obscurePassword = true;
 
   Country _country = countryByIso('IN');
@@ -35,8 +37,22 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   bool _isLoading = false;
   int _step = 0; // 0 = account, 1 = about you, 2 = interests
 
+  // Sign-up method: 'email' (email+password) or 'phone' (Firebase SMS OTP).
+  String _method = 'email';
+
+  // Phone-OTP state.
+  final _phoneAuth = PhoneAuthService();
+  bool _codeSent = false;
+  bool _phoneVerified = false;
+  bool _sendingCode = false;
+  bool _verifyingCode = false;
+  int _resendIn = 0;
+  UserProfile? _phoneSession; // session created by Firebase after phone verify
+
+  String get _e164 => '${_country.dialCode}${_phoneController.text.replaceAll(RegExp(r'\D'), '')}';
+
   // Per-field error text for the stepped flow (validated on Continue).
-  String? _emailError, _passwordError, _phoneError, _nameError;
+  String? _emailError, _passwordError, _phoneError, _nameError, _codeError;
 
   final _experienceLevels = const [
     'Brand new to trading',
@@ -76,6 +92,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -95,20 +112,78 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     return score.clamp(0, 4);
   }
 
+  // ── Phone OTP (Firebase) ────────────────────────────────────────────────────
+  Future<void> _sendCode({bool resend = false}) async {
+    if (_phoneController.text.replaceAll(RegExp(r'\D'), '').length < 6) {
+      setState(() => _phoneError = 'Enter a valid phone number');
+      return;
+    }
+    setState(() { _sendingCode = true; _phoneError = null; _codeError = null; });
+    await _phoneAuth.start(
+      _e164,
+      resend: resend,
+      onCodeSent: () {
+        if (!mounted) return;
+        setState(() { _sendingCode = false; _codeSent = true; });
+        _startResendCountdown();
+      },
+      onAutoSignedIn: (profile) {
+        // Android instant verification — treat as verified.
+        if (!mounted) return;
+        setState(() { _sendingCode = false; _codeSent = true; _phoneVerified = true; _phoneSession = profile; });
+      },
+      onError: (m) {
+        if (!mounted) return;
+        setState(() { _sendingCode = false; _phoneError = m; });
+      },
+    );
+  }
+
+  Future<void> _verifyCode() async {
+    if (_codeController.text.trim().length < 6) {
+      setState(() => _codeError = 'Enter the 6-digit code');
+      return;
+    }
+    setState(() { _verifyingCode = true; _codeError = null; });
+    try {
+      final profile = await _phoneAuth.confirm(_codeController.text.trim());
+      if (!mounted) return;
+      setState(() { _verifyingCode = false; _phoneVerified = true; _phoneSession = profile; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _verifyingCode = false; _codeError = e.toString(); });
+    }
+  }
+
+  void _startResendCountdown() {
+    setState(() => _resendIn = 45);
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false;
+      setState(() => _resendIn--);
+      return _resendIn > 0;
+    });
+  }
+
   // ── Step navigation ───────────────────────────────────────────────────────
   bool _validateAccount() {
-    setState(() {
-      _emailError = _emailController.text.trim().isNotEmpty && !_emailController.text.contains('@')
-          ? 'Enter a valid email'
-          : null;
-      _passwordError = _passwordController.text.length < 8 ? 'Use at least 8 characters' : null;
-      _phoneError = _phoneController.text.trim().isEmpty ? 'Enter your phone number' : null;
-    });
     if (_residence == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select your country of residence')));
       return false;
     }
-    return _emailError == null && _passwordError == null && _phoneError == null;
+    if (_method == 'phone') {
+      if (!_phoneVerified) {
+        setState(() => _phoneError = _codeSent ? 'Verify the code to continue' : 'Verify your number to continue');
+        return false;
+      }
+      return true;
+    }
+    // Email method.
+    setState(() {
+      _emailError = !_emailController.text.contains('@') ? 'Enter a valid email' : null;
+      _passwordError = _passwordController.text.length < 8 ? 'Use at least 8 characters' : null;
+    });
+    return _emailError == null && _passwordError == null;
   }
 
   bool _validateAbout() {
@@ -145,73 +220,78 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
       setState(() => _step = 0);
       return;
     }
-    final phone = '${_country.dialCode} ${_phoneController.text.trim()}';
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     setState(() => _isLoading = true);
 
-    // ── Live backend: register returns { token, user } — an immediate session.
-    if (kUseBackend) {
-      try {
-        final user = await AuthApi.registerFollower(
-          name: name,
-          phone: phone,
-          residenceIso: _residence!.iso,
-          experience: _experience,
-          interests: _interests.toList(),
-          photoUrl: _photoDataUrl,
-          email: email,
-          password: password,
-        );
-        if (!mounted) return;
-        final nav = Navigator.of(context);
-        final session = SessionScope.of(context);
-        session.applyBackendSession(user);
-        // Refresh so email/emailVerified are in the session (register response
-        // may omit them → profile showed empty email).
-        try {
-          final me = await AuthApi.me();
-          session.applyBackendSession(me);
-        } catch (_) {}
-        setState(() => _isLoading = false);
-        nav.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (r) => false,
-        );
-        // If they gave an email, prompt verification on top of home (the code
-        // was already emailed at registration).
-        if (email.isNotEmpty) {
-          final dev = await AuthApi.sendEmailCode().catchError((_) => null);
-          nav.push(MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
-        }
-        return;
-      } on ApiException catch (e) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      } catch (_) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
-      }
-      return;
-    }
-
-    // ── Demo: keep the OTP verification screen.
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    // ── Demo (no backend): keep the legacy OTP screen. ─────────────────────────
+    if (!kUseBackend) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => OtpScreen(
-          phoneNumber: phone,
+          phoneNumber: _e164,
           name: name,
           residenceIso: _residence!.iso,
           residenceCountry: _residence!.name,
         ),
-      ),
-    );
+      ));
+      return;
+    }
+
+    final nav = Navigator.of(context);
+    final session = SessionScope.of(context);
+    try {
+      if (_method == 'phone') {
+        // The account already exists (created when the phone was verified via
+        // Firebase). Enrich it with the profile details.
+        if (_phoneSession != null) session.applyBackendSession(_phoneSession!);
+        final user = await AuthApi.updateMe({
+          'name': name,
+          'residenceIso': _residence!.iso,
+          'experience': _experience,
+          'interests': _interests.toList(),
+          if (_photoDataUrl != null) 'photoUrl': _photoDataUrl,
+        });
+        if (!mounted) return;
+        session.applyBackendSession(user);
+        setState(() => _isLoading = false);
+        nav.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const HomeScreen()), (r) => false);
+        return;
+      }
+
+      // Email method: create the account with email + password.
+      final user = await AuthApi.registerFollower(
+        name: name,
+        residenceIso: _residence!.iso,
+        experience: _experience,
+        interests: _interests.toList(),
+        photoUrl: _photoDataUrl,
+        email: email,
+        password: password,
+      );
+      if (!mounted) return;
+      session.applyBackendSession(user);
+      try {
+        final me = await AuthApi.me();
+        session.applyBackendSession(me);
+      } catch (_) {}
+      setState(() => _isLoading = false);
+      nav.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const HomeScreen()), (r) => false);
+      // Prompt email verification on top of home (code emailed at registration).
+      final dev = await AuthApi.sendEmailCode().catchError((_) => null);
+      nav.push(MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach the server')));
+    }
   }
 
   static const _titles = ['Create your account', 'About you', 'Your interests'];
@@ -292,9 +372,11 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      _step == 0
-                          ? 'We\'ll email a code to verify your address.'
-                          : 'You can change these later in your profile.',
+                      _step != 0
+                          ? 'You can change these later in your profile.'
+                          : _method == 'phone'
+                              ? 'We\'ll text a 6-digit code to verify your number.'
+                              : 'We\'ll email a code to verify your address.',
                       style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
                     ),
                   ],
@@ -323,53 +405,118 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Label('Email'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          autocorrect: false,
-          onChanged: (_) { if (_emailError != null) setState(() => _emailError = null); },
-          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-          decoration: InputDecoration(hintText: 'you@email.com', errorText: _emailError),
+        // Method chooser: Email or Phone.
+        _MethodToggle(
+          method: _method,
+          onChanged: _phoneVerified || _codeSent
+              ? (_) {} // lock while a phone verification is in progress
+              : (m) => setState(() { _method = m; _emailError = null; _passwordError = null; _phoneError = null; }),
         ),
-        const SizedBox(height: 20),
-        _Label('Password'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          textInputAction: TextInputAction.next,
-          autocorrect: false,
-          enableSuggestions: false,
-          onChanged: (_) => setState(() => _passwordError = null),
-          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'At least 8 characters',
-            errorText: _passwordError,
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 20, color: AppColors.textMuted),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        const SizedBox(height: 24),
+        if (_method == 'email') ...[
+          _Label('Email'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autocorrect: false,
+            onChanged: (_) { if (_emailError != null) setState(() => _emailError = null); },
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: InputDecoration(hintText: 'you@email.com', errorText: _emailError),
+          ),
+          const SizedBox(height: 20),
+          _Label('Password'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.next,
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: (_) => setState(() => _passwordError = null),
+            style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'At least 8 characters',
+              errorText: _passwordError,
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 20, color: AppColors.textMuted),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
             ),
           ),
-        ),
-        if (_passwordController.text.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _PasswordStrength(strength: _pwStrength),
-        ],
-        const SizedBox(height: 20),
-        _Label('Phone number'),
-        const SizedBox(height: 8),
-        PhoneField(
-          controller: _phoneController,
-          country: _country,
-          onCountryChanged: (c) => setState(() => _country = c),
-          onSubmitted: _next,
-        ),
-        if (_phoneError != null) ...[
-          const SizedBox(height: 6),
-          Text(_phoneError!, style: GoogleFonts.inter(fontSize: 12, color: AppColors.red)),
+          if (_passwordController.text.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _PasswordStrength(strength: _pwStrength),
+          ],
+        ] else ...[
+          // Phone method — verify with an SMS code before continuing.
+          _Label('Phone number'),
+          const SizedBox(height: 8),
+          PhoneField(
+            controller: _phoneController,
+            country: _country,
+            onCountryChanged: (c) => setState(() => _country = c),
+            onSubmitted: () => _sendCode(),
+          ),
+          if (_phoneError != null) ...[
+            const SizedBox(height: 6),
+            Text(_phoneError!, style: GoogleFonts.inter(fontSize: 12, color: AppColors.red)),
+          ],
+          const SizedBox(height: 12),
+          if (!_phoneVerified) ...[
+            if (!_codeSent)
+              OutlinedButton.icon(
+                onPressed: _sendingCode ? null : () => _sendCode(),
+                icon: _sendingCode
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.sms_outlined, size: 18),
+                label: Text(_sendingCode ? 'Sending…' : 'Send code'),
+              )
+            else ...[
+              _Label('Enter the 6-digit code'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                onChanged: (_) { if (_codeError != null) setState(() => _codeError = null); },
+                style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 6, color: AppColors.textPrimary),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(hintText: '••••••', errorText: _codeError),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: _verifyingCode ? null : _verifyCode,
+                    child: _verifyingCode
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Verify'),
+                  ),
+                  const SizedBox(width: 12),
+                  _resendIn > 0
+                      ? Text('Resend in ${_resendIn}s', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted))
+                      : TextButton(onPressed: () => _sendCode(resend: true), child: const Text('Resend')),
+                ],
+              ),
+            ],
+          ] else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.green.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.green.withOpacity(0.4)),
+              ),
+              child: Row(children: [
+                Icon(Icons.check_circle_rounded, size: 20, color: AppColors.green),
+                const SizedBox(width: 10),
+                Text('Phone verified', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.green)),
+              ]),
+            ),
+          const SizedBox(height: 8),
+          Text('You can add an email later in your profile.', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
         ],
         const SizedBox(height: 20),
         _Label('Country of residence'),
@@ -429,6 +576,49 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
           }),
         );
       }).toList(),
+    );
+  }
+}
+
+/// Email / Phone sign-up method chooser.
+class _MethodToggle extends StatelessWidget {
+  final String method;
+  final ValueChanged<String> onChanged;
+  const _MethodToggle({required this.method, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: [
+          _seg('email', 'Email', Icons.mail_outline_rounded),
+          _seg('phone', 'Phone', Icons.smartphone_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _seg(String value, String label, IconData icon) {
+    final on = method == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(color: on ? AppColors.primary : Colors.transparent, borderRadius: BorderRadius.circular(9)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 17, color: on ? Colors.white : AppColors.textMuted),
+              const SizedBox(width: 7),
+              Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: on ? Colors.white : AppColors.textMuted)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -110,7 +110,15 @@ export class AuthService {
 
   // ── registration ───────────────────────────────────────────────────
   async registerFollower(dto: RegisterFollowerDto): Promise<AuthResponseDto> {
-    await this.assertPhoneFree(dto.phone);
+    // Either identifier works: phone (via OTP) OR email+password.
+    if (!dto.phone && !dto.email) {
+      throw new BadRequestException({ code: 'identifier_required', message: 'Provide an email or a phone number.' });
+    }
+    if (!dto.phone && !dto.password) {
+      throw new BadRequestException({ code: 'password_required', message: 'Set a password to register with email.' });
+    }
+    if (dto.phone) await this.assertPhoneFree(dto.phone);
+    if (dto.email) await this.assertEmailFree(dto.email);
     const user = await this.prisma.user.create({
       data: {
         id: genId('u'),
@@ -404,6 +412,17 @@ export class AuthService {
       throw new ConflictException({
         code: 'phone_in_use',
         message: 'An account with this phone already exists',
+      });
+    }
+  }
+
+  private async assertEmailFree(email: string): Promise<void> {
+    const e = email.trim().toLowerCase();
+    const existing = await this.prisma.user.findUnique({ where: { email: e } });
+    if (existing) {
+      throw new ConflictException({
+        code: 'email_in_use',
+        message: 'An account with this email already exists',
       });
     }
   }
