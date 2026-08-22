@@ -20,6 +20,7 @@ import 'copied_trades_screen.dart';
 import 'support_chat_screen.dart';
 import 'support_screen.dart';
 import 'edit_profile_screen.dart';
+import 'kyc_screen.dart';
 import 'wallet_screen.dart';
 import 'referrals_screen.dart';
 import 'security_screen.dart';
@@ -116,7 +117,11 @@ class ProfileScreen extends StatelessWidget {
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), side: BorderSide(color: AppColors.border)),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Account / KYC status — informative, not nagging. Deposits &
+            // withdrawals unlock once identity is verified.
+            if (user != null) _AccountStatusCard(user: user, onVerify: () => _push(context, const KycScreen())),
 
             // Copy performance
             _CopyHero(store: store),
@@ -364,6 +369,68 @@ class _CircleIcon extends StatelessWidget {
         width: 40, height: 40,
         decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: AppColors.border)),
         child: Icon(icon, size: 19, color: AppColors.textPrimary),
+      ),
+    );
+  }
+}
+
+/// Account/KYC status with an unlock hint. Informative — the user is never
+/// nagged; deposits & withdrawals are simply locked until verified.
+class _AccountStatusCard extends StatelessWidget {
+  final dynamic user; // UserProfile
+  final VoidCallback onVerify;
+  const _AccountStatusCard({required this.user, required this.onVerify});
+
+  @override
+  Widget build(BuildContext context) {
+    final status = (user.kycStatus ?? 'none').toString();
+    final verified = status == 'verified';
+    final pending = status == 'pending';
+    final rejected = status == 'rejected';
+
+    final (IconData icon, Color color, String title, String sub) = verified
+        ? (Icons.verified_user_rounded, AppColors.green, 'Identity verified', 'Deposits & withdrawals are enabled.')
+        : pending
+            ? (Icons.hourglass_top_rounded, AppColors.primary, 'Verification under review', 'We\'ll unlock deposits & withdrawals once approved.')
+            : rejected
+                ? (Icons.error_outline_rounded, AppColors.red, 'Verification needs attention', 'Please re-submit your ID to unlock deposits & withdrawals.')
+                : (Icons.badge_outlined, AppColors.slate, 'Verify your identity', 'Unlock deposits & withdrawals with a quick ID check.');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: verified ? AppColors.green.withOpacity(0.35) : AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(sub, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, height: 1.35)),
+              ],
+            ),
+          ),
+          if (!verified && !pending) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onVerify,
+              style: TextButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+              child: Text('Verify', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ],
+        ],
       ),
     );
   }
