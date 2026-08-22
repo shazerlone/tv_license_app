@@ -145,7 +145,7 @@ class _TraderProfileScreenState extends State<TraderProfileScreen>
         ),
         child: Container(
           padding: const EdgeInsets.all(2.5),
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.background),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.background),
           child: Avatar(name: trader.name, photoUrl: trader.avatarUrl, size: 66),
         ),
       ),

@@ -207,7 +207,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       _store = AppStateScope.of(context);
       _store!.startPriceFeed();
     }
-    _myUsername ??= SessionScope.of(context).user?.username;
+    _myUsername ??= SessionScope.of(context).user?.name;
   }
 
   @override
