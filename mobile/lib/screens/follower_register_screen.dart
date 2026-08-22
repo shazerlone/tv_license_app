@@ -10,6 +10,7 @@ import '../services/api_client.dart';
 import '../state/session.dart';
 import 'otp_screen.dart';
 import 'home_screen.dart';
+import 'email_verify_screen.dart';
 
 class FollowerRegisterScreen extends StatefulWidget {
   const FollowerRegisterScreen({super.key});
@@ -23,6 +24,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
 
   Country _country = countryByIso('IN');
   Country? _residence;
@@ -67,6 +69,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     _entryController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -91,6 +94,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     }
     final phone = '${_country.dialCode} ${_phoneController.text.trim()}';
     final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
     setState(() => _isLoading = true);
 
     // ── Live backend: register returns { token, user } — an immediate session.
@@ -103,14 +107,24 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
           experience: _experience,
           interests: _interests.toList(),
           photoUrl: _photoDataUrl,
+          email: email,
         );
         if (!mounted) return;
+        final nav = Navigator.of(context);
         SessionScope.of(context).applyBackendSession(user);
         setState(() => _isLoading = false);
-        Navigator.of(context).pushAndRemoveUntil(
+        nav.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (r) => false,
         );
+        // If they gave an email, prompt verification on top of home.
+        if (email.isNotEmpty) {
+          try {
+            final dev = await AuthApi.sendEmailCode();
+            nav.push(MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
+          } catch (_) {}
+        }
+        return;
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
@@ -201,6 +215,19 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
                           style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                           decoration: const InputDecoration(hintText: 'e.g. Alex Morgan'),
                           validator: (v) => (v == null || v.isEmpty) ? 'Enter your name' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        _Label('Email (optional)'),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autocorrect: false,
+                          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                          decoration: const InputDecoration(hintText: 'you@email.com — for updates & receipts'),
+                          validator: (v) => (v != null && v.isNotEmpty && !v.contains('@')) ? 'Enter a valid email' : null,
                         ),
                         const SizedBox(height: 20),
 
