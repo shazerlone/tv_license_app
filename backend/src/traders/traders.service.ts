@@ -140,6 +140,10 @@ export class TradersService {
 
   async trades(id: string, status?: 'active' | 'closed'): Promise<PublicTradeDto[]> {
     const trader = await this.getEntityOrThrow(id);
+    // Real creators have no trade history yet (totalTrades == 0) — never
+    // fabricate trades for them. Only the seeded demo traders (which carry a
+    // non-zero totalTrades) get the synthetic sample feed.
+    if (!trader.totalTrades || trader.totalTrades <= 0) return [];
     const pairs = PAIRS[trader.category] ?? PAIRS.Forex;
     const rnd = mulberry32(seedFromString(`${trader.id}:trades`));
     const out: PublicTradeDto[] = [];
