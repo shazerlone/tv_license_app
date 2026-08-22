@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator';
 
 /** PATCH /me body (contract §4.1: `{ name?, photoUrl?, ... }`). */
 export class UpdateMeDto {
@@ -8,6 +8,17 @@ export class UpdateMeDto {
   @IsString()
   @MaxLength(120)
   name?: string;
+
+  @ApiPropertyOptional({ description: 'Setting/changing email resets emailVerified to false; verify via /me/email/verify.' })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(160)
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Opt in/out of email notifications.' })
+  @IsOptional()
+  @IsBoolean()
+  emailNotifications?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

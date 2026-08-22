@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   Prisma,
   CreatorApplication,
@@ -137,16 +137,29 @@ export class AdminService {
 
   async updateUser(id: string, dto: UpdateAdminUserDto): Promise<AdminUserDto> {
     await this.getUserOrThrow(id);
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: {
-        role: dto.role,
-        banned: dto.banned,
-        creatorStatus: dto.creatorStatus,
-        frozen: dto.frozen,
-        adminNote: dto.adminNote,
-      },
-    });
+    const email = dto.email?.trim().toLowerCase();
+    // Editing the email resets verification unless the admin explicitly sets it.
+    const emailVerified = dto.email !== undefined && dto.emailVerified === undefined ? false : dto.emailVerified;
+    const user = await this.prisma.user
+      .update({
+        where: { id },
+        data: {
+          role: dto.role,
+          banned: dto.banned,
+          creatorStatus: dto.creatorStatus,
+          frozen: dto.frozen,
+          adminNote: dto.adminNote,
+          name: dto.name,
+          ...(email !== undefined ? { email } : {}),
+          ...(emailVerified !== undefined ? { emailVerified } : {}),
+        },
+      })
+      .catch((e) => {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          throw new ConflictException({ code: 'email_taken', message: 'That email is already in use' });
+        }
+        throw e;
+      });
     return this.toAdminUserDto(user);
   }
 

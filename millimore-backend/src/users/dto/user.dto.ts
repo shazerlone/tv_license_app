@@ -6,6 +6,8 @@ export class UserDto {
   @ApiProperty({ example: 'Marcus Sterling' }) name: string;
   @ApiProperty({ example: 'marcussterling' }) username: string;
   @ApiPropertyOptional({ example: 'marcus@x.com', nullable: true }) email: string | null;
+  @ApiPropertyOptional({ example: false }) emailVerified?: boolean;
+  @ApiPropertyOptional({ example: true }) emailNotifications?: boolean;
   @ApiPropertyOptional({ example: '+91 90000 00000', nullable: true }) phone: string | null;
   @ApiPropertyOptional({ nullable: true }) photoUrl: string | null;
   @ApiProperty({ enum: ['follower', 'creator', 'admin'] }) role: string;

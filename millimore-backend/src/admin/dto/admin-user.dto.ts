@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Role, CreatorStatus } from '@prisma/client';
 import { UserDto } from '../../users/dto/user.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
@@ -91,4 +91,22 @@ export class UpdateAdminUserDto {
   @IsOptional()
   @IsString()
   adminNote?: string;
+
+  @ApiPropertyOptional({ description: "Edit the user's name." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @ApiPropertyOptional({ description: "Edit the user's email (must be unique). Resets emailVerified unless emailVerified is also sent." })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(160)
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Manually mark the email verified/unverified.' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  emailVerified?: boolean;
 }

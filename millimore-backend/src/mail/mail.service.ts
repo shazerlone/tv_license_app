@@ -84,6 +84,21 @@ export class MailService {
     });
   }
 
+  async sendEmailVerification(to: string, opts: { name?: string; code: string; ttlMinutes: number }): Promise<boolean> {
+    const hi = opts.name ? `Hi ${opts.name},` : 'Hi,';
+    return this.send({
+      to,
+      subject: `Your Millimore verification code: ${opts.code}`,
+      text: `${hi}\n\nYour email verification code is: ${opts.code}\n\nIt expires in ${opts.ttlMinutes} minutes. If you didn't request it, ignore this email.`,
+      html: this.wrap(
+        `<p>${hi}</p>
+         <p>Enter this code to verify your email:</p>
+         <p style="font-size:28px;font-weight:800;letter-spacing:4px;margin:16px 0">${opts.code}</p>
+         <p style="color:#64748B;font-size:13px">This code expires in ${opts.ttlMinutes} minutes. If you didn't request it, you can safely ignore this email.</p>`,
+      ),
+    });
+  }
+
   async sendSecurityAlert(to: string, opts: { name?: string; title: string; detail: string }): Promise<boolean> {
     const hi = opts.name ? `Hi ${opts.name},` : 'Hi,';
     return this.send({

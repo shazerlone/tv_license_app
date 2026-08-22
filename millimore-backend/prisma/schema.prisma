@@ -51,6 +51,8 @@ model User {
   name           String
   username       String        @unique
   email          String?       @unique
+  emailVerified  Boolean       @default(false)
+  emailNotifications Boolean    @default(true) // opt-in to transactional/marketing email
   phone          String?       @unique
   photoUrl       String?
   role           Role          @default(follower)
@@ -134,6 +136,7 @@ model User {
   wallet        Wallet?
   deposits      Deposit[]
   payoutMethods PayoutMethod[]
+  stories       Story[]
 
   @@index([role])
   @@index([creatorStatus])
@@ -871,4 +874,51 @@ model Sweep {
   @@index([userId])
   @@index([network, fromAddress])
   @@index([status])
+}
+
+/// Email verification code (OTP) sent to the address a user enters. Only the hash
+/// is stored; single-use, short-lived — mirrors OtpRequest but keyed to email.
+model EmailVerification {
+  id         String    @id // "ev_..."
+  userId     String
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([email])
+}
+
+/// A 24h ephemeral Story (image/video + caption). `kind=recap` carries a live
+/// broadcast stat card (broadcastId set). Grouped by author on read.
+model Story {
+  id          String   @id // "st_..."
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaUrl    String
+  mediaType   String   @default("image") // "image" | "video"
+  caption     String?
+  kind        String   @default("normal") // "normal" | "recap"
+  broadcastId String? // set when kind=recap
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  views StoryView[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// A per-viewer view record for a Story (dedup + unseen badges).
+model StoryView {
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@id([storyId, userId])
+  @@index([userId])
 }

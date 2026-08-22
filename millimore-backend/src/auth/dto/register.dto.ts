@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsEmail,
   IsOptional,
   IsString,
   Length,
@@ -48,6 +49,12 @@ export class RegisterFollowerDto {
   @IsString()
   phone: string;
 
+  @ApiPropertyOptional({ example: 'priya@example.com', description: 'Optional email; a verification code is sent when provided.' })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(160)
+  email?: string;
+
   @ApiProperty({ example: 'IN' })
   @IsString()
   @Length(2, 2)
@@ -86,6 +93,12 @@ export class RegisterCreatorDto {
   @ApiProperty({ example: '+91 90000 00000' })
   @IsString()
   phone: string;
+
+  @ApiPropertyOptional({ example: 'marcus@example.com', description: 'Optional email; a verification code is sent when provided.' })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(160)
+  email?: string;
 
   @ApiProperty({ example: 'IN' })
   @IsString()

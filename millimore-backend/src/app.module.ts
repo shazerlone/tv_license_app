@@ -15,6 +15,7 @@ import { AdminModule } from './admin/admin.module';
 import { TradersModule } from './traders/traders.module';
 import { PostsModule } from './posts/posts.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { StoriesModule } from './stories/stories.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MarketModule } from './market/market.module';
 import { CopyModule } from './copy/copy.module';
@@ -74,6 +75,7 @@ const staticModules = existsSync(ADMIN_DIR)
     TradersModule,
     PostsModule,
     SubscriptionsModule,
+    StoriesModule,
     NotificationsModule,
     MarketModule,
     SettingsModule,

@@ -17,6 +17,7 @@ import { OtpService } from './otp/otp.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { TwofaService } from '../twofa/twofa.service';
 import { MailService } from '../mail/mail.service';
+import { EmailVerificationService } from '../users/email-verification.service';
 import { genId } from '../common/ids';
 import { countryNameFromIso } from '../common/countries';
 import {
@@ -40,7 +41,19 @@ export class AuthService {
     private readonly referrals: ReferralsService,
     private readonly twofa: TwofaService,
     private readonly mail: MailService,
+    private readonly emailVerification: EmailVerificationService,
   ) {}
+
+  /** Set an email at registration (unverified) + fire a verification code. Guards
+   *  against a duplicate email and never fails registration on a mail hiccup. */
+  private async attachEmail(userId: string, email?: string): Promise<void> {
+    const e = email?.trim().toLowerCase();
+    if (!e) return;
+    const clash = await this.prisma.user.findFirst({ where: { email: e, NOT: { id: userId } }, select: { id: true } });
+    if (clash) return; // silently skip a taken email — the user can fix it via PATCH /me
+    await this.prisma.user.update({ where: { id: userId }, data: { email: e, emailVerified: false } }).catch(() => undefined);
+    void this.emailVerification.sendCode(userId, e).catch(() => undefined);
+  }
 
   /** Resolve a referral code → { referredById, referredByCode } for user create. */
   private async referralData(code?: string): Promise<{ referredById?: string; referredByCode?: string }> {
@@ -77,7 +90,8 @@ export class AuthService {
         ...(await this.referralData(dto.referralCode)),
       },
     });
-    return this.envelope(user);
+    await this.attachEmail(user.id, dto.email);
+    return this.envelope(await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
   }
 
   async registerCreator(dto: RegisterCreatorDto): Promise<AuthResponseDto> {
@@ -116,7 +130,8 @@ export class AuthService {
       },
     });
 
-    return this.envelope(user);
+    await this.attachEmail(user.id, dto.email);
+    return this.envelope(await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
   }
 
   // ── OTP ────────────────────────────────────────────────────────────

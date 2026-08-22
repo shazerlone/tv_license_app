@@ -718,6 +718,20 @@ address, KYC (Sumsub-ready), and an admin audit trail.
   a like only notifies on a first like, not repeat taps.
 - **Feed** — `GET /feed` now also includes the caller's OWN posts when they are a
   creator (own + subscribed traders, newest first), so the app renders one list.
+- **Email + verification** — `User` now has `email`, `emailVerified`, and
+  `emailNotifications`. Registration DTOs accept optional `email` (a code is emailed
+  when provided). `PATCH /me` accepts `email` (unique; changing it resets
+  `emailVerified` and emails a fresh code — error `email_taken`) and
+  `emailNotifications`. Verify with `POST /me/email/send-code` (resend; returns
+  `devCode` in non-prod when mail is unconfigured) and `POST /me/email/verify
+  { code }`. Admin can edit a user's `name`/`email`/`emailVerified` via the admin
+  user update.
+- **Stories (24h)** — `POST /stories { mediaUrl, mediaType?, caption?, kind?,
+  broadcastId? }` (kind `recap` needs your own `broadcastId`); `GET /stories` →
+  active stories grouped by author from creators you follow (+ your own), each group
+  `{ user, stories[], hasUnseen }`; `GET /stories/{id}`; `POST /stories/{id}/view`
+  (idempotent, returns view count); `DELETE /stories/{id}` (own). Stories expire 24h
+  after creation (filtered on read).
 - **Broadcast WHIP ingest** — the `Broadcast` object now carries an owner-only
   `whipUrl` (Cloudflare WebRTC/WHIP publish URL) alongside `ingestUrl`/`streamKey`,
   on the same responses (`POST /broadcasts`, `POST /broadcasts/{id}/start`, owner
