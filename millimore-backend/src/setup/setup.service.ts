@@ -30,6 +30,72 @@ export class SetupService {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Purge seeded DEMO rows from the live DB (token-gated, browser-openable). Deletes
+   * only the known demo entities by stable id — never real users/admin/brokers/
+   * settings — then reconciles isLive so no trader shows live without a live
+   * broadcast. Mirrors scripts/wipe-demo.ts so it can run on the deployed server.
+   */
+  async wipeDemo(token: string) {
+    this.assertSetup(token);
+    const DEMO_USERS = ['u_marcus', 'u_priya', 'u_aisha'];
+    const DEMO_TRADERS = ['t_marcus', 't_elena', 't_kenji', 't_sofia'];
+    const DEMO_POSTS = ['p_1', 'p_2', 'p_3', 'p_4', 'p_5'];
+    const byUser = { userId: { in: DEMO_USERS } };
+    const byTrader = { traderId: { in: DEMO_TRADERS } };
+    const removed: Record<string, number> = {};
+    const del = async (label: string, fn: () => Promise<{ count: number }>) => {
+      try { removed[label] = (await fn()).count; } catch (e) { removed[label] = -1; this.logger.warn(`wipe ${label}: ${(e as Error).message.split('\n')[0]}`); }
+    };
+
+    // Demo broadcasts + their chat (children first) — this is what shows as fake LIVE.
+    const bs = await this.prisma.broadcast.findMany({
+      where: { OR: [{ creatorId: { in: DEMO_USERS } }, { traderId: { in: DEMO_TRADERS } }] },
+      select: { id: true },
+    });
+    const bIds = bs.map((b) => b.id);
+    if (bIds.length) {
+      await del('broadcastChat', () => this.prisma.broadcastChat.deleteMany({ where: { broadcastId: { in: bIds } } }));
+      await del('broadcasts', () => this.prisma.broadcast.deleteMany({ where: { id: { in: bIds } } }));
+    }
+    await del('postLikes', () => this.prisma.postLike.deleteMany({ where: { OR: [byUser, { postId: { in: DEMO_POSTS } }] } }));
+    await del('postSaves', () => this.prisma.postSave.deleteMany({ where: { OR: [byUser, { postId: { in: DEMO_POSTS } }] } }));
+    await del('comments', () => this.prisma.comment.deleteMany({ where: { OR: [byUser, { postId: { in: DEMO_POSTS } }] } }));
+    await del('posts', () => this.prisma.post.deleteMany({ where: { OR: [{ id: { in: DEMO_POSTS } }, byTrader] } }));
+    await del('subscriptions', () => this.prisma.subscription.deleteMany({ where: { OR: [byUser, byTrader] } }));
+    await del('copyPositions', () => this.prisma.copyPosition.deleteMany({ where: { OR: [byUser, byTrader] } }));
+    await del('copyConfigs', () => this.prisma.copyConfig.deleteMany({ where: { OR: [byUser, byTrader] } }));
+    await del('priceAlerts', () => this.prisma.priceAlert.deleteMany({ where: byUser }));
+    await del('ledgerEntries', () => this.prisma.ledgerEntry.deleteMany({ where: byUser }));
+    await del('deposits', () => this.prisma.deposit.deleteMany({ where: byUser }));
+    await del('payoutMethods', () => this.prisma.payoutMethod.deleteMany({ where: byUser }));
+    await del('wallets', () => this.prisma.wallet.deleteMany({ where: byUser }));
+    await del('tradingAccounts', () => this.prisma.tradingAccount.deleteMany({ where: { OR: [{ id: 'acc_demo' }, byUser] } }));
+    await del('creatorApplications', () => this.prisma.creatorApplication.deleteMany({ where: byUser }));
+    await del('traders', () => this.prisma.trader.deleteMany({ where: { id: { in: DEMO_TRADERS } } }));
+    await del('passwordResets', () => this.prisma.passwordReset.deleteMany({ where: byUser }));
+    await del('demoUsers', () => this.prisma.user.deleteMany({ where: { id: { in: DEMO_USERS } } }));
+
+    // Self-heal: any trader flagged live without an actual live broadcast → not live.
+    const liveBroadcasts = await this.prisma.broadcast.findMany({ where: { phase: 'live', traderId: { not: null } }, select: { traderId: true } });
+    const liveTraderIds = liveBroadcasts.map((b) => b.traderId!).filter(Boolean);
+    const reconciled = await this.prisma.trader.updateMany({
+      where: { isLive: true, id: { notIn: liveTraderIds.length ? liveTraderIds : ['__none__'] } },
+      data: { isLive: false },
+    });
+
+    const liveNow = await this.prisma.broadcast.count({ where: { phase: 'live' } });
+    return {
+      removed,
+      isLiveReconciled: reconciled.count,
+      liveBroadcastsRemaining: liveNow,
+      seedDemo: process.env.SEED_DEMO === 'true',
+      warning: process.env.SEED_DEMO === 'true'
+        ? 'SEED_DEMO is still TRUE — the on-startup seed will recreate demo creators on the next deploy. Set SEED_DEMO=false in prod and redeploy.'
+        : 'SEED_DEMO is false — demo data will not be recreated. Good.',
+    };
+  }
+
   /** Browser-openable check (token-gated): create a REAL Cloudflare live input and
    *  return its WHIP/ingest/HLS URLs so the app team can eyeball whipUrl without
    *  auth. Each call mints a throwaway Cloudflare input. */

@@ -61,4 +61,9 @@ export class SetupController {
   broadcastTest(@Query('token') token: string) {
     return this.setup.broadcastTest(token);
   }
+
+  @Get('wipe-demo')
+  wipeDemo(@Query('token') token: string) {
+    return this.setup.wipeDemo(token);
+  }
 }
