@@ -21,7 +21,6 @@ class FollowerRegisterScreen extends StatefulWidget {
 
 class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
@@ -34,6 +33,10 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   String? _experience;
   final Set<String> _interests = {};
   bool _isLoading = false;
+  int _step = 0; // 0 = account, 1 = about you, 2 = interests
+
+  // Per-field error text for the stepped flow (validated on Continue).
+  String? _emailError, _passwordError, _phoneError, _nameError;
 
   final _experienceLevels = const [
     'Brand new to trading',
@@ -81,18 +84,65 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     if (url != null && mounted) setState(() => _photoDataUrl = url);
   }
 
-  Future<void> _continue() async {
-    if (!_formKey.currentState!.validate()) return;
+  /// Password strength 0..4 (length + variety of character classes).
+  int get _pwStrength {
+    final p = _passwordController.text;
+    if (p.length < 8) return p.isEmpty ? 0 : 1;
+    var score = 1;
+    if (RegExp(r'[A-Z]').hasMatch(p) && RegExp(r'[a-z]').hasMatch(p)) score++;
+    if (RegExp(r'[0-9]').hasMatch(p)) score++;
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(p) || p.length >= 12) score++;
+    return score.clamp(0, 4);
+  }
+
+  // ── Step navigation ───────────────────────────────────────────────────────
+  bool _validateAccount() {
+    setState(() {
+      _emailError = _emailController.text.trim().isNotEmpty && !_emailController.text.contains('@')
+          ? 'Enter a valid email'
+          : null;
+      _passwordError = _passwordController.text.length < 8 ? 'Use at least 8 characters' : null;
+      _phoneError = _phoneController.text.trim().isEmpty ? 'Enter your phone number' : null;
+    });
     if (_residence == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your country of residence')),
-      );
-      return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select your country of residence')));
+      return false;
     }
+    return _emailError == null && _passwordError == null && _phoneError == null;
+  }
+
+  bool _validateAbout() {
+    setState(() => _nameError = _nameController.text.trim().isEmpty ? 'Enter your name' : null);
+    if (_nameError != null) return false;
     if (_experience == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your trading experience')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select your trading experience')));
+      return false;
+    }
+    return true;
+  }
+
+  void _next() {
+    if (_step == 0 && !_validateAccount()) return;
+    if (_step == 1 && !_validateAbout()) return;
+    if (_step < 2) {
+      setState(() => _step++);
+    } else {
+      _continue();
+    }
+  }
+
+  void _back() {
+    if (_step == 0) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _step--);
+    }
+  }
+
+  Future<void> _continue() async {
+    // Each step was validated before reaching here.
+    if (_residence == null || _experience == null) {
+      setState(() => _step = 0);
       return;
     }
     final phone = '${_country.dialCode} ${_phoneController.text.trim()}';
@@ -164,6 +214,13 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     );
   }
 
+  static const _titles = ['Create your account', 'About you', 'Your interests'];
+  static const _subtitles = [
+    'Secure your account — you\'ll sign in with these.',
+    'A little about you so we can tailor your feed.',
+    'Pick a few markets — we\'ll personalise your feed.',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,175 +230,267 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
           opacity: _fade,
           child: Column(
             children: [
-              // Top bar
+              // Top bar + progress
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
                 child: Row(
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _back,
                     ),
+                    Expanded(child: _StepBar(step: _step, total: 3)),
+                    const SizedBox(width: 8),
+                    Text('${_step + 1}/3', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
                   ],
                 ),
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Create your account',
-                          style: GoogleFonts.inter(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                            letterSpacing: -0.8,
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _titles[_step],
+                        style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.8),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _subtitles[_step],
+                        style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted, height: 1.4),
+                      ),
+                      const SizedBox(height: 28),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween(begin: const Offset(0.06, 0), end: Offset.zero).animate(anim),
+                            child: child,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Join thousands following the world\'s top traders.',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            color: AppColors.textMuted,
-                            height: 1.4,
-                          ),
+                        child: KeyedSubtree(
+                          key: ValueKey(_step),
+                          child: _stepContent(),
                         ),
-                        const SizedBox(height: 28),
-
-                        // Profile photo
-                        Center(child: _PhotoPicker(dataUrl: _photoDataUrl, onTap: _pickPhoto)),
-                        const SizedBox(height: 28),
-
-                        _Label('Full name'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _nameController,
-                          textCapitalization: TextCapitalization.words,
-                          textInputAction: TextInputAction.next,
-                          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                          decoration: const InputDecoration(hintText: 'e.g. Alex Morgan'),
-                          validator: (v) => (v == null || v.isEmpty) ? 'Enter your name' : null,
-                        ),
-                        const SizedBox(height: 20),
-
-                        _Label('Email (optional)'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autocorrect: false,
-                          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                          decoration: const InputDecoration(hintText: 'you@email.com — for updates & receipts'),
-                          validator: (v) => (v != null && v.isNotEmpty && !v.contains('@')) ? 'Enter a valid email' : null,
-                        ),
-                        const SizedBox(height: 20),
-
-                        _Label('Password'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.next,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
-                          decoration: InputDecoration(
-                            hintText: 'At least 8 characters',
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 20, color: AppColors.textMuted),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                          ),
-                          validator: (v) => (v == null || v.length < 8) ? 'Use at least 8 characters' : null,
-                        ),
-                        const SizedBox(height: 20),
-
-                        _Label('Phone number'),
-                        const SizedBox(height: 8),
-                        PhoneField(
-                          controller: _phoneController,
-                          country: _country,
-                          onCountryChanged: (c) => setState(() => _country = c),
-                          onSubmitted: _continue,
-                        ),
-                        const SizedBox(height: 20),
-
-                        _Label('Country of residence'),
-                        const SizedBox(height: 8),
-                        CountryField(
-                          country: _residence,
-                          hint: 'Where do you live?',
-                          onChanged: (c) => setState(() => _residence = c),
-                        ),
-                        const SizedBox(height: 20),
-
-                        _Label('How experienced are you?'),
-                        const SizedBox(height: 10),
-                        ..._experienceLevels.map(
-                          (level) => _RadioRow(
-                            label: level,
-                            selected: _experience == level,
-                            onTap: () => setState(() => _experience = level),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        _Label('What are you interested in?'),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Pick a few — we\'ll tailor your feed.',
-                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _interestOptions.map((opt) {
-                            final sel = _interests.contains(opt);
-                            return _ChoiceChip(
-                              label: opt,
-                              selected: sel,
-                              onTap: () => setState(() {
-                                sel ? _interests.remove(opt) : _interests.add(opt);
-                              }),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 32),
-
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _continue,
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Continue'),
-                        ),
-                        const SizedBox(height: 14),
-                        Center(
-                          child: Text(
-                            'We\'ll text a 6-digit code to verify your number.',
-                            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
+              ),
+              // Bottom action bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: Column(
+                  children: [
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _next,
+                      child: _isLoading
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(_step < 2 ? 'Continue' : 'Create account'),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _step == 0
+                          ? 'We\'ll email a code to verify your address.'
+                          : 'You can change these later in your profile.',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _stepContent() {
+    switch (_step) {
+      case 0:
+        return _accountStep();
+      case 1:
+        return _aboutStep();
+      default:
+        return _interestsStep();
+    }
+  }
+
+  // Step 0 — email + password + phone + country (the account itself).
+  Widget _accountStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Label('Email'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autocorrect: false,
+          onChanged: (_) { if (_emailError != null) setState(() => _emailError = null); },
+          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+          decoration: InputDecoration(hintText: 'you@email.com', errorText: _emailError),
+        ),
+        const SizedBox(height: 20),
+        _Label('Password'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          textInputAction: TextInputAction.next,
+          autocorrect: false,
+          enableSuggestions: false,
+          onChanged: (_) => setState(() => _passwordError = null),
+          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'At least 8 characters',
+            errorText: _passwordError,
+            suffixIcon: IconButton(
+              icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 20, color: AppColors.textMuted),
+              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            ),
+          ),
+        ),
+        if (_passwordController.text.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _PasswordStrength(strength: _pwStrength),
+        ],
+        const SizedBox(height: 20),
+        _Label('Phone number'),
+        const SizedBox(height: 8),
+        PhoneField(
+          controller: _phoneController,
+          country: _country,
+          onCountryChanged: (c) => setState(() => _country = c),
+          onSubmitted: _next,
+        ),
+        if (_phoneError != null) ...[
+          const SizedBox(height: 6),
+          Text(_phoneError!, style: GoogleFonts.inter(fontSize: 12, color: AppColors.red)),
+        ],
+        const SizedBox(height: 20),
+        _Label('Country of residence'),
+        const SizedBox(height: 8),
+        CountryField(
+          country: _residence,
+          hint: 'Where do you live?',
+          onChanged: (c) => setState(() => _residence = c),
+        ),
+      ],
+    );
+  }
+
+  // Step 1 — photo + name + experience.
+  Widget _aboutStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(child: _PhotoPicker(dataUrl: _photoDataUrl, onTap: _pickPhoto)),
+        const SizedBox(height: 28),
+        _Label('Full name'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _nameController,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) { if (_nameError != null) setState(() => _nameError = null); },
+          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+          decoration: InputDecoration(hintText: 'e.g. Alex Morgan', errorText: _nameError),
+        ),
+        const SizedBox(height: 24),
+        _Label('How experienced are you?'),
+        const SizedBox(height: 10),
+        ..._experienceLevels.map(
+          (level) => _RadioRow(
+            label: level,
+            selected: _experience == level,
+            onTap: () => setState(() => _experience = level),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Step 2 — interests.
+  Widget _interestsStep() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: _interestOptions.map((opt) {
+        final sel = _interests.contains(opt);
+        return _ChoiceChip(
+          label: opt,
+          selected: sel,
+          onTap: () => setState(() {
+            sel ? _interests.remove(opt) : _interests.add(opt);
+          }),
+        );
+      }).toList(),
+    );
+  }
+}
+
+/// Segmented progress bar across the registration steps.
+class _StepBar extends StatelessWidget {
+  final int step;
+  final int total;
+  const _StepBar({required this.step, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(total, (i) {
+        final done = i <= step;
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            height: 4,
+            margin: EdgeInsets.only(right: i == total - 1 ? 0 : 6),
+            decoration: BoxDecoration(
+              color: done ? AppColors.primary : AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+/// Password strength meter (4 bars + label).
+class _PasswordStrength extends StatelessWidget {
+  final int strength; // 0..4
+  const _PasswordStrength({required this.strength});
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'];
+    final colors = [AppColors.red, AppColors.red, Colors.orange, AppColors.green, AppColors.green];
+    final c = colors[strength];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(4, (i) {
+            final on = i < strength;
+            return Expanded(
+              child: Container(
+                height: 4,
+                margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
+                decoration: BoxDecoration(
+                  color: on ? c : AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
+        Text(labels[strength], style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: c)),
+      ],
     );
   }
 }
