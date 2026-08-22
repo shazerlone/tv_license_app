@@ -25,6 +25,8 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   Country _country = countryByIso('IN');
   Country? _residence;
@@ -70,6 +72,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -95,6 +98,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
     final phone = '${_country.dialCode} ${_phoneController.text.trim()}';
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
+    final password = _passwordController.text;
     setState(() => _isLoading = true);
 
     // ── Live backend: register returns { token, user } — an immediate session.
@@ -108,6 +112,7 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
           interests: _interests.toList(),
           photoUrl: _photoDataUrl,
           email: email,
+          password: password,
         );
         if (!mounted) return;
         final nav = Navigator.of(context);
@@ -234,6 +239,26 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
                           style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                           decoration: const InputDecoration(hintText: 'you@email.com — for updates & receipts'),
                           validator: (v) => (v != null && v.isNotEmpty && !v.contains('@')) ? 'Enter a valid email' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        _Label('Password'),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.next,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: 'At least 8 characters',
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 20, color: AppColors.textMuted),
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                          ),
+                          validator: (v) => (v == null || v.length < 8) ? 'Use at least 8 characters' : null,
                         ),
                         const SizedBox(height: 20),
 

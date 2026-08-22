@@ -81,6 +81,7 @@ export class AuthService {
         username: await this.uniqueUsername(dto.name),
         phone: dto.phone,
         photoUrl: dto.photoUrl,
+        passwordHash: dto.password ? await bcrypt.hash(dto.password, 10) : undefined,
         role: Role.follower,
         creatorStatus: CreatorStatus.none,
         residenceIso: dto.residenceIso.toUpperCase(),
@@ -102,6 +103,7 @@ export class AuthService {
         name: dto.name,
         username: await this.uniqueUsername(dto.name),
         phone: dto.phone,
+        passwordHash: dto.password ? await bcrypt.hash(dto.password, 10) : undefined,
         role: Role.creator,
         creatorStatus: CreatorStatus.pending, // awaits admin approval (milestone 2)
         residenceIso: dto.residenceIso.toUpperCase(),

@@ -7,6 +7,7 @@ import {
   IsString,
   Length,
   MaxLength,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -55,6 +56,15 @@ export class RegisterFollowerDto {
   @MaxLength(160)
   email?: string;
 
+  /** Write-only: sets the account password so the user can log in with
+   *  email + password. Optional for phone-first (OTP) signups. */
+  @ApiPropertyOptional({ example: 'S3curePass', minLength: 8, writeOnly: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password?: string;
+
   @ApiProperty({ example: 'IN' })
   @IsString()
   @Length(2, 2)
@@ -99,6 +109,14 @@ export class RegisterCreatorDto {
   @IsEmail()
   @MaxLength(160)
   email?: string;
+
+  /** Write-only: sets the account password. Optional for phone-first signups. */
+  @ApiPropertyOptional({ example: 'S3curePass', minLength: 8, writeOnly: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password?: string;
 
   @ApiProperty({ example: 'IN' })
   @IsString()

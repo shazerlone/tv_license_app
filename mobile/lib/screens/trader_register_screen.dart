@@ -34,6 +34,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   Country _country = countryByIso('IN');
   Country? _residence;
   final _formKey1 = GlobalKey<FormState>();
@@ -140,6 +141,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
             if (_uploadedFileName != null) 'statementUrl': _uploadedFileName,
           },
           email: _emailController.text.trim(),
+          password: _passwordController.text,
         );
         if (!mounted) return;
         SessionScope.of(context).applyBackendSession(user);
@@ -220,6 +222,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     _serverController.dispose();
     _accountController.dispose();
     _investorPwController.dispose();
@@ -277,6 +280,7 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
           nameController: _nameController,
           phoneController: _phoneController,
           emailController: _emailController,
+          passwordController: _passwordController,
           country: _country,
           onCountryChanged: (c) => setState(() => _country = c),
           residence: _residence,
@@ -474,6 +478,7 @@ class _StepPersonal extends StatelessWidget {
   final TextEditingController nameController;
   final TextEditingController phoneController;
   final TextEditingController emailController;
+  final TextEditingController passwordController;
   final Country country;
   final ValueChanged<Country> onCountryChanged;
   final Country? residence;
@@ -485,6 +490,7 @@ class _StepPersonal extends StatelessWidget {
     required this.nameController,
     required this.phoneController,
     required this.emailController,
+    required this.passwordController,
     required this.country,
     required this.onCountryChanged,
     required this.residence,
@@ -530,6 +536,19 @@ class _StepPersonal extends StatelessWidget {
                   style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
                   decoration: const InputDecoration(hintText: 'you@email.com — payouts & updates'),
                   validator: (v) => (v != null && v.isNotEmpty && !v.contains('@')) ? 'Enter a valid email' : null,
+                ),
+                const SizedBox(height: 20),
+                _FieldLabel('Password'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.next,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimary),
+                  decoration: const InputDecoration(hintText: 'At least 8 characters — to sign in'),
+                  validator: (v) => (v == null || v.length < 8) ? 'Use at least 8 characters' : null,
                 ),
                 const SizedBox(height: 20),
                 _FieldLabel('Phone number'),
