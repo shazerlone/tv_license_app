@@ -55,7 +55,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     } else {
       // Demo mode only: seed sample chat + ambient hearts.
       _resolving = false;
-      _messages.addAll(const [
+      _messages.addAll([
         _Msg('alex_t', 'great setup on EURUSD!'),
         _Msg('jade_fx', 'following this one live'),
         _Msg('mark99', 'copied! 🔥'),
