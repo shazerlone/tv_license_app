@@ -89,7 +89,11 @@ export class UploadsController {
     await this.prisma.upload.create({
       data: { id, userId: user.userId, contentType: dto.contentType, data: buf },
     });
-    const origin = `${req.protocol}://${req.get('host')}`;
+    // Behind the ALB req.protocol is "http"; honor X-Forwarded-Proto so the
+    // returned URL is https (iOS ATS blocks plain-http image loads → broken icon).
+    const fwdProto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim();
+    const proto = fwdProto || (req.get('host')?.includes('localhost') ? req.protocol : 'https');
+    const origin = `${proto}://${req.get('host')}`;
     return { id, url: `${origin}/v1/uploads/${id}` };
   }
 

@@ -194,7 +194,9 @@ class AppState extends ChangeNotifier {
     return _comments.putIfAbsent(post.id, () => _seedComments(post));
   }
 
-  int commentCount(Post post) => commentsFor(post).length;
+  // In backend mode the real count comes from the post itself (the CommentsSheet
+  // loads the real thread), so the badge never disagrees with what's inside.
+  int commentCount(Post post) => kUseBackend ? post.comments : commentsFor(post).length;
 
   void addComment(Post post, String text) {
     final list = commentsFor(post);
@@ -806,6 +808,8 @@ class AppState extends ChangeNotifier {
   }
 
   List<Comment> _seedComments(Post post) {
+    // Backend mode: never fabricate comments — the real thread is fetched live.
+    if (kUseBackend) return [];
     // A little realistic seed so the thread isn't empty.
     return [
       Comment(author: 'Priya Nair', username: 'priyatrades', text: 'Great breakdown, thanks for sharing 🙏', createdAt: DateTime.now().subtract(const Duration(minutes: 12))),

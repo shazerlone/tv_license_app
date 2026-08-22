@@ -12,6 +12,7 @@ import '../models/trader.dart';
 import '../models/trade.dart';
 import '../models/copy_models.dart';
 import '../state/app_state.dart';
+import '../state/session.dart';
 import '../widgets/verified_badge.dart';
 import '../widgets/add_account_sheet.dart';
 import '../widgets/live_reactions.dart';
@@ -35,6 +36,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   Trader get _trader => widget.trader ?? mockTraders[0];
 
   AppState? _store;
+  String? _myUsername; // to suppress the echo of our own chat messages
   final _reactions = LiveReactionsController();
   Timer? _heartTimer;
   String? _broadcastId;
@@ -126,7 +128,10 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       final d = (m['data'] is Map) ? (m['data'] as Map).cast<String, dynamic>() : const <String, dynamic>{};
       switch (type) {
         case 'chat':
-          setState(() => _messages.add(_Msg((d['author'] ?? '').toString(), (d['text'] ?? '').toString())));
+          final author = (d['author'] ?? '').toString();
+          // Our own message was already shown optimistically as "you" — skip the echo.
+          if (_myUsername != null && author == _myUsername) break;
+          setState(() => _messages.add(_Msg(author, (d['text'] ?? '').toString(), isHost: author == _trader.username)));
           break;
         case 'viewers':
           if (d['count'] is num) setState(() => _viewers = (d['count'] as num).toInt());
@@ -145,7 +150,10 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       setState(() {
         _messages
           ..clear()
-          ..addAll(rows.map((r) => _Msg((r['author'] ?? '').toString(), (r['text'] ?? '').toString())));
+          ..addAll(rows.map((r) {
+            final a = (r['author'] ?? '').toString();
+            return _Msg(a, (r['text'] ?? '').toString(), isHost: a == _trader.username);
+          }));
       });
     } catch (_) {}
   }
@@ -157,6 +165,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       _store = AppStateScope.of(context);
       _store!.startPriceFeed();
     }
+    _myUsername ??= SessionScope.of(context).user?.username;
   }
 
   @override
@@ -394,6 +403,22 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                 Text('Stream unavailable', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
                 const SizedBox(height: 4),
                 Text('Not live right now — check back soon.', style: GoogleFonts.inter(fontSize: 13, color: Colors.white70)),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () {
+                    setState(() { _resolving = true; _videoFailed = false; });
+                    _initVideo();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                      const SizedBox(width: 6),
+                      Text('Retry', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ]),
+                  ),
+                ),
               ],
             ),
           ),
@@ -519,7 +544,17 @@ class _ChatLine extends StatelessWidget {
       child: RichText(
         text: TextSpan(
           children: [
-            TextSpan(text: '${msg.user}  ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: me ? AppColors.primary : Colors.white.withOpacity(0.85))),
+            if (msg.isHost)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(5)),
+                  child: Text('HOST', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+                ),
+              ),
+            TextSpan(text: '${msg.user}  ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: me ? AppColors.primary : (msg.isHost ? AppColors.red : Colors.white.withOpacity(0.85)))),
             TextSpan(text: msg.text, style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
           ],
         ),
@@ -531,7 +566,8 @@ class _ChatLine extends StatelessWidget {
 class _Msg {
   final String user;
   final String text;
-  _Msg(this.user, this.text);
+  final bool isHost;
+  _Msg(this.user, this.text, {this.isHost = false});
 }
 
 class _StreamPainter extends CustomPainter {
