@@ -111,18 +111,24 @@ class _FollowerRegisterScreenState extends State<FollowerRegisterScreen>
         );
         if (!mounted) return;
         final nav = Navigator.of(context);
-        SessionScope.of(context).applyBackendSession(user);
+        final session = SessionScope.of(context);
+        session.applyBackendSession(user);
+        // Refresh so email/emailVerified are in the session (register response
+        // may omit them → profile showed empty email).
+        try {
+          final me = await AuthApi.me();
+          session.applyBackendSession(me);
+        } catch (_) {}
         setState(() => _isLoading = false);
         nav.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (r) => false,
         );
-        // If they gave an email, prompt verification on top of home.
+        // If they gave an email, prompt verification on top of home (the code
+        // was already emailed at registration).
         if (email.isNotEmpty) {
-          try {
-            final dev = await AuthApi.sendEmailCode();
-            nav.push(MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
-          } catch (_) {}
+          final dev = await AuthApi.sendEmailCode().catchError((_) => null);
+          nav.push(MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
         }
         return;
       } on ApiException catch (e) {

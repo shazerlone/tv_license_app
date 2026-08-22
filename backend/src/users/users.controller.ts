@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiOkResponse } from '@nestjs/swagger';
 import { IsString, Length } from 'class-validator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -55,5 +55,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Confirm the email verification code → marks email verified' })
   verifyEmail(@CurrentUser() auth: AuthUser, @Body() dto: VerifyEmailDto) {
     return this.emailVerification.verify(auth.userId, dto.code);
+  }
+
+  @Delete('me')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Permanently delete the authenticated account (frees email/phone).' })
+  async deleteMe(@CurrentUser() auth: AuthUser): Promise<void> {
+    await this.users.deleteMe(auth.userId);
   }
 }

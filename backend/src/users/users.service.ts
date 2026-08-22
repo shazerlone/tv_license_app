@@ -52,6 +52,12 @@ export class UsersService {
     return user;
   }
 
+  /** Permanently delete a user. Related rows cascade (schema onDelete: Cascade),
+   *  freeing the email + phone for re-registration. */
+  async deleteMe(id: string): Promise<void> {
+    await this.prisma.user.delete({ where: { id } });
+  }
+
   async updateMe(id: string, dto: UpdateMeDto): Promise<User> {
     if (dto.username) {
       const clash = await this.prisma.user.findFirst({

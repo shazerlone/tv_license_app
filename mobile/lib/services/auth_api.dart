@@ -121,6 +121,12 @@ class AuthApi {
     return (res is Map ? res['emailVerified'] == true : false);
   }
 
+  /// Permanently delete the account (frees email/phone), then clears the token.
+  static Future<void> deleteAccount() async {
+    await _api.delete('/me');
+    _api.clear();
+  }
+
   static void logout() {
     // Best-effort server logout (stateless JWT — client discards regardless).
     _api.post('/auth/logout').catchError((_) => null);

@@ -144,16 +144,29 @@ class _TraderRegisterScreenState extends State<TraderRegisterScreen>
         if (!mounted) return;
         SessionScope.of(context).applyBackendSession(user);
         _backendApplied = true;
+        // Refresh the full profile so email/emailVerified land in the session
+        // (the register response may omit them → profile showed empty email).
+        try {
+          final me = await AuthApi.me();
+          if (mounted) SessionScope.of(context).applyBackendSession(me);
+        } catch (_) {}
+        if (!mounted) return;
         setState(() => _isLoading = false);
-        _go(4);
-        // Prompt email verification if provided.
+        // Verify email BEFORE the pending screen. The code was already emailed
+        // at registration, so show the screen even if the resend hiccups.
         final email = _emailController.text.trim();
         if (email.isNotEmpty) {
-          try {
-            final dev = await AuthApi.sendEmailCode();
-            if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
-          } catch (_) {}
+          final dev = await AuthApi.sendEmailCode().catchError((_) => null);
+          if (mounted) {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => EmailVerifyScreen(email: email, devCode: dev)));
+            // Reflect the freshly-verified state.
+            try {
+              final me = await AuthApi.me();
+              if (mounted) SessionScope.of(context).applyBackendSession(me);
+            } catch (_) {}
+          }
         }
+        if (mounted) _go(4);
         return;
       } on ApiException catch (e) {
         if (!mounted) return;

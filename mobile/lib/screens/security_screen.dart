@@ -5,6 +5,8 @@ import '../theme/app_theme.dart';
 import '../widgets/skeletons.dart';
 import '../services/backend_api.dart';
 import '../services/api_client.dart';
+import '../services/auth_api.dart';
+import '../state/session.dart';
 
 /// Settings › Security — two-factor authentication (M14).
 /// GET /2fa, POST /2fa/setup|enable|disable.
@@ -101,9 +103,47 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   icon: Icon(Icons.lock_reset_rounded, size: 19, color: AppColors.primary),
                   label: Text('Change password', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ),
+                const SizedBox(height: 30),
+                Text('Danger zone', style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w700, color: AppColors.red)),
+                const SizedBox(height: 6),
+                Text('Permanently delete your account and all its data (frees your email & phone).',
+                    style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted, height: 1.4)),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _deleteAccount,
+                  style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.red.withOpacity(0.4))),
+                  icon: Icon(Icons.delete_forever_rounded, size: 19, color: AppColors.red),
+                  label: Text('Delete account', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.red)),
+                ),
               ],
             ),
     );
+  }
+
+  Future<void> _deleteAccount() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Delete account?', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        content: Text('This permanently deletes your account and frees your email & phone. This cannot be undone.',
+            style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textMuted))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.red))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final session = SessionScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await AuthApi.deleteAccount();
+      session.signOut(); // app shell shows login when signed out
+      messenger.showSnackBar(const SnackBar(content: Text('Account deleted')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the account — try again')));
+    }
   }
 
   Future<void> _changePassword() async {
