@@ -211,6 +211,15 @@ export class AdminController {
     return res;
   }
 
+  @Delete('users/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Permanently delete a user (frees email/phone; related data cascades)' })
+  @RequirePermissions('users.write')
+  async deleteUser(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    await this.admin.deleteUser(id);
+    await this.audit.record(user.userId, 'user.delete', 'user', id, {});
+  }
+
   @Post('users/:id/adjust')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Manually credit/debit a user wallet (audited)' })

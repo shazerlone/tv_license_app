@@ -103,6 +103,10 @@ export class AdminService {
   }
 
   // ── users ──────────────────────────────────────────────────────────
+  async deleteUser(id: string): Promise<void> {
+    await this.users.deleteMe(id);
+  }
+
   private toAdminUserDto(u: User): AdminUserDto {
     return { ...this.users.toDto(u), banned: u.banned, frozen: u.frozen, adminNote: u.adminNote, adminRole: u.adminRole };
   }
