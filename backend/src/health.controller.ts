@@ -12,7 +12,7 @@ export class HealthController {
     return {
       status: 'ok',
       service: 'millimore-backend',
-      version: '1.1200', // deploy marker — bump to verify a new image is live
+      version: '1.1201', // deploy marker — bump to verify a new image is live
       ts: new Date().toISOString(),
       // Safety flags so you can confirm the running image's config remotely.
       // depositAutoConfirm MUST be false in production.
