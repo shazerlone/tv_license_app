@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
@@ -119,47 +122,103 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
     final trades = store.closedLiveTrades.length + store.liveTrades.length;
     final booked = store.closedLiveTrades.fold<double>(0, (s, c) => s + c.pnl) +
         store.liveTrades.fold<double>(0, (s, t) => s + store.livePnl(t));
+    final bid = store.broadcastId; // capture before endBroadcast clears it
     await _broadcaster.stop();
     _publishStarted = false;
     store.endBroadcast();
-    if (mounted) await _showRecap(peak, dur, trades, booked);
+    if (mounted) await _showRecap(peak, dur, trades, booked, bid);
     return true;
   }
 
-  Future<void> _showRecap(int peak, String duration, int trades, double booked) {
+  final GlobalKey _recapKey = GlobalKey();
+  bool _sharingRecap = false;
+
+  Future<void> _showRecap(int peak, String duration, int trades, double booked, String? broadcastId) {
     final positive = booked >= 0;
     return showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isDismissible: false,
-      builder: (_) => Container(
-        decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 18),
-            Text('Live ended', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.4)),
-            const SizedBox(height: 4),
-            Text('Nice session. Here\'s how it went.', style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textMuted)),
-            const SizedBox(height: 18),
-            Row(children: [
-              _RecapStat(label: 'Duration', value: duration),
-              _RecapStat(label: 'Peak viewers', value: '$peak'),
-            ]),
-            const SizedBox(height: 14),
-            Row(children: [
-              _RecapStat(label: 'Trades', value: '$trades'),
-              _RecapStat(label: 'Session P&L', value: '${positive ? '+' : '-'}\$${booked.abs().toStringAsFixed(2)}', color: positive ? AppColors.green : AppColors.red),
-            ]),
-            const SizedBox(height: 22),
-            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))),
-          ],
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => Container(
+          decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 18),
+              // The shareable recap card (rendered to an image for the story).
+              RepaintBoundary(
+                key: _recapKey,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF111C33)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Live session recap', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        _RecapStat(label: 'Duration', value: duration, onDark: true),
+                        _RecapStat(label: 'Peak viewers', value: '$peak', onDark: true),
+                      ]),
+                      const SizedBox(height: 14),
+                      Row(children: [
+                        _RecapStat(label: 'Trades', value: '$trades', onDark: true),
+                        _RecapStat(label: 'Session P&L', value: '${positive ? '+' : '-'}\$${booked.abs().toStringAsFixed(2)}', color: positive ? const Color(0xFF4ADE80) : const Color(0xFFF87171), onDark: true),
+                      ]),
+                      const SizedBox(height: 14),
+                      Text('Millimore', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.6))),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _sharingRecap ? null : () async {
+                    setSheet(() => _sharingRecap = true);
+                    await _shareRecapToStory(broadcastId);
+                    setSheet(() => _sharingRecap = false);
+                  },
+                  icon: _sharingRecap
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.auto_awesome_motion_rounded, size: 18, color: AppColors.primary),
+                  label: Text(_sharingRecap ? 'Sharing…' : 'Share to your story', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppColors.primary)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done'))),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Render the recap card to a PNG, upload it, and post it as a recap story.
+  Future<void> _shareRecapToStory(String? broadcastId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final boundary = _recapKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw 'no card';
+      final image = await boundary.toImage(pixelRatio: 3);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw 'render';
+      final b64 = base64Encode(bytes.buffer.asUint8List());
+      final url = await BackendApi.uploadMedia(contentType: 'image/png', data: b64, kind: 'story');
+      await BackendApi.createStory(mediaUrl: url, mediaType: 'image', kind: 'recap', broadcastId: broadcastId);
+      messenger.showSnackBar(const SnackBar(content: Text('Shared to your story')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not share to story')));
+    }
   }
 
   @override
@@ -715,20 +774,25 @@ class _RecapStat extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  const _RecapStat({required this.label, required this.value, this.color});
+  final bool onDark;
+  const _RecapStat({required this.label, required this.value, this.color, this.onDark = false});
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(14),
         margin: const EdgeInsets.symmetric(horizontal: 2),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+        decoration: BoxDecoration(
+          color: onDark ? Colors.white.withOpacity(0.1) : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: onDark ? Colors.white.withOpacity(0.15) : AppColors.border),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(value, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: color ?? AppColors.textPrimary)),
+            Text(value, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: color ?? (onDark ? Colors.white : AppColors.textPrimary))),
             const SizedBox(height: 2),
-            Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+            Text(label, style: GoogleFonts.inter(fontSize: 12, color: onDark ? Colors.white.withOpacity(0.6) : AppColors.textMuted)),
           ],
         ),
       ),
