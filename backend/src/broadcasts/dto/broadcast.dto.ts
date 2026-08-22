@@ -16,6 +16,7 @@ export class BroadcastDto {
   @ApiPropertyOptional({ description: 'Owner-only', nullable: true }) streamKey?: string | null;
   @ApiPropertyOptional({ description: 'Owner-only WebRTC/WHIP publish URL (mobile go-live)', nullable: true }) whipUrl?: string | null;
   @ApiProperty() hlsUrl: string;
+  @ApiPropertyOptional({ description: 'WebRTC/WHEP low-latency playback URL (sub-second live)', nullable: true }) whepUrl?: string | null;
   @ApiProperty({ example: 42 }) viewers: number;
   @ApiProperty({ example: 80 }) peakViewers: number;
   @ApiPropertyOptional({ nullable: true }) startedAt: string | null;

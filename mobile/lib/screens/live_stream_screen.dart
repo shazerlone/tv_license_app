@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../config.dart';
 import '../services/backend_api.dart';
 import '../services/realtime_service.dart';
+import '../services/whep_player.dart';
 import '../models/trader.dart';
 import '../models/trade.dart';
 import '../models/copy_models.dart';
@@ -42,11 +43,14 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   String? _broadcastId;
   StreamSubscription? _bcSub;
 
-  // Real HLS playback.
+  // Real playback: WebRTC/WHEP preferred (sub-second), HLS fallback.
+  WhepPlayer? _whep;
+  bool _whepReady = false;
   VideoPlayerController? _video;
   bool _videoReady = false;
   bool _resolving = true; // connecting to the stream
   bool _videoFailed = false; // no live broadcast / init failed (backend mode)
+  bool _cancelled = false; // widget disposed mid-connect
 
   @override
   void initState() {
@@ -87,11 +91,10 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
       if (mounted) setState(() { _resolving = false; _videoFailed = true; });
       return;
     }
-    Map<String, dynamic>? b;
-    // Retry across ~30s: HLS lags the WHIP ingest by a few seconds after go-live.
-    for (var attempt = 0; attempt < 5; attempt++) {
+    // Retry across ~30s: the input takes a moment to go live after go-live.
+    for (var attempt = 0; attempt < 5 && !_cancelled; attempt++) {
       try {
-        b = await BackendApi.liveBroadcastForTrader(trader.id);
+        final b = await BackendApi.liveBroadcastForTrader(trader.id);
         if (b != null) {
           final id = b['id']?.toString();
           if (id != null && _broadcastId == null) {
@@ -99,24 +102,63 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
             _subscribeBroadcast(id);
             _loadChat(id);
           }
-          if (b['viewers'] is num && mounted) setState(() => _viewers = (b!['viewers'] as num).toInt());
+          if (b['viewers'] is num && mounted) setState(() => _viewers = (b['viewers'] as num).toInt());
+
+          // 1) Preferred: WebRTC/WHEP — sub-second and reliable at go-live.
+          final whep = b['whepUrl']?.toString();
+          if (whep != null && whep.isNotEmpty) {
+            if (await _tryWhep(whep)) return;
+          }
+
+          // 2) Fallback: HLS (higher latency; can 404 briefly after go-live).
           final hls = _normalizeHls(b['hlsUrl']?.toString());
           if (hls != null && hls.isNotEmpty) {
-            final c = VideoPlayerController.networkUrl(Uri.parse(hls));
-            await c.initialize();
-            c
-              ..setLooping(false)
-              ..play();
-            if (!mounted) { c.dispose(); return; }
-            setState(() { _video = c; _videoReady = true; _resolving = false; });
-            return;
+            if (await _tryHls(hls)) return;
           }
         }
       } catch (_) {/* retry */}
       await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
     }
-    // No playable video: "connecting" if a real broadcast exists, else offline.
-    if (mounted) setState(() { _resolving = false; _videoFailed = true; });
+    if (mounted && !_cancelled) setState(() { _resolving = false; _videoFailed = true; });
+  }
+
+  /// Connect over WebRTC/WHEP. Returns true once media is flowing.
+  Future<bool> _tryWhep(String whepUrl) async {
+    final player = WhepPlayer();
+    final connected = Completer<bool>();
+    player.onConnected = () { if (!connected.isCompleted) connected.complete(true); };
+    player.onFailed = () { if (!connected.isCompleted) connected.complete(false); };
+    try {
+      await player.play(whepUrl);
+    } catch (_) {
+      await player.dispose();
+      return false;
+    }
+    // Wait briefly for the first frame to arrive.
+    final ok = await connected.future.timeout(const Duration(seconds: 6), onTimeout: () => false);
+    if (!ok || _cancelled || !mounted) {
+      await player.dispose();
+      return false;
+    }
+    setState(() { _whep = player; _whepReady = true; _resolving = false; _videoFailed = false; });
+    return true;
+  }
+
+  /// Play the HLS manifest. Returns true once initialized.
+  Future<bool> _tryHls(String hls) async {
+    final c = VideoPlayerController.networkUrl(Uri.parse(hls));
+    try {
+      await c.initialize();
+    } catch (_) {
+      await c.dispose();
+      return false;
+    }
+    c
+      ..setLooping(false)
+      ..play();
+    if (!mounted || _cancelled) { await c.dispose(); return false; }
+    setState(() { _video = c; _videoReady = true; _resolving = false; _videoFailed = false; });
+    return true;
   }
 
   /// Subscribe to the broadcast room for real chat / viewers / reactions.
@@ -177,6 +219,8 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
     _bcSub?.cancel();
     final id = _broadcastId;
     if (id != null) RealtimeService.current?.unsubscribeBroadcast(id);
+    _cancelled = true;
+    _whep?.dispose();
     _video?.dispose();
     _store?.stopPriceFeed();
     super.dispose();
@@ -375,6 +419,9 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
   /// The video surface: real stream when ready, else a branded animated
   /// backdrop with a connecting spinner or an "unavailable" message.
   Widget _videoLayer() {
+    if (_whepReady && _whep != null) {
+      return ColoredBox(color: Colors.black, child: Center(child: _whep!.view()));
+    }
     final v = _video;
     if (_videoReady && v != null && v.value.isInitialized) {
       return ColoredBox(
@@ -406,7 +453,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> with SingleTickerPr
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () {
-                    setState(() { _resolving = true; _videoFailed = false; });
+                    setState(() { _resolving = true; _videoFailed = false; _cancelled = false; });
                     _initVideo();
                   },
                   child: Container(

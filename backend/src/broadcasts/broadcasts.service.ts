@@ -38,6 +38,16 @@ export class BroadcastsService {
     private readonly ytIngest: YoutubeIngestService,
   ) {}
 
+  /** Cloudflare Stream low-latency WebRTC (WHEP) playback URL, derived from the
+   *  HLS manifest URL (…/<uid>/manifest/video.m3u8 → …/<uid>/webRTC/play). Returns
+   *  null for the dev/fallback host that has no WebRTC endpoint. */
+  private whepFromHls(hls: string | null | undefined): string | null {
+    if (!hls) return null;
+    const m = hls.match(/^(https:\/\/[^/]+\/[^/]+)\/manifest\/video\.m3u8/);
+    if (!m || hls.includes('cdn.millimore.app')) return null;
+    return `${m[1]}/webRTC/play`;
+  }
+
   private toDto(
     b: Broadcast,
     owner = false,
@@ -57,6 +67,7 @@ export class BroadcastsService {
       streamKey: owner ? b.streamKey : undefined,
       whipUrl: owner ? b.whipUrl : undefined,
       hlsUrl: b.hlsUrl,
+      whepUrl: this.whepFromHls(b.hlsUrl),
       viewers: b.viewers,
       peakViewers: b.peakViewers,
       startedAt: b.startedAt ? b.startedAt.toISOString() : null,
