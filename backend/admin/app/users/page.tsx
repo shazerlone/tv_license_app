@@ -208,6 +208,10 @@ export default function UsersPage() {
             setRows((prev) => prev.map((r) => (r.id === u.id ? u : r)));
             setDetail(u);
           }}
+          onDeleted={(id) => {
+            setRows((prev) => prev.filter((r) => r.id !== id));
+            setDetail(null);
+          }}
         />
       )}
     </Shell>
@@ -221,6 +225,7 @@ function UserDetail({
   statusSelect,
   banBtn,
   onPatched,
+  onDeleted,
 }: {
   user: AdminUser;
   onClose: () => void;
@@ -228,6 +233,7 @@ function UserDetail({
   statusSelect: (u: AdminUser) => JSX.Element;
   banBtn: (u: AdminUser) => JSX.Element;
   onPatched: (u: AdminUser) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [d, setD] = useState<AdminUserDetail | null>(null);
   const [busy, setBusy] = useState(false);
@@ -267,6 +273,15 @@ function UserDetail({
       setAmt(''); setReason('');
       await reload();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  async function deleteUser() {
+    if (!confirm(`Permanently delete ${user.name} (@${user.username})? This frees their email/phone and removes all their data. This cannot be undone.`)) return;
+    setBusy(true); setErr(null);
+    try {
+      await apiFetch(`/admin/users/${user.id}`, { method: 'DELETE' });
+      onDeleted(user.id);
+    } catch (e: any) { setErr(e.message); setBusy(false); }
   }
 
   async function patchDetail(body: Record<string, unknown>) {
@@ -424,6 +439,13 @@ function UserDetail({
           <div style={{ marginTop: 8 }}>
             <button className="btn sm" disabled={busy} onClick={() => patchDetail({ adminNote: note })}>Save note</button>
           </div>
+
+          {/* Danger zone */}
+          <div className="section-title" style={{ marginTop: 16, color: 'var(--red, #dc2626)' }}>Danger zone</div>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+            Permanently delete this user and all their data. Frees their email/phone so they can be re-registered. This cannot be undone.
+          </div>
+          <button className="btn danger sm" disabled={busy} onClick={deleteUser}>Delete user permanently</button>
         </div>
       </aside>
     </>
